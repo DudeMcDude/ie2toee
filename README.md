@@ -53,6 +53,12 @@ Requires Python 3.9+ with `numpy` and `pillow`.
     python3 verify_toee_output.py --out ../out --area AR1000      # paints the .sec blocking over the ground art
     python3 door_debug.py --game "<IE install>" --out ../out --area AR1000   # closed/open patch + impeded cells per door
 
+Supported installs: classic Icewind Dale (palette TIS, `Data/`, `CDn/`, compressed `.cbf` BIFs) and
+Icewind Dale: Enhanced Edition (TIS V2 pointing into PVRZ pages: zlib + PVR v3, DXT1/DXT5). Point `--game` at the
+folder holding `chitin.key`. Area layouts, search maps, doors and strrefs match between the two; only the tile
+storage differs. `compare_versions.py --a <classic> --b <EE> --area <AREA> --out <dir>` diffs one area between
+two installs (art, search map, object counts).
+
 Install into a **private** copy of ToEE (loose files in `modules/ToEE` override the .dat files):
 
     MES_SRC=<vanilla ground.mes/MapList.mes/map_names.mes extracted from your ToEE> \

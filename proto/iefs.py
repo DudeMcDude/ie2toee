@@ -79,7 +79,8 @@ class Bif:
 
 
 class IEGame:
-    """Resolve resources like the engine: override/ first, then chitin.key -> BIF."""
+    """Resolve resources like the engine: override/ first, then chitin.key -> BIF.
+    Works for classic installs (Data/, CDn/, .cbf) and EE installs (data/*.bif, lowercase paths, no override/)."""
 
     def __init__(self, root):
         self.root = root

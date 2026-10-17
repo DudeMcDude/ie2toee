@@ -45,7 +45,7 @@ class Tis:
 
 def decode_pvrz(data):
     """PVRZ = uint32 uncompressed size + zlib(PVR v3). EE tilesets use DXT1 (fmt 7) or DXT5 (fmt 11).
-    NOTE: untested against real EE data on this box; DXT decode is delegated to Pillow's BCn decoder."""
+    Verified on IWD:EE 2.7 (area tilesets are DXT1; GUI/MOS pages also use DXT5); BCn decode via Pillow."""
     pvr = zlib.decompress(data[4:])
     assert pvr[:4] == b'PVR\x03', 'not PVR v3'
     fmt = struct.unpack_from('<Q', pvr, 8)[0]
