@@ -1,0 +1,151 @@
+diff --git a/TemplePlus/graphics/mapterrain.cpp b/TemplePlus/graphics/mapterrain.cpp
+index 319f66ba..24f90502 100644
+--- a/TemplePlus/graphics/mapterrain.cpp
++++ b/TemplePlus/graphics/mapterrain.cpp
+@@ -84,6 +84,35 @@ void TerrainSystem::Render() {
+ 		}
+ 	}
+ 
++	// Ground overlays (canvas pixel space, drawn over the tiles)
++	if (!sOverlays.empty()) {
++		XMCOLOR color(mTerrainTintRed, mTerrainTintGreen, mTerrainTintBlue, 1);
++		for (auto& it : sOverlays) {
++			auto& ov = it.second;
++			auto x = terrainOriginX + ov.x, y = terrainOriginY + ov.y;
++			if (x + ov.w < 0 || y + ov.h < 0 || x >= viewportWidth || y >= viewportHeight)
++				continue;
++			auto texture = mDevice.GetTextures().Resolve(ov.texture, false);
++			if (!texture->IsValid())
++				continue;
++			mShapeRenderer.DrawRectangle((float)x, (float)y, (float)ov.w, (float)ov.h, *texture, color);
++		}
++	}
++
++}
++
++std::map<int, TerrainSystem::GroundOverlay> TerrainSystem::sOverlays;
++
++void TerrainSystem::SetOverlay(int id, const GroundOverlay& ov) {
++	sOverlays[id] = ov;
++}
++
++void TerrainSystem::RemoveOverlay(int id) {
++	sOverlays.erase(id);
++}
++
++void TerrainSystem::ClearOverlays() {
++	sOverlays.clear();
+ }
+ 
+ void TerrainSystem::RenderTile(int x, int y, const TigRect& destRect) {
+diff --git a/TemplePlus/graphics/mapterrain.h b/TemplePlus/graphics/mapterrain.h
+index 937dfed7..082e6e8f 100644
+--- a/TemplePlus/graphics/mapterrain.h
++++ b/TemplePlus/graphics/mapterrain.h
+@@ -2,6 +2,8 @@
+ 
+ #include "../gamesystems/gamesystem.h"
+ #include <temple/dll.h>
++#include <map>
++#include <string>
+ 
+ struct TigRect;
+ 
+@@ -56,6 +58,20 @@ public:
+ 	TerrainSystem& operator=(TerrainSystem&&) = delete;
+ 	
+ 	void UpdateDayNight();
++
++	/**
++	 * Ground overlays ("ground patches"): textures drawn on top of the ground art at a fixed
++	 * ground-canvas pixel position (same space as the 256px ground tiles), after the tiles.
++	 * Used e.g. for imported Infinity Engine door tiles (open/closed variants swapped at runtime).
++	 */
++	struct GroundOverlay {
++		std::string texture;
++		int x, y, w, h; // canvas pixels
++	};
++	static void SetOverlay(int id, const GroundOverlay& ov);
++	static void RemoveOverlay(int id);
++	static void ClearOverlays();
++	static std::map<int, GroundOverlay> sOverlays;
+ private:
+ 	gfx::RenderingDevice& mDevice;
+ 	gfx::ShapeRenderer2d& mShapeRenderer;
+diff --git a/TemplePlus/python/python_game.cpp b/TemplePlus/python/python_game.cpp
+index a54d7d5b..b4d99e7f 100644
+--- a/TemplePlus/python/python_game.cpp
++++ b/TemplePlus/python/python_game.cpp
+@@ -57,6 +57,8 @@
+ #include <pybind11/embed.h>
+ #include <gamesystems/mapsystem.h>
+ #include <tig/tig_keyboard.h>
++#include "gamesystems/map/sector.h"
++#include "graphics/mapterrain.h"
+ namespace py = pybind11;
+ 
+ std::map<std::string, MesHandle> mesMap;
+@@ -917,6 +919,52 @@ PyObject* PyGame_ScrollTo(PyObject*, PyObject* args)
+ 	Py_RETURN_TRUE;
+ }
+ 
++// Sector tile flags (Block/FlyOver per subtile, see TileFlags). Used by imported-map door scripts to
++// switch a door's impeded cells between its open and closed state at runtime.
++PyObject* PyGame_TileFlagsGet(PyObject*, PyObject* args) {
++	locXY loc;
++	if (!PyArg_ParseTuple(args, "L:game.tile_flags_get", &loc)) {
++		return nullptr;
++	}
++	LocAndOffsets l{ loc, 0, 0 };
++	return PyLong_FromUnsignedLong((unsigned long)sectorSys.GetTileFlags(l));
++}
++
++PyObject* PyGame_TileFlagsSet(PyObject*, PyObject* args) {
++	locXY loc;
++	unsigned int flags;
++	if (!PyArg_ParseTuple(args, "LI:game.tile_flags_set", &loc, &flags)) {
++		return nullptr;
++	}
++	LocAndOffsets l{ loc, 0, 0 };
++	if (sectorSys.SetTileFlags(l, (TileFlags)flags)) {
++		Py_RETURN_TRUE;
++	}
++	Py_RETURN_FALSE;
++}
++
++// game.ground_overlay_set(id, texture_path, canvas_x, canvas_y, w, h) / game.ground_overlay_remove(id|-1 = all)
++PyObject* PyGame_GroundOverlaySet(PyObject*, PyObject* args) {
++	int id;
++	TerrainSystem::GroundOverlay ov;
++	char* tex;
++	if (!PyArg_ParseTuple(args, "isiiii:game.ground_overlay_set", &id, &tex, &ov.x, &ov.y, &ov.w, &ov.h)) {
++		return nullptr;
++	}
++	ov.texture = tex;
++	TerrainSystem::SetOverlay(id, ov);
++	Py_RETURN_NONE;
++}
++
++PyObject* PyGame_GroundOverlayRemove(PyObject*, PyObject* args) {
++	int id = -1;
++	if (!PyArg_ParseTuple(args, "|i:game.ground_overlay_remove", &id)) {
++		return nullptr;
++	}
++	if (id < 0) TerrainSystem::ClearOverlays(); else TerrainSystem::RemoveOverlay(id);
++	Py_RETURN_NONE;
++}
++
+ PyObject* PyGame_Keypress(PyObject*, PyObject* args) {
+ 
+ 	int dik = 0;
+@@ -1524,6 +1572,10 @@ static PyMethodDef PyGameMethods[]{
+ 	{"is_spell_harmful", PyGame_IsSpellHarmful, METH_VARARGS, NULL },
+ 	{"keypress", PyGame_Keypress, METH_VARARGS, NULL},
+ 	{ "scroll_to", PyGame_ScrollTo, METH_VARARGS, NULL },
++	{ "tile_flags_get", PyGame_TileFlagsGet, METH_VARARGS, NULL },
++	{ "tile_flags_set", PyGame_TileFlagsSet, METH_VARARGS, NULL },
++	{ "ground_overlay_set", PyGame_GroundOverlaySet, METH_VARARGS, NULL },
++	{ "ground_overlay_remove", PyGame_GroundOverlayRemove, METH_VARARGS, NULL },
+ 	{"mouse_move_to", PyGame_MouseMoveTo, METH_VARARGS, NULL },
+ 	{"mouse_click", PyGame_MouseClick, METH_VARARGS, NULL },
+ 	{"shake", PyGame_Shake, METH_VARARGS, NULL},

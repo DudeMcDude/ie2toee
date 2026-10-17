@@ -1,0 +1,110 @@
+{
+  "_comment": "Guidance data: facts and choices only, never IE pixels, text or names. Shipped with a TC; the converter combines it with the player's own install. Values below are placeholders.",
+  "game": "iwd2",
+  "expect_files": {
+    "chitin.key": {
+      "size": null,
+      "sha1": null
+    }
+  },
+  "scale": 1.0,
+  "jpeg_quality": 92,
+  "pathnode_spacing_tiles": 10,
+  "pathnode_link_tiles": 28,
+  "searchmap": {
+    "0": [
+      "block",
+      "ReservedBlocked"
+    ],
+    "1": [
+      "walk",
+      "Dirt"
+    ],
+    "2": [
+      "walk",
+      "Wood"
+    ],
+    "3": [
+      "walk",
+      "Wood"
+    ],
+    "4": [
+      "walk",
+      "Stone"
+    ],
+    "5": [
+      "walk",
+      "Grass"
+    ],
+    "6": [
+      "walk",
+      "Water"
+    ],
+    "7": [
+      "walk",
+      "Stone"
+    ],
+    "8": [
+      "flyover",
+      "ReservedFlyOver"
+    ],
+    "9": [
+      "walk",
+      "Wood"
+    ],
+    "10": [
+      "block",
+      "ReservedBlocked"
+    ],
+    "11": [
+      "walk",
+      "Ice"
+    ],
+    "12": [
+      "flyover",
+      "DeepWater"
+    ],
+    "13": [
+      "block",
+      "ReservedBlocked"
+    ],
+    "14": [
+      "walk",
+      "Dirt"
+    ],
+    "15": [
+      "walk",
+      "Grass"
+    ]
+  },
+  "areas": {
+    "AR1000": {
+      "toee_map_id": 5010,
+      "ground_id": 1,
+      "searchmap_fix": [],
+      "doors": {
+        "DOOR1000": {
+          "proto": 39
+        }
+      },
+      "travel": {
+        "Tran1000": {
+          "jumppoint": 1001
+        }
+      },
+      "animations": {
+        "fire01": {
+          "particles": "ef-fireplace"
+        }
+      },
+      "lightscheme": 1,
+      "soundscheme": [
+        1,
+        0
+      ],
+      "door_state": {
+        "DOOR1000": "open"
+      }
+    }
+  }
+}
