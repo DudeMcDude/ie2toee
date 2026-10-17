@@ -78,6 +78,12 @@ This needs two small engine hooks, described in [ENGINE_HOOKS.md](ENGINE_HOOKS.m
 (`proto/runtime/templeplus-hooks.diff`). Without the hooks, use the MVP: the baked default state, and a portal
 that only provides interaction.
 
+### IE-style dialogue window (Temple+)
+
+`proto/ie_dialog_skin.py` rebuilds the IWD conversation window (EE or classic) from your install as a Temple+
+dialog skin, selectable per module and per dialogue. It needs a Temple+ build with dialog skin support
+(branch `feature/ie-dialog-skin` of DudeMcDude/TemplePlus). See [docs/dialog_skin.md](docs/dialog_skin.md).
+
 ### Developer tools
 
 * `calibrate.py`: compares the converted blocking with a hand-made ToEE map of the same area (FFT alignment, then
@@ -96,4 +102,6 @@ that only provides interaction.
 | `proto/ie2toee.py` | the converter |
 | `proto/toee_sectors.py` | reads ToEE `.sec` files into a subtile grid |
 | `proto/runtime/ie_doors.py` | Temple+ door runtime |
+| `proto/iegui.py` | CHU, MOS (V1/MOSC/V2) and BAM (V1/BAMC/V2) readers |
+| `proto/ie_dialog_skin.py` | IE dialogue window exporter (Temple+ dialog skins) |
 | `proto/guidance/*.json` | guidance format example (placeholders only) |

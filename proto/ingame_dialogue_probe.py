@@ -70,6 +70,8 @@ def step(s):
             log('KEY ' + arg)
         elif cmd == 'click':
             log('CLICK ' + arg)
+        elif cmd == 'move':
+            log('MOVE ' + arg)
         elif cmd == 'shot':
             log('SHOT ' + arg)
         elif cmd == 'vars':
