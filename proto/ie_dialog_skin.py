@@ -8,7 +8,7 @@ into the player's ToEE module:
   art/interface/dialog_ie/<skin>/*.tga           panel background (from MOS), buttons and scrollbar (from BAM)
   art/interface/dialog_ie/skins.json             which conversations use which skin (per module and per dialog id)
   art/interface/dialog_ie/portraits/<cre>.tga    IE portraits of converted speakers (when their CRE has one)
-  fonts/*.ttf                                    the EE dialogue font (EE installs only; Temple+ loads fonts/*.ttf)
+  fonts/*.ttf                                    the dialogue font: EE TTF copied, classic BAM font converted (iebamfont)
 
 Two layouts are produced:
   iwdee   the EE "WORLD_DIALOG" menu: bordered panel at the bottom, portrait, NPC text, reply list, log-history toggle,
@@ -331,6 +331,28 @@ class Exporter:
         self.written.append('fonts/ie_%s.ttf' % ref.lower())
         return {'face': ttf_family(data) or ref, 'file': 'fonts\\ie_%s.ttf' % ref.lower()}
 
+    def bam_font_face(self):
+        """Classic: convert the message window's BAM font (CHU text area font, usually NORMAL) to fonts/ie_<ref>.ttf.
+        point = the bitmap line height, so 1 font pixel = 1 GUI pixel at the CHU design resolution."""
+        from iebamfont import bam_to_ttf
+        ref = 'normal'
+        try:
+            w = self.guiw_message_window()
+            ta = max((c for c in w['controls'] if c['type'] == 'textarea'), key=lambda c: c['h'])
+            ref = (ta.get('font') or ref).lower()
+        except Exception:
+            pass
+        try:
+            data = self.g.read(ref, 'bam')
+        except Exception:
+            return {'face': 'Junicode'}, 12.0
+        family = 'IE %s' % ref.upper()
+        dst = self.path('fonts', 'ie_%s.ttf' % ref)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        m = bam_to_ttf(Bam(data), family, dst)
+        self.written.append('fonts/ie_%s.ttf' % ref)
+        return {'face': family, 'file': 'fonts\\ie_%s.ttf' % ref, 'source': ref.upper() + '.BAM'}, float(m['line_px'])
+
     def chu_extent(self):
         """GUI resolution the classic CHU layout was made for (bottom-right corner of its windows)."""
         chu = Chu(self.g.read('guiw', 'chu'))
@@ -355,7 +377,7 @@ class Exporter:
             # classic engines hard-code their text colours; these are the defaults, editable in skin.json
             colors = {'npc_text': 'FFE0E0E0', 'npc_name': 'FFFFE682', 'reply': 'FFFF2E21', 'reply_hover': 'FFFFFFFF',
                       'reply_down': 'FFFFFFFF', 'history_pc': 'FFA0A0A0', 'history_npc': 'FFC8C8C8'}
-            face, point = {'face': 'Junicode'}, 12.0     # classic fonts are BAM bitmaps (not converted yet)
+            face, point = self.bam_font_face()      # classic fonts are BAM bitmaps -> pixel-outline TTF
         if which in ('iwdee', 'auto', 'all') and self.ee:
             k, js = self.skin_iwdee(colors, styles, fontcolors); skins[k] = js
         if which in ('iwd', 'all') or (which == 'auto' and not self.ee):

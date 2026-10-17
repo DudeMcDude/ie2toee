@@ -98,6 +98,7 @@ dialog skin, selectable per module and per dialogue. It needs a Temple+ build wi
 | file | purpose |
 |---|---|
 | `proto/iefs.py` | KEY/BIF/CBF/BIFC resource access, override, CD folders, case-insensitive paths |
+| `proto/iebamfont.py` | classic BAM bitmap font -> pixel-outline TTF (fontTools) |
 | `proto/ieformats.py` | TIS, WED V1.3, ARE V1.0/V9.1 (incl. full door records), SR/HT/LM bitmaps, background renderer |
 | `proto/ie2toee.py` | the converter |
 | `proto/toee_sectors.py` | reads ToEE `.sec` files into a subtile grid |

@@ -28,8 +28,10 @@ python3 proto/ie_dialogue.py <IE install> <out> \
 
 Copy `<out>/modules/ToEE/{dlg,scr}` and `ie_runtime.py` into the module. Script discovery runs before the module
 folder is mounted, so a loose test install must put them in `modules/<Module>_core/` (or pack them into the module
-DAT). `SCRIPT_ID` has to be **below 1000**: the legacy script system won't resolve higher ids. A TC module owns that
-id range anyway.
+DAT). Any `SCRIPT_ID` works (tested 993, 5000 and 12345 as `san_dialog`/heartbeat from `modules/ToEE_core/scr`).
+If the files are in a folder that isn't mounted yet at discovery (e.g. loose `modules/ToEE/scr`), the engine logs
+`Script: cache_add: ERROR: Failed to build script name: <id>` and the NPC does nothing; that message means
+"script file not found", for any id, not an id limit.
 
 ## Mapping
 

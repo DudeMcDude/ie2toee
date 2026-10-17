@@ -57,7 +57,7 @@ format descriptions.
 
 ## Limitations
 
-* Classic installs use BAM fonts; they are not converted, the skin uses a ToEE font instead.
+* Classic installs use BAM bitmap fonts: `proto/iebamfont.py` converts the message window's font (CHU text area font, `NORMAL.BAM` in IWD) into a pixel-outline TTF (`fonts/ie_normal.ttf`, point = bitmap line height; grey AA thresholded). Tested on a real classic IWD install.
 * The `DLGDIVI` divider of the EE menu is not in the tested install and is not drawn.
 * Colour conventions (`AABBGGRR` fontcolors, the reply colour from the EE `gsub`) are inferred.
 * Fonts: Temple+ loads `fonts/*.ttf` from the module folder when the skin is first used. DirectWrite may
