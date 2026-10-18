@@ -130,9 +130,9 @@ Open questions that are not options yet:
 * Kits. The kit is read (big-endian 0x244) but not converted. Map kits to prestige classes or feats later (CM p.11).
 * Proficiencies → feats. EE opcode 233 is read; "1 feat + 1 per 3 levels" (CM p.7) is not applied yet.
 * Thief skills (CM p.9) are computed but not yet written to ToEE skill ranks.
-* Spells. Memorised and known spells are matched by **name**, using the player's TLK, the CM rename list and the
-  Temple+ `spell_enum.mes`. Unmatched spells are reported. Wiring them into NPC spell lists and casting AI is the next
-  step.
+* Spells: see [spells.md](spells.md). Known and memorised spells map through the authored guidance table, then by
+  name, and only to spells Temple+ implements. They are given to the NPC at spawn with a custom AI strategy, and the
+  IE spell actions cast them in game.
 * Innate abilities (IE `innate` spells) need per-ability authored mappings (breath weapons, gazes).
 
 ## What guidance data may contain
@@ -150,8 +150,8 @@ It must **not** contain:
 * copied Monster Manual / SRD text;
 * any IWD resource reference list beyond what a rule needs.
 
-Spell mapping is name-based at conversion time for this reason. The few spells that need an override are keyed by IE
-resref → ToEE spell enum, as authored pairs of identifiers. A mapping of resref → proto id is a fact about how two
+Spell mapping uses an authored table of IE resref → Temple+ spell enum pairs (`guidance/spells_iwd.json`, see spells.md), then a
+name match at conversion time. A mapping of resref → proto id is a fact about how two
 file sets relate and contains no creative content from either. We keep even those to the minimum.
 
 ## Artwork: IE animations → ToEE models

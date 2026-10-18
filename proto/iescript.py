@@ -167,7 +167,7 @@ class IdsSet(object):
     `fallback` (dict like {'triggers': {hex: [name, sig]}, 'actions': {...}, 'ids': {file: {val: name}}})
     fills gaps, e.g. while developing against an install that lacks DEFAULT.BIF."""
     FILES = ('trigger', 'action', 'object', 'ea', 'general', 'race', 'class', 'specific', 'gender', 'alignmen',
-             'state', 'stats', 'svtriobj')
+             'state', 'stats', 'svtriobj', 'spell')
     def __init__(self, game=None, fallback=None):
         self.t = {f: Ids() for f in self.FILES}
         self.missing = []
@@ -312,7 +312,7 @@ def parse_script_text(s, object_names=None):
         if k == 'str':
             take(); return v[1:-1]
         if k == 'num':
-            take(); return int(v, 0)
+            take(); return int(v, 0) if v[:2].lower() in ('0x', '0b', '0o') or not v.startswith('0') else int(v, 10)
         if k == 'brk':
             take(); return _bracket(v)
         if k == 'id':
@@ -407,7 +407,8 @@ class Bcs(object):
         sig = self.ids['trigger'].sig.get(tid)
         if name is None:
             name = 'Trigger_0x%04X' % tid; self.unknown.add(name)
-        return Call(name, _place(sig, [obj], [i1, i2, i3], [s1, s2], None), bool(flags & 1), op=tid)
+        return Call(name, _spell_res(sig, _place(sig, [obj], [i1, i2, i3], [s1, s2], None), s1), bool(flags & 1),
+                    op=tid)
 
     def _action(self):
         self._expect('AC'); aid = self._int()
@@ -417,12 +418,37 @@ class Bcs(object):
         name = self.ids['action'].name(aid); sig = self.ids['action'].sig.get(aid)
         if name is None:
             name = 'Action_%d' % aid; self.unknown.add(name)
-        c = Call(name, _place(sig, o[1:], [i1, i2, i3], [s1, s2], Point(px, py)), op=aid)
+        c = Call(name, _spell_res(sig, _place(sig, o[1:], [i1, i2, i3], [s1, s2], Point(px, py)), s1), op=aid)
         if not o[0].empty() and aid != 1:
             return Call('ActionOverride', [o[0], c], op=1)
         return c
 
 _AREA_TAGS = ('area', 'scope', 'area1', 'area2', 'areaname')
+
+def _spell_res(sig, args, s1):
+    """EE '...RES' spell actions/triggers share their opcode with the SPELL.IDS form (Spell/SpellRES, HaveSpell/
+    HaveSpellRES); the compiled script stores the resref in the first string slot. Put it in the I:Spell slot so
+    generated code sees the resref (a str) instead of 0."""
+    if sig and s1:
+        for k, p in enumerate(sig):
+            if p[0] == 'I' and p[2].lower() == 'spell' and k < len(args):
+                args[k] = s1.lower()
+                break
+    return args
+
+def spell_resref(v, spell_ids=None):
+    """SPELL.IDS number (or symbol / resref string) -> spell resref, by the IE convention: 1xxx SPPR, 2xxx SPWI,
+    3xxx SPIN, 4xxx SPCL + the last three digits."""
+    if isinstance(v, Sym):
+        v = spell_ids.value(v.name) if spell_ids is not None else None
+        if v is None:
+            return None
+    if isinstance(v, str):
+        return v.lower() or None
+    if not isinstance(v, int) or v <= 0:
+        return None
+    pre = {1: 'sppr', 2: 'spwi', 3: 'spin', 4: 'spcl'}.get(v // 1000)
+    return pre + '%03d' % (v % 1000) if pre else None
 
 def _place(sig, objs, ints, strs, point):
     """Map the fixed compiled parameter slots onto the IDS signature order. Strings of Name+Area pairs are stored

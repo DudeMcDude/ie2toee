@@ -127,6 +127,8 @@ def bcs_module(game, ids, resref, ident, area, gen):
         rs = ', '.join('(%d, %s)' % (w, gen.action_list(acts)) for w, acts in resp)
         src.append('    (lambda c: %s,\n     [%s]),' % (cond, rs))
     src.append(']\n')
+    casts = any(re.search(r'\bA\.(Spell|ForceSpell|ReallyForceSpell|ApplySpell|SpellPoint|ForceSpellPoint)', x) for x in src)
+    src.append('CASTS = %r   # the script casts spells (SPL-ADJ-18)\n' % casts)
     return '\n'.join(src), len(b.blocks), sorted(b.unknown)
 
 def actor_script(sid, ident, area, dlg_parts, bcs_mods):
@@ -145,9 +147,14 @@ def actor_script(sid, ident, area, dlg_parts, bcs_mods):
                '    if SCRIPTS:\n        rt.tick(attachee, IDENT, AREA, SCRIPTS)\n    return RUN_DEFAULT\n')
     src.append('def san_first_heartbeat(attachee, triggerer):\n'
                '    rt.bind(attachee, IDENT, AREA)\n    return RUN_DEFAULT\n')
-    for san, ev in (('san_dying', 'Die'), ('san_enter_combat', 'AttackedBy'), ('san_start_combat', 'AttackedBy')):
+    for san, ev in (('san_dying', 'Die'), ('san_enter_combat', 'AttackedBy')):
         src.append('def %s(attachee, triggerer):\n    rt.event(IDENT, %s, triggerer)\n    return RUN_DEFAULT\n'
                    % (san, pystr(ev)))
+    # each combat turn: one IE script round; if it cast a spell (or took another turn-consuming action) the Temple+ AI
+    # skips this turn, otherwise the converted strategy / default AI acts
+    src.append('def san_start_combat(attachee, triggerer):\n    rt.event(IDENT, "AttackedBy", triggerer)\n'
+               '    if SCRIPTS and rt.combat_tick(attachee, IDENT, AREA, SCRIPTS):\n        return SKIP_DEFAULT\n'
+               '    return RUN_DEFAULT\n')
     return '\n'.join(src)
 
 def main():

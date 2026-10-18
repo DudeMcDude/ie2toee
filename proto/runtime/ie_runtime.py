@@ -317,6 +317,12 @@ class _Triggers(object):
         return False
 
     def Exists(self, c, obj): return obj is not None
+    def HaveSpell(self, c, spell):
+        if not IN_GAME:
+            return False
+        import ie_spellrt
+        return ie_spellrt.have(c.me, spell)
+    HaveSpellRES = HaveSpell
     def Dead(self, c, name):
         o = N(c, name)
         return o is None or _dead(o)
@@ -754,6 +760,36 @@ class _Actions(object):
         if ea in (255, 200):
             self.Enemy(Ctx(obj, c.other, c.ident, c.area))
 
+    # ---- spells (ie_spellrt: IE resref / SPELL.IDS -> Temple+ spell via the converter's ie_spellmap). A cast takes
+    # one IE round (6 s); Temple+ runs it as a normal cast action of the caster.
+    def _cast(self, c, obj, spell, mode, pt=None):
+        if not IN_GAME:
+            log('SPELL %s %s -> %r' % (mode, spell, obj)); return 6
+        try:
+            import ie_spellrt
+            ie_spellrt.LOG[0] = LOG_PATH
+            point = ie_to_tile(c.area, pt[0], pt[1]) if pt is not None else None
+            if ie_spellrt.cast(c.me, spell, obj, mode, point) is not None:
+                ACTED[0] = True
+        except Exception as e:
+            log('IE_ERR spell %s %s: %s' % (mode, spell, e))
+        return 6
+    def Spell(self, c, obj, spell): return self._cast(c, obj, spell, 'spell')
+    def SpellNoDec(self, c, obj, spell): return self._cast(c, obj, spell, 'spell')
+    def ForceSpell(self, c, obj, spell): return self._cast(c, obj, spell, 'force')
+    def ForceSpellRange(self, c, obj, spell): return self._cast(c, obj, spell, 'force')
+    def ReallyForceSpell(self, c, obj, spell): return self._cast(c, obj, spell, 'really')
+    def ReallyForceSpellDead(self, c, obj, spell): return self._cast(c, obj, spell, 'really')
+    def ApplySpell(self, c, obj, spell): return self._cast(c, obj, spell, 'apply')
+    def SpellPoint(self, c, pt, spell): return self._cast(c, None, spell, 'spell', pt)
+    def SpellPointNoDec(self, c, pt, spell): return self._cast(c, None, spell, 'spell', pt)
+    def ForceSpellPoint(self, c, pt, spell): return self._cast(c, None, spell, 'force', pt)
+    def ForceSpellPointRange(self, c, pt, spell): return self._cast(c, None, spell, 'force', pt)
+    def ReallyForceSpellPoint(self, c, pt, spell): return self._cast(c, None, spell, 'really', pt)
+    # EE ...RES forms compile to the same opcode (the resref arrives in the spell slot), but keep the names callable
+    SpellRES, ForceSpellRES, ReallyForceSpellRES, ApplySpellRES = Spell, ForceSpell, ReallyForceSpell, ApplySpell
+    SpellPointRES, ForceSpellPointRES, ReallyForceSpellPointRES = SpellPoint, ForceSpellPoint, ReallyForceSpellPoint
+
 A = _Actions()
 
 def _walk(o, u, v):
@@ -862,6 +898,7 @@ def tick(obj, ident, area, scripts, force=False):
     if ident not in _first:
         _first[ident] = 1; ev['OnCreation'] = obj
         bind(obj, ident, area)
+        script_ai(obj, ident, scripts)
     if not force and now - _last_tick.get(ident, -99) < ROUND_SECS:
         return
     _last_tick[ident] = now
@@ -871,6 +908,33 @@ def tick(obj, ident, area, scripts, force=False):
     for m in scripts:
         if run_script(c, m.BLOCKS):
             break
+
+def script_ai(obj, ident, scripts):
+    """SPL-ADJ-18: a creature whose IE scripts cast spells keeps only the non-spell part of its Temple+ AI strategy."""
+    if not IN_GAME or not [m for m in scripts if getattr(m, 'CASTS', False)]:
+        return
+    try:
+        import ie_spellrt
+        if ie_spellrt.script_first(obj):
+            log('SCRIPT_AI %s: IE script casts; Temple+ strategy without spells' % ident)
+    except Exception as e:
+        log('IE_ERR script_ai %s: %s' % (ident, e))
+
+ACTED = [False]       # set by turn-consuming actions (spell casts) during combat_tick
+
+def combat_tick(obj, ident, area, scripts):
+    """san_start_combat: run one IE script round on the critter's combat turn. True if it cast a spell, so the
+    caller returns SKIP_DEFAULT and the Temple+ AI does not act on top of it."""
+    ACTED[0] = False
+    _busy.pop(ident, None)
+    if ident not in _first:
+        _first[ident] = 1; bind(obj, ident, area); script_ai(obj, ident, scripts)
+    log('COMBAT_TURN %s' % ident)
+    try:
+        tick(obj, ident, area, scripts, force=True)
+    except Exception as e:
+        log('IE_ERR combat tick %s: %s' % (ident, e))
+    return ACTED[0]
 
 def event(ident, name, other=None):
     """Hook helper for san_* handlers: record an IE event trigger (AttackedBy, HitBy, Die, Entered...)."""

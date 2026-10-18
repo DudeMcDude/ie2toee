@@ -62,11 +62,9 @@ class Guidance(object):
 CREATE_ACTIONS = re.compile(r'^CreateCreature', re.I)
 
 
-def survey(game, log=print):
-    ids = S.IdsSet(game)
-    fl = flavor(game)
-    gd = Guidance()
-    names = anim_names(game)
+def creature_refs(game, ids):
+    """Every creature an install uses: ARE actors, spawn points, rest spawns, CreateCreature* in BCS and DLG.
+    Returns (refs: Counter cre -> placements, where: cre -> Counter of source kinds, areas: cre -> set, nbcs)."""
     refs = collections.Counter()          # cre resref -> placements
     where = collections.defaultdict(collections.Counter)   # cre -> source kind counts
     areas = collections.defaultdict(set)
@@ -114,6 +112,15 @@ def survey(game, log=print):
                     a0 = next((x for x in c.args if isinstance(x, str) and x), None)
                     if a0:
                         refs[a0.lower()] += 1; where[a0.lower()]['dialog CreateCreature'] += 1
+    return refs, where, areas, nbcs
+
+
+def survey(game, log=print):
+    ids = S.IdsSet(game)
+    fl = flavor(game)
+    gd = Guidance()
+    names = anim_names(game)
+    refs, where, areas, nbcs = creature_refs(game, ids)
     all_cre = set(game.list('cre'))
     fams = collections.defaultdict(lambda: {'placements': 0, 'cres': set(), 'anims': collections.Counter()})
     anims = collections.defaultdict(lambda: {'placements': 0, 'cres': set()})
@@ -250,8 +257,10 @@ RACE_ABILITY_ADJ = {'ELF': (0, 2, -2, 0, 0, 0), 'HALF_ELF': (0,) * 6, 'DWARF': (
 
 
 class Converter(object):
-    def __init__(self, game, toee, options=None, guidance=None):
+    def __init__(self, game, toee, options=None, guidance=None, tp_root=None):
         self.game, self.toee = game, toee
+        self.tp_root = tp_root
+        self._spells = None
         self.fl = flavor(game)
         self.ids = S.IdsSet(game)
         self.gd = guidance or Guidance()
@@ -498,13 +507,11 @@ class Converter(object):
             if self.gd.cb.get('default_boots'):
                 items.append({'slot': 'boots', 'proto': self.gd.cb['default_boots'], 'ie_type': 'boots (default)', 'enchantment': 0})
         spec['items'] = items
-        # ---- spells (names from the player's TLK -> Temple+ spell enum; CM p.15 renames)
-        sp, miss = [], []
-        for m in cre.memorized + [dict(k, memorized=False) for k in cre.known_spells if k['type'] != 'innate']:
-            nm = self.spell_name(m['resref'])
-            sid = self.match_spell(m['resref'], nm)
-            (sp if sid is not None else miss).append((m['resref'], m['level'], m['type'], sid))
-        spec['spells'] = sorted(set(sp)); spec['spells_unmatched'] = sorted(set(miss))
+        # ---- spells: IE memorised / known spells -> Temple+ spell lists (ie_spells.SpellMapper, docs/spells.md)
+        sp, miss, strat = self.npc_spells(cre, spec)
+        spec['spells'] = sp; spec['spells_unmatched'] = miss
+        if strat:
+            spec['ai_strategy'] = strat
         ok = lambda r: r and r.strip() and r.strip().lower() != 'none'
         dlg = (actor or {}).get('dialog')
         spec['dialog'] = (dlg if ok(dlg) else cre.dialog if ok(cre.dialog) else '').lower()
@@ -516,27 +523,98 @@ class Converter(object):
         spec['notes'] = notes
         return spec
 
-    def spell_name(self, ref):
-        try:
-            d = self.game.read(ref, 'spl')
-            import struct
-            return self.text(struct.unpack_from('<i', d, 0x08)[0])
-        except Exception:
-            return ''
+    @property
+    def spells(self):
+        if self._spells is None:
+            import ie_spells
+            tp = ie_spells.TPSpells(self.toee.td.root, self.tp_root)
+            self._spells = ie_spells.SpellMapper(self.game, tp, {k: v for k, v in self.opt.items()
+                                                                 if k in ie_spells.SPELL_OPTIONS})
+        return self._spells
 
-    def match_spell(self, ref, name):
-        ov = self.gd.g['spells']['overrides'].get(ref.upper())
-        if ov:
-            return self.toee.spells.get(_norm(ov))
-        n = name.lower().strip()
-        n = CM_SPELL_RENAMES.get(n, n)
-        return self.toee.spells.get(_norm(n))
+    def npc_spells(self, cre, spec):
+        """IE spell lists -> [{res, toee, cls (Temple+ class key or 'domain_special'), lvl, n, mem}] plus unmatched
+        [(res, ie level, ie type, class)] and a Temple+ custom AI strategy that casts them (SPL-ADJ-3/5/6/7)."""
+        import ie_spells
+        mp = self.spells
+        lv = dict(spec.get('levels') or [])
+        keys = {'cleric': 'clr', 'druid': 'drd', 'wizard': 'wiz', 'sorcerer': 'sor', 'bard': 'brd', 'paladin': 'pal',
+                'ranger': 'rgr'}
+        have = {keys[c]: n for c, n in lv.items() if c in keys}
+
+        def max_level(k, n):
+            if k in ('clr', 'drd', 'wiz'):
+                return min(9, (n + 1) // 2)
+            if k == 'sor':
+                return min(9, n // 2)
+            if k == 'brd':
+                return min(6, (n + 1) // 3) if n > 1 else 0
+            return min(4, (n - 1) // 3) if n >= 4 else 0     # paladin / ranger
+        counts = collections.Counter()
+        known_only = set()
+        for m in cre.memorized:
+            counts[(m['resref'], m['type'])] += 1 if m.get('memorized', True) else 0
+        for k in cre.known_spells:
+            if (k['resref'], k['type']) not in counts:
+                known_only.add((k['resref'], k['type']))
+        out, miss = [], []
+        for (ref, typ) in sorted(set(counts) | known_only):
+            m = mp.lookup(ref)
+            if m['toee'] is None:
+                miss.append((ref, m['ie_level'], typ, m['cls'])); continue
+            ck = next((k for k in ie_spells.CLASS_KEYS.get(typ, ()) if k in have and k in m['lv']), None)
+            if typ == 'wizard' and ck is None and 'wiz' in have:
+                ck = 'wiz'
+            if typ == 'priest' and ck is None:
+                ck = next((k for k in ('clr', 'drd') if k in have), None)
+            if ck is None:
+                if mp.opt['innate'] == 'skip' and typ == 'innate':
+                    miss.append((ref, m['ie_level'], typ, 'innate_skipped')); continue
+                ck = 'domain_special'
+            lvl = mp.slot_level(m, ck) if ck != 'domain_special' else max(1, min(9, m['ie_level'] or 1))
+            if ck != 'domain_special' and mp.opt['npc_spells'] == 'cap_level' and lvl > max_level(ck, have.get(ck, 0)):
+                miss.append((ref, m['ie_level'], typ, 'above_max_level')); continue
+            n = counts.get((ref, typ), 0)
+            out.append(dict(res=ref, toee=m['toee'], name=m['label'], cls=ck, lvl=lvl, n=n, mem=n > 0, ai=m['ai']))
+        return out, miss, self.strategy(out)
+
+    @staticmethod
+    def strategy(spells):
+        """Temple+ custom AI strategy (ai_strategy_set_custom triplets): buff self, heal friends, then offensive and
+        crowd-control spells at the nearest enemy, then melee. Spells are named the way strategy.tab names them."""
+        cast, seen = [], set()
+        for s in spells:                     # several IE spells can map to one ToEE spell: one strategy entry each
+            if s['mem'] and s['toee'] not in seen:
+                seen.add(s['toee']); cast.append(s)
+        if not cast:
+            return None
+        cls = lambda s: 'domain_special' if s['cls'] == 'domain_special' else 'class_' + {
+            'clr': 'cleric', 'drd': 'druid', 'wiz': 'wizard', 'sor': 'sorcerer', 'brd': 'bard', 'pal': 'paladin',
+            'rgr': 'ranger'}[s['cls']]
+        ent = lambda s: "'%s' %s %d" % (s['name'], cls(s), s['lvl'])
+        by = lambda pre: sorted([s for s in cast if s['ai'].startswith(pre)], key=lambda s: -s['lvl'])
+        t = ['ie2toee']
+        buffs = by('ai_action_defensive')
+        if buffs:
+            t += ['clear target', '', '', 'target self', '', '']
+            for s in buffs[:3]:
+                t += ['cast single', '', ent(s)]
+        heals = by('ai_action_heal')
+        if heals:
+            t += ['clear target', '', '', 'target friend hurt', '', '']
+            for s in heals[:3]:
+                t += ['cast single', '', ent(s)]
+        t += ['clear target', '', '', 'target closest', '', '']
+        for s in by('ai_action_offensive') + by('ai_action_summon'):
+            t += ['cast single', '', ent(s)]
+        t += ['use potion', '', '', 'attack', '', '', 'approach', '', '', 'attack', '', '']
+        return t
 
 
-def convert_area(game, toee_root, out, area, name_base=27000, options=None, script_base=None):
+def convert_area(game, toee_root, out, area, name_base=27000, options=None, script_base=None, tp_root=None):
     import toeedata
     tx = ToEEIndex(toeedata.ToEEData(toee_root))
-    cv = Converter(game, tx, options)
+    cv = Converter(game, tx, options, tp_root=tp_root)
     a = F.Are(game.read(area, 'are'))
     specs, names, dlg_args, used = [], {}, [], set()
     for i, act in enumerate(a.actors):
@@ -566,7 +644,8 @@ def convert_area(game, toee_root, out, area, name_base=27000, options=None, scri
         ''.join('{%d}{%s}\n' % kv for kv in sorted(names.items())))
     keep = ('actor', 'resref', 'status', 'track', 'family', 'proto', 'model', 'scale', 'x', 'y', 'orient', 'gender',
             'alignment', 'hostility', 'abilities', 'levels', 'monster_hd', 'hp', 'natural_ac', 'bab', 'to_hit_bonus',
-            'save_bonus', 'conditions', 'no_flee', 'invulnerable', 'ident', 'cr', 'items', 'spells', 'name_id', 'script_id', 'schedule')
+            'save_bonus', 'conditions', 'no_flee', 'invulnerable', 'ident', 'cr', 'items', 'spells', 'ai_strategy', 'name_id',
+            'script_id', 'schedule')
     py = ['# Generated by ie2toee ie_creatures.py from the player\'s own IE install. Do not distribute.',
           'AREA = %r' % area.upper(), 'CREATURES = [']
     for s in specs:
@@ -588,7 +667,9 @@ def main():
     s2.add_argument('--area', required=True); s2.add_argument('--name-base', type=int, default=27000)
     s2.add_argument('--script-base', type=int, help='give actors with a dialog/script ToEE script ids base+index and '
                     'write <out>/dialogue_actors.txt (--actor args for ie_dialogue.py)')
-    s2.add_argument('--option', action='append', default=[], help='key=value (see ie_rules.DEFAULT_OPTIONS)')
+    s2.add_argument('--option', action='append', default=[], help='key=value (see ie_rules.DEFAULT_OPTIONS, '
+                    'ie_spells.SPELL_OPTIONS)')
+    s2.add_argument('--tp', help='Temple+ install (tpdata/*.dat) for the Temple+ spell list')
     a = ap.parse_args()
     if a.cmd == 'survey':
         reps = [survey(iefs.IEGame(g)) for g in a.games]
@@ -600,7 +681,7 @@ def main():
                                                   'coverage_placements', 'coverage_cres')})
     elif a.cmd == 'convert':
         opts = dict(kv.split('=', 1) for kv in a.option)
-        specs = convert_area(iefs.IEGame(a.game), a.toee, a.out, a.area, a.name_base, opts, a.script_base)
+        specs = convert_area(iefs.IEGame(a.game), a.toee, a.out, a.area, a.name_base, opts, a.script_base, a.tp)
         c = collections.Counter(s.get('status') for s in specs)
         print(a.area, dict(c))
         for s in specs:

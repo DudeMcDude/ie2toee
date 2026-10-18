@@ -76,16 +76,21 @@ def step(s):
                 [(it['proto'], o.item_find_by_proto(it['proto']) != OBJ_HANDLE_NULL) for it in sp.get('items', [])]))
         elif cmd == 'lineup':   # move one of each friendly resref next to the leader for a close-up shot
             lx, ly = location_to_axis(game.leader.location)
-            seen, n = set(), 0
+            seen, n, skipped = set(), 0, 0
+            taken = set([(lx, ly)] + [location_to_axis(p.location) for p in game.party])
             for sp, o in spawned:
                 if sp.get('hostility') == 'hostile' or sp['resref'] in seen:
                     continue
                 seen.add(sp['resref'])
-                o.move(location_from_axis(lx - 4 + (n % 6) * 2, ly - 3 - (n // 6) * 3))
+                # wanted slot on a 6-wide grid in front of the leader, moved to the nearest walkable free tile
+                p = cr.place_near(o, lx - 4 + (n % 6) * 2, ly - 3 - (n // 6) * 3, taken)
+                if p is None:
+                    skipped += 1; log('lineup: no walkable tile for %s' % sp.get('actor'))
+                    continue
                 o.rotation = 2.36
                 n += 1
             game.scroll_to(game.leader)
-            log('lineup %d' % n)
+            log('lineup %d (skipped %d)' % (n, skipped))
         elif cmd == 'wear':
             for sp, o in spawned:
                 cr.wear(o, sp)

@@ -122,6 +122,14 @@ def apply(o, s):
     except Exception:
         pass
     fix_hp(o, s)
+    if s.get('spells'):
+        try:
+            import ie_spellrt
+            ie_spellrt.LOG[0] = LOG[0]
+            got = ie_spellrt.give_spells(o, s)
+            _log('  spells %s%s' % (got, ' + ai strategy' if s.get('ai_strategy') else ''))
+        except Exception, e:
+            _log('  spells failed: %s' % e)
     if s.get('name_id'):
         _set(o, 'obj_f_description', int(s['name_id']))
         _set(o, 'obj_f_critter_description_unknown', int(s['name_id']))   # IE shows names without an introduction
@@ -186,3 +194,49 @@ def spawn_area(specs, to_tile, log_path=None, filt=None):
             import traceback
             _log('spawn %s failed: %s %s' % (s.get('actor'), e, traceback.format_exc()))
     return out
+
+
+# ------------------------------------------------------------------------------------------------ placement
+# subtile Block* (0x200-0x20000) and FlyOver* (0x40000-0x4000000) bits + the legacy TF_Blocks bit: a tile with any
+# of them is not fully walkable (converted IE search maps mark impassable cells and water this way)
+NOT_WALKABLE = 0x1 | 0x7FFFE00
+
+def walkable(x, y):
+    """Tile (x, y) is free ground: no blocked / fly-over subtile (needs the harness' game.tile_flags_get; without it
+    every tile counts as walkable) and no critter or blocking object standing on it."""
+    loc = location_from_axis(x, y)
+    try:
+        if game.tile_flags_get(loc) & NOT_WALKABLE:
+            return False
+    except AttributeError:
+        pass
+    try:
+        for o in game.obj_list_vicinity(loc, OLC_CRITTERS | OLC_SCENERY | OLC_CONTAINER | OLC_PORTAL):
+            if o.location == loc and not (o.type == obj_t_scenery and (o.object_flags_get() & OF_NO_BLOCK)):
+                return False
+    except Exception:
+        pass
+    return True
+
+def free_spot(x, y, taken=None, radius=8):
+    """Nearest walkable tile to (x, y) not in `taken` (a set of (x, y) it is added to), searching outwards ring by
+    ring; None if there is none within radius. Prefers tiles whose 4 neighbours are walkable too (no edge-of-water)."""
+    taken = taken if taken is not None else set()
+    for strict in (True, False):
+        for r in range(radius + 1):
+            ring = [(x + dx, y + dy) for dx in range(-r, r + 1) for dy in range(-r, r + 1) if max(abs(dx), abs(dy)) == r]
+            for p in ring:
+                if p in taken or not walkable(p[0], p[1]):
+                    continue
+                if strict and not all(walkable(p[0] + a, p[1] + b) for a, b in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                    continue
+                taken.add(p)
+                return p
+    return None
+
+def place_near(o, x, y, taken=None, radius=8):
+    p = free_spot(x, y, taken, radius)
+    if p is None:
+        return None
+    o.move(location_from_axis(p[0], p[1]))
+    return p

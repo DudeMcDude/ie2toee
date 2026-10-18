@@ -93,11 +93,20 @@ supported. Monsters map to ToEE models and template protos through an authored g
 Manual). `proto/runtime/ie_critters.py` spawns them in game. Rules, the adjudication list, the model coverage and
 the free-model candidates are in [docs/creatures.md](docs/creatures.md).
 
+### Spells (prototype)
+
+`proto/ie_spells.py` surveys the spells an IE game uses and maps them to Temple+ spells. It reads SPL / PRO / EFF with
+`proto/iespl.py`, and uses an authored guidance table of resref → Temple+ spell ids per flavour
+(`proto/guidance/spells_iwd.json`). Converted NPCs get their spell lists and a custom Temple+ AI strategy. IE
+`Spell` / `ForceSpell` / `ReallyForceSpell` / `ApplySpell` actions, `HaveSpell`, and a creature's own script on its
+combat turn all cast through Temple+ (`proto/runtime/ie_spellrt.py`). The design, coverage, the SPL-ADJ adjudication
+list and the plan for IWD-only spells are in [docs/spells.md](docs/spells.md).
+
 ### Developer tools
 
 * `calibrate.py`: compares the converted blocking with a hand-made ToEE map of the same area (FFT alignment, then
   agreement statistics).
-* `run_ingame.sh` + `ingame_probe.py` / `ingame_doors_probe.py` / `ingame_doors_smoke.py` / `ingame_creatures_probe.py`
+* `run_ingame.sh` + `ingame_probe.py` / `ingame_doors_probe.py` / `ingame_doors_smoke.py` / `ingame_creatures_probe.py` / `ingame_spells_probe.py`
   (`ingame_fields_test.py` dumps raw object fields): automated in-game tests.
   They need a Temple+ build with a small test harness that loads a save and runs Python from the `TP_AUTOLOAD` and
   `TP_AUTOEXEC` environment variables (not part of this repo). Runs in a private wine prefix.
@@ -121,4 +130,8 @@ the free-model candidates are in [docs/creatures.md](docs/creatures.md).
 | `proto/toeedata.py` | reads the player's ToEE install (dat archives, protos.tab, meshes, spell enum) |
 | `proto/runtime/ie_critters.py` | Temple+ creature spawner |
 | `proto/guidance/creatures_iwd.json` | authored creature/model/item mapping (ids and labels only) |
+| `proto/iespl.py` | SPL V1, PRO and EFF V2 readers (IESDP) |
+| `proto/ie_spells.py` | spell survey, coverage, mapper and runtime map writer; SPL-ADJ options |
+| `proto/runtime/ie_spellrt.py` | Temple+ spell runtime (spell lists, IE casting actions) |
+| `proto/guidance/spells_iwd.json` | authored IE resref → Temple+ spell mapping per flavour (ids and Temple+ labels only) |
 | `proto/guidance/*.json` | guidance format example (placeholders only) |
