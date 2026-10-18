@@ -137,12 +137,26 @@ def give_spells(o, spec):
         except Exception, e:
             log('grant %s failed: %s' % (s, e))
     strat = spec.get('ai_strategy')
+    _strategy[_okey(o)] = strat
     if strat:
         try:
             o.ai_strategy_set_custom(list(strat), 1)
         except Exception, e:
             log('ai_strategy_set_custom failed: %s' % e)
     return got
+
+
+_strategy = {}               # object key -> converted static strategy (the per-round fallback, ie_combat)
+
+def strategy_of(o):
+    return _strategy.get(_okey(o))
+
+def script_first_on():
+    try:
+        from ie_spellmap import OPTIONS
+    except Exception:
+        OPTIONS = {}
+    return OPTIONS.get('npc_ai', 'script_first') == 'script_first'
 
 
 MELEE = ['ie2toee_script', 'use potion', '', '', 'attack', '', '', 'approach', '', '', 'attack', '', '']

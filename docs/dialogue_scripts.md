@@ -64,7 +64,16 @@ If the files are in a folder that isn't mounted yet at discovery (e.g. loose `mo
 * Creature scripts: the NPC's ToEE script (`py<id>ie_<ident>.py`) imports its BCS modules in IE priority order and
   ticks them from `san_heartbeat` (throttled to one round per second). `san_first_heartbeat` sets `OnCreation`.
   `san_dying` -> `Die`, `san_enter_combat`/`san_start_combat` -> `AttackedBy`. These are event triggers that the
-  next round consumes.
+  next round consumes (`AttackedBy`/`HitBy` last one round).
+* Combat rounds:
+  * While turn-based combat is active, the heartbeat no longer runs creature scripts.
+  * `san_start_combat` runs one round per turn of the creature (`rt.combat_round`). Spell and Attack are
+    feasibility-checked against the engine (slots, range, LOS, path, components, target state).
+  * A block whose action is not feasible falls through to the next one.
+  * The chosen action becomes that turn's Temple+ strategy, ending in `stop`. With no feasible block, the converted
+    static strategy is the fallback.
+  * Hostile creatures defer Spell and Attack responses until their first round.
+  * Details: [spells.md, Combat rounds](spells.md#combat-rounds-san_start_combat).
 * Area scripts: driven by `rt.loop(holder, 'area_<AREA>', AREA, [module])`, a real-time time event. In the pilot the
   holder is the party leader. For release, the converter should place an invisible holder object per map with a
   `san_heartbeat`.
@@ -104,7 +113,10 @@ FloatMessage/DisplayString/DisplayStringHead, Face, FaceObject, MoveToPoint, Mov
 Start/EndCutSceneMode (logged), StartMovie (logged), HideCreature, ChangeEnemyAlly, LeaveAreaLUA/LeaveArea,
 ReturnToSavedLocation.
 
-Not done yet: spells (Spell, ForceSpell, HaveSpell, RemoveSpell), cutscenes, stores' contents, journal/quest UI,
+Spells (Spell, ForceSpell, ReallyForceSpell, ApplySpell, HaveSpell and the *Point forms) are in
+[spells.md](spells.md).
+
+Not done yet: RemoveSpell, cutscenes, stores' contents, journal/quest UI,
 item mapping data (`ie_items.py`: IE resref -> ToEE proto, guidance data), creature stats (CRE -> ToEE proto),
 interjections and speaker changes, and IE interrupt semantics.
 

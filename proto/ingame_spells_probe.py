@@ -113,6 +113,17 @@ def step(s):
         elif cmd == 'heal':
             for p in game.party:
                 p.heal(OBJ_HANDLE_NULL, dice_new('20d10'))
+        elif cmd == 'paralyze':       # paralyze <who> rounds : engine 'Paralyzed' condition (feasibility fall-through test)
+            if a[0] == 'leader':
+                o = game.leader
+            else:
+                sp, o = find(a[0])
+            o.condition_add_with_args('Paralyzed', int(a[1]), 0, 0)
+            log('PARALYZED %s held=%s helpless=%s' % (o, o.d20_query(Q_Critter_Is_Held), o.d20_query(Q_Helpless)))
+        elif cmd == 'tough':          # tough n : raise the party's max HP by n so multi-round fights last (test only)
+            for p in game.party:
+                p.obj_set_int(obj_f_hp_pts, p.obj_get_int(obj_f_hp_pts) + int(a[0]))
+                p.heal(OBJ_HANDLE_NULL, dice_new('%dd1' % int(a[0])))
         elif cmd == 'hurt':           # hurt <who> n : damage for heal tests
             sp, o = find(a[0]); o.damage(OBJ_HANDLE_NULL, D20DT_UNSPECIFIED, dice_new('%dd1' % int(a[1])))
         elif cmd in ('key', 'click', 'move', 'shot'):

@@ -150,10 +150,10 @@ def actor_script(sid, ident, area, dlg_parts, bcs_mods):
     for san, ev in (('san_dying', 'Die'), ('san_enter_combat', 'AttackedBy')):
         src.append('def %s(attachee, triggerer):\n    rt.event(IDENT, %s, triggerer)\n    return RUN_DEFAULT\n'
                    % (san, pystr(ev)))
-    # each combat turn: one IE script round; if it cast a spell (or took another turn-consuming action) the Temple+ AI
-    # skips this turn, otherwise the converted strategy / default AI acts
+    # each combat turn: one IE script round with engine feasibility checks (runtime/ie_combat.py); the first feasible
+    # block's Spell/Attack becomes the turn's Temple+ strategy, else the converted static strategy (both end in "stop")
     src.append('def san_start_combat(attachee, triggerer):\n    rt.event(IDENT, "AttackedBy", triggerer)\n'
-               '    if SCRIPTS and rt.combat_tick(attachee, IDENT, AREA, SCRIPTS):\n        return SKIP_DEFAULT\n'
+               '    if SCRIPTS:\n        return rt.combat_round(attachee, IDENT, AREA, SCRIPTS)\n'
                '    return RUN_DEFAULT\n')
     return '\n'.join(src)
 

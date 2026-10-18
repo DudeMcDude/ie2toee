@@ -555,6 +555,8 @@ def _run_q(c, q):
         if r is CONTINUE or r is None:
             continue
         if isinstance(r, _NUM) and r > 0:
+            if MODE['round']:          # a combat round plans one action; IE waits do not carry into later rounds
+                continue
             _busy[c.ident] = _now() + r
             if q and IN_GAME:
                 game.timeevent_add(_resume, (c.me, c.other, c.ident, c.area, len(q)), int(r * 1000), 1)
@@ -568,7 +570,22 @@ def _resume(me, other, ident, area, n):
         _run_q(ent[0], ent[1])
     return 1
 
+MODE = {'round': False, 'dry': False, 'probe': False, 'fail': []}
+# actions that are checked for feasibility in a combat round; every other action is a no-op during the dry run
+COMBAT_ACTIONS = set(['Spell', 'SpellNoDec', 'ForceSpell', 'ForceSpellRange', 'ReallyForceSpell', 'ReallyForceSpellDead',
+                      'ApplySpell', 'SpellPoint', 'SpellPointNoDec', 'ForceSpellPoint', 'ForceSpellPointRange',
+                      'ReallyForceSpellPoint', 'SpellRES', 'ForceSpellRES', 'ReallyForceSpellRES', 'ApplySpellRES',
+                      'Attack', 'AttackOneRound', 'AttackReevaluate'])
+
+def _noop(*args):
+    return None
+
 class _Actions(object):
+    def __getattribute__(self, name):
+        if MODE['dry'] and name[:1] != '_' and name not in COMBAT_ACTIONS:
+            return _noop
+        return object.__getattribute__(self, name)
+
     def __getattr__(self, name):
         def unsupported(c, *args):
             log_once('a:' + name, 'IE_UNSUPPORTED action %s%r' % (name, args))
@@ -628,6 +645,17 @@ class _Actions(object):
             except Exception as e:
                 log('IE_ERR Enemy: %s' % e)
     def Attack(self, c, obj):
+        if MODE.get('probe'):
+            MODE['fail'].append('Attack'); return None
+        r = _round_for(c)
+        if r is not None:                      # combat round: feasibility check / plan, executed by Temple+ AI
+            if MODE['dry']:
+                code, p = r.check_attack(obj)
+                if code:
+                    MODE['fail'].append('Attack: %s' % _reason(code))
+            else:
+                r.plan_attack(obj)
+            return None
         if IN_GAME and obj is not None:
             c.me.attack(obj)
     def AttackOneRound(self, c, obj): self.Attack(c, obj); return 6
@@ -765,12 +793,28 @@ class _Actions(object):
     def _cast(self, c, obj, spell, mode, pt=None):
         if not IN_GAME:
             log('SPELL %s %s -> %r' % (mode, spell, obj)); return 6
+        r = _round_for(c)
+        if MODE.get('probe') and (mode != 'apply' or obj is None or obj == c.me):
+            MODE['fail'].append('%s %s' % (mode, spell)); return None
+        if r is not None and (mode != 'apply' or obj is None or obj == c.me):
+            import ie_spellrt
+            res = ie_spellrt.resref(spell)
+            tgt = obj
+            if pt is not None and tgt is None:
+                tgt = ie_spellrt._near_point(c.me, ie_to_tile(c.area, pt[0], pt[1]))
+            m = 'force' if mode == 'apply' else mode
+            if MODE['dry']:
+                code, p = r.check_spell(res, tgt, m)
+                if code:
+                    MODE['fail'].append('%s %s: %s' % (mode, res, _reason(code)))
+            else:
+                r.plan_spell(res, tgt, m)
+            return None
         try:
             import ie_spellrt
             ie_spellrt.LOG[0] = LOG_PATH
             point = ie_to_tile(c.area, pt[0], pt[1]) if pt is not None else None
-            if ie_spellrt.cast(c.me, spell, obj, mode, point) is not None:
-                ACTED[0] = True
+            ie_spellrt.cast(c.me, spell, obj, mode, point)
         except Exception as e:
             log('IE_ERR spell %s %s: %s' % (mode, spell, e))
         return 6
@@ -873,6 +917,39 @@ def run_script(c, blocks):
             log('BLOCK %s #%d' % (c.ident, bi))
         acts = list(resp)
         cont = bool(acts) and getattr(acts[-1], 'is_continue', False)
+        if MODE['round']:
+            # combat round (san_start_combat): dry-run the response first; if one of its Spell/Attack actions is not
+            # feasible right now (no slot, out of range, no LOS, target already affected, ...) the block does not fire
+            # and evaluation falls through to the next block, as if its trigger had been false.
+            MODE['dry'] = True; MODE['fail'] = []
+            try:
+                for fn in acts:
+                    try:
+                        fn(c)
+                    except Exception:
+                        pass
+            finally:
+                MODE['dry'] = False
+            if MODE['fail']:
+                log('BLOCK %s #%d not feasible: %s' % (c.ident, blocks.index((cond, responses)), '; '.join(MODE['fail'])))
+                continue
+        elif IN_GAME and _hostile_npc(c.me):
+            # a hostile creature outside a combat round: Spell/Attack would start combat out of turn order (the cast
+            # used to land before round 1).  Defer the block: KOS makes Temple+ start combat, and the round evaluates it.
+            MODE['dry'] = True; MODE['probe'] = True; MODE['fail'] = []
+            try:
+                for fn in acts:
+                    try:
+                        fn(c)
+                    except Exception:
+                        pass
+            finally:
+                MODE['dry'] = False; MODE['probe'] = False
+            if MODE['fail']:
+                if _lastdefer.get(c.ident) != blocks.index((cond, responses)):
+                    _lastdefer[c.ident] = blocks.index((cond, responses))
+                    log('DEFER %s #%d to the combat round: %s' % (c.ident, _lastdefer[c.ident], '; '.join(MODE['fail'])))
+                return True
         run_actions(c, acts)
         if not cont:
             return True
@@ -901,6 +978,8 @@ def tick(obj, ident, area, scripts, force=False):
         script_ai(obj, ident, scripts)
     if not force and now - _last_tick.get(ident, -99) < ROUND_SECS:
         return
+    if not MODE['round'] and IN_GAME and _in_combat(obj):
+        return                         # turn-based combat: the critter's script runs from san_start_combat only
     _last_tick[ident] = now
     if _busy.get(ident, 0) > now and not ev:
         return
@@ -908,6 +987,10 @@ def tick(obj, ident, area, scripts, force=False):
     for m in scripts:
         if run_script(c, m.BLOCKS):
             break
+    # IE: AttackedBy/HitBy are true for one script round; left pending they also bypassed the busy check above, so
+    # a heal cast was issued again on the next tick before the first resolved (double-spent IE count, EE test)
+    for k in ('AttackedBy', 'HitBy'):
+        ev.pop(k, None)
 
 def script_ai(obj, ident, scripts):
     """SPL-ADJ-18: a creature whose IE scripts cast spells keeps only the non-spell part of its Temple+ AI strategy."""
@@ -920,21 +1003,61 @@ def script_ai(obj, ident, scripts):
     except Exception as e:
         log('IE_ERR script_ai %s: %s' % (ident, e))
 
-ACTED = [False]       # set by turn-consuming actions (spell casts) during combat_tick
+_lastdefer = {}
 
-def combat_tick(obj, ident, area, scripts):
-    """san_start_combat: run one IE script round on the critter's combat turn. True if it cast a spell, so the
-    caller returns SKIP_DEFAULT and the Temple+ AI does not act on top of it."""
-    ACTED[0] = False
-    _busy.pop(ident, None)
+def _hostile_npc(obj):
+    try:
+        return (obj is not None and obj.type == obj_t_npc and obj.leader_get() == OBJ_HANDLE_NULL
+                and (obj.npc_flags_get() & ONF_KOS) != 0)
+    except Exception:
+        return False
+
+def _in_combat(obj):
+    try:
+        return game.combat_is_active() and obj.type == obj_t_npc   # rounds belong to san_start_combat
+    except Exception:
+        return False
+
+def _round_for(c):
+    """The ie_combat.Round being planned for this actor, or None (outside san_start_combat / another actor)."""
+    if not MODE['round'] or not IN_GAME:
+        return None
+    import ie_combat
+    r = ie_combat.CUR[0]
+    return r if r is not None and c.me == r.npc else None
+
+def _reason(code):
+    import ie_combat
+    return ie_combat.REASON.get(code, code)
+
+def _foes(me):
+    out = []
+    try:
+        for o in game.obj_list_vicinity(me.location, OLC_CRITTERS):
+            if o != me and not _dead(o) and _hostile(me, o):
+                out.append(o)
+    except Exception:
+        pass
+    return out
+
+def combat_round(obj, ident, area, scripts):
+    """san_start_combat, every turn of the critter: one IE script round with feasibility checks (ie_combat). The
+    first feasible block's Spell/Attack becomes this round's Temple+ strategy; with no feasible block the converted
+    static strategy is the fallback. Both end in "stop", so Temple+ never adds its own DefaultCast."""
+    if not IN_GAME:
+        return 1
     if ident not in _first:
         _first[ident] = 1; bind(obj, ident, area); script_ai(obj, ident, scripts)
-    log('COMBAT_TURN %s' % ident)
-    try:
-        tick(obj, ident, area, scripts, force=True)
-    except Exception as e:
-        log('IE_ERR combat tick %s: %s' % (ident, e))
-    return ACTED[0]
+    _busy.pop(ident, None)
+    import ie_combat, ie_spellrt
+    ie_combat.LOG[0] = LOG_PATH; ie_spellrt.LOG[0] = LOG_PATH
+    def run(r):
+        MODE['round'] = True
+        try:
+            tick(obj, ident, area, scripts, force=True)
+        finally:
+            MODE['round'] = False; MODE['dry'] = False
+    return ie_combat.round_start(obj, ident, _foes(obj), run, ie_spellrt.strategy_of(obj), ie_spellrt.script_first_on())
 
 def event(ident, name, other=None):
     """Hook helper for san_* handlers: record an IE event trigger (AttackedBy, HitBy, Die, Entered...)."""
