@@ -1,5 +1,9 @@
 # Temple+ runtime for doors of maps converted by ie2toee (Python 2.7, runs inside the game).
 #
+# Baked maps (proto/ie_bake.py) carry the portals in their .sec files; start(area) attaches to them (and creates
+# only missing ones, so runtime mode does not duplicate doors on reload either). setup(area) is the old always-create
+# path, kept for the door probes.
+#
 # MVP: each IE door's default state is baked into the ground art and the .sec files by the converter. At map load
 # setup(area) places one ToEE portal object per door (minimal: a scaled-down stock door model) and polls it; when the
 # portal opens or closes, the door's impeded tiles are switched between the IE open/closed impeded cells and the
@@ -19,6 +23,7 @@ OVERLAY_BASE = 7000
 
 _doors = []              # [(door dict, portal handle, last_open)]
 _area = None
+_gen = 0             # bumped per start(): polls of an earlier load stop
 
 def _is_open(p):
     try:
@@ -65,8 +70,48 @@ def setup(area, model_scale=MODEL_SCALE, proto=PORTAL_PROTO):
     game.timeevent_add(poll, (area,), POLL_MS, 1)
     return len(_doors)
 
-def poll(area):
-    if area != _area:
+def _find_portal(x, y, ox, oy):
+    """The portal standing at a door's spot (baked into the .sec, or created earlier and kept in the save)."""
+    loc = location_from_axis(x, y)
+    best = None
+    for p in game.obj_list_vicinity(loc, OLC_PORTAL):
+        if p.location == loc:
+            best = p
+    return best
+
+def start(area, model_scale=MODEL_SCALE, proto=PORTAL_PROTO):
+    """Map-load entry point for both modes: reuse the portals already on the map (baked prefab doors, or runtime
+    doors restored from a save) and create only the missing ones, so a reload never duplicates a door. The tile
+    flags and ground patches follow each portal's current (saved) state."""
+    global _doors, _area, _gen
+    mod = __import__('ie_doors_' + area.lower())
+    game.ground_overlay_remove(-1)
+    _doors = []
+    _area = area
+    _gen = _gen + 1
+    made = 0
+    for idx in range(len(mod.DOORS)):
+        d = mod.DOORS[idx]
+        x, y, ox, oy = d['loc']
+        p = _find_portal(x, y, ox, oy)
+        if p is None:
+            made = made + 1
+            p = game.obj_create(proto, location_from_axis(x, y))
+            p.move(location_from_axis(x, y), ox, oy)
+            p.obj_set_int(8, model_scale)
+            if d['locked']:
+                p.portal_flag_set(OPF_LOCKED)
+            if _is_open(p) != bool(d['open']):
+                p.portal_toggle_open()
+        now = _is_open(p)
+        _apply(idx, d, now)
+        _doors.append([d, p, now])
+    game.timeevent_add(poll, (area, _gen), POLL_MS, 1)
+    print "ie_doors: %s attached %d doors (%d created)" % (area, len(_doors), made)
+    return len(_doors)
+
+def poll(area, gen=None):
+    if area != _area or (gen is not None and gen != _gen):
         return 0
     for idx in range(len(_doors)):
         d, p, last = _doors[idx]
@@ -78,7 +123,7 @@ def poll(area):
             _apply(idx, d, now)
             _doors[idx][2] = now
             print "ie_doors: %s %s" % (d['name'], now and 'opened' or 'closed')
-    game.timeevent_add(poll, (area,), POLL_MS, 1)
+    game.timeevent_add(poll, (area, gen), POLL_MS, 1)
     return 0
 
 def toggle(name):

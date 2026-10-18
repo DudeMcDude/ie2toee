@@ -144,6 +144,11 @@ def _key(obj):
 
 def bind(obj, ident, area):
     _bound[_key(obj)] = (ident, area)
+    try:      # baked maps: finalize the prefab objects + attach the doors once per map load (ie_bakert)
+        import ie_bakert
+        ie_bakert.first_heartbeat(obj, area)
+    except ImportError:
+        pass
 
 def _party():
     if not IN_GAME:
@@ -742,6 +747,8 @@ class _Actions(object):
     def MoveToPoint(self, c, pt):
         u, v = ie_to_tile(c.area, pt[0], pt[1])
         log('MOVE %s -> IE(%d,%d) tile(%d,%d)' % (c.ident, pt[0], pt[1], u, v))
+        if IN_GAME and c.me is not None and _on_waypoints(c.me):
+            return 3      # a baked fixed-loop patrol: the engine walks the converted waypoints (ie_patrol.py)
         if IN_GAME and c.me is not None:
             try:
                 _walk(c.me, u, v)
@@ -840,6 +847,12 @@ class _Actions(object):
     SpellPointRES, ForceSpellPointRES, ReallyForceSpellPointRES = SpellPoint, ForceSpellPoint, ReallyForceSpellPoint
 
 A = _Actions()
+
+def _on_waypoints(o):
+    try:
+        return (o.npc_flags_get() & (ONF_WAYPOINTS_DAY | ONF_WAYPOINTS_NIGHT)) != 0
+    except Exception:
+        return 0
 
 def _walk(o, u, v):
     loc = location_from_axis(u, v)

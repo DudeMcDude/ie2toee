@@ -4,7 +4,8 @@
 # screenshot on every "SHOT <name>" line the probe writes. Kills only this prefix's wineserver.
 #
 # Usage: TP_DIST=<Temple+ dist dir> TOEE_DIR=<vanilla ToEE> TOEE_OVERLAY=<overlay copy> ./run_ingame.sh <tag> [secs]
-#   optional: TOEE_XVFB=<display number> (private Xvfb display, recommended), WINEPREFIX (default ~/.wine-toee-ie), IE_OUT (default ../out), TP_AUTOEXEC (default: import ingame_probe)
+#   optional: KEEP_SAVES=<dir> (copy the probe's saves out before the restore), SAVE_SEED=<dir> (saves to add first),
+#   TOEE_XVFB=<display number> (private Xvfb display, recommended), WINEPREFIX (default ~/.wine-toee-ie), IE_OUT (default ../out), TP_AUTOEXEC (default: import ingame_probe)
 # Probe protocol (one line each in the probe log): SHOT <name> | KEY <xdotool keys> | CLICK <x> <y> | MOVE <x> <y> | DONE
 # Screenshots/logs go to $IE_OUT/ingame/<tag>/ (derived from the player's files: local only).
 set -u
@@ -27,6 +28,7 @@ fresh_saves() {   # the probes teleport and autosave (pickling their time events
 }
 wineserver -k 2>/dev/null; sleep 0.3
 fresh_saves
+[ -n "${SAVE_SEED:-}" ] && cp -a "$SAVE_SEED"/. "$TOEE_OVERLAY/modules/ToEE/Save/"   # e.g. a save kept by KEEP_SAVES
 export TP_AUTOLOAD=${TP_AUTOLOAD:-SlotAuto}
 export TP_AUTOEXEC=${TP_AUTOEXEC:-"import sys; sys.path[:0]=['Z:$HERE', 'Z:$HERE/runtime', 'Z:$IE_OUT']; import ingame_probe"}
 cd "$TP_DIST"
@@ -53,6 +55,7 @@ done
 import -display "$DISPLAY" -window root "$OUT/final.png" 2>/dev/null
 wineserver -k 2>/dev/null; sleep 1
 [ -n "$XVFB_PID" ] && kill "$XVFB_PID" 2>/dev/null
+[ -n "${KEEP_SAVES:-}" ] && { rm -rf "$KEEP_SAVES"; cp -a "$TOEE_OVERLAY/modules/ToEE/Save" "$KEEP_SAVES"; }   # saves the probe wrote
 fresh_saves
 cp "$L" "$OUT/TemplePlus.log" 2>/dev/null; cp "$P" "$OUT/" 2>/dev/null
 for f in "$OUT"/*.bmp; do [ -e "$f" ] && convert "$f" -crop 1290x830+0+0 +repage "${f%.bmp}.png" && rm "$f"; done
