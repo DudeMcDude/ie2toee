@@ -112,6 +112,12 @@ list and the plan for IWD-only spells are in [docs/spells.md](docs/spells.md).
   `TP_AUTOEXEC` environment variables (not part of this repo). Runs in a private wine prefix.
 * `ingame_overlay.py`: aligns a screenshot with the ground art and draws the blocking and door rectangles over it.
 
+### Baked maps (prototype)
+`proto/ie_bake.py bake` writes the converted objects of an area into the ToEE map files: creatures, items and
+containers as prefab `.mob` files with stable permanent GUIDs, doors as portals in the `.sec` object lists
+(saves then store only differences). `runtime/ie_bakert.py` finishes what the files cannot hold. The runtime spawner
+stays available as a fallback. Format notes, WorldBuilder discrepancies, patrol buckets: [docs/mapfiles.md](docs/mapfiles.md).
+
 ### Items (prototype)
 
 `proto/ie_items.py` surveys every item an IE game uses: creature inventories, area containers, stores, and
@@ -149,4 +155,8 @@ ITEM-ADJ adjudication list, coverage and open items are in [docs/items.md](docs/
 | `proto/ie_items.py` | item survey, coverage, mapper and runtime map / icon / name writer; ITEM-ADJ options |
 | `proto/runtime/ie_itemrt.py` | Temple+ item runtime (create, give, find, containers, stores) |
 | `proto/guidance/items_iwd.json` | authored IE resref → ToEE proto mapping (ids and ToEE labels only) |
+| `proto/toeemob.py` | ToEE object files: .mob and .sec object list reader/writer (byte-exact round trip), docs/mapfiles.md |
+| `proto/ie_bake.py` | bakes converted creatures / items / containers (prefab MOBs) and doors (.sec portals) into a map |
+| `proto/ie_patrol.py` | IE patrol survey (fixed loop / wander / conditional / reactive) and waypoint routes |
+| `proto/runtime/ie_bakert.py` | Temple+ finalize for baked maps (conditions, spells, item conditions; once per object) |
 | `proto/guidance/*.json` | guidance format example (placeholders only) |
