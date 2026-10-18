@@ -1,6 +1,11 @@
 ICEWIND DALE IN THE TEMPLE OF ELEMENTAL EVIL ENGINE - PLAYER PREVIEW (2026-10-18)
 =================================================================================
 
+IMPORTANT: PYTHON 3.9 OR NEWER MUST BE INSTALLED
+  The converter is a Python program. Before you start, install Python 3.9+ from
+  https://www.python.org/downloads/ and, in the installer, tick "Add python.exe to PATH".
+  Without it convert.bat stops with a message. You also need your own Icewind Dale or Icewind Dale: EE.
+
 WHAT THIS IS
 ------------
 A preliminary adaptation that loads an Icewind Dale map into the ToEE engine (Temple+). It converts the
@@ -24,8 +29,10 @@ REQUIREMENTS
 ------------
   * The Temple of Elemental Evil (GOG or Steam).
   * Icewind Dale (classic, GOG/CD) or Icewind Dale: Enhanced Edition (GOG/Steam/Beamdog), installed.
-  * Windows, and Python 3.9 or newer (https://www.python.org/downloads/ - tick "Add python.exe to PATH").
-    The converter installs its three Python packages itself (numpy, pillow, fonttools).
+  * Windows.
+  * Python 3.9 or newer, installed BEFORE you run the converter: https://www.python.org/downloads/
+    In the installer, tick "Add python.exe to PATH". The converter then installs its three Python packages
+    itself (numpy, pillow, fonttools).
   * The Temple+ build in the TemplePlus folder of this download. It's Temple+ 1.0.98 plus two preview
     features: the IE dialogue window and the door/tile hooks. Official Temple+ can't show the converted doors
     or the IE dialogue window.
@@ -90,5 +97,7 @@ CREDITS / LICENCES
 ------------------
 Converter: ie2toee (https://github.com/DudeMcDude/ie2toee), see converter\LICENSE.txt.
 Engine: Temple+ (https://github.com/GrognardsFromHell/TemplePlus, MIT licence). The preview changes to Temple+
-are in TemplePlus\ie-preview-changes.diff. Icewind Dale is (c) its publishers. You need your own legal copy;
+are in TemplePlus\ie-preview-changes.diff (against Temple+ master 03d72045). Source:
+https://github.com/DudeMcDude/TemplePlus/tree/feature/ie-dialog-skin
+commit 644ceb9f (https://github.com/DudeMcDude/TemplePlus/commit/644ceb9fbc84c3aae7aa930f966c0b92767fcbed). Icewind Dale is (c) its publishers. You need your own legal copy;
 nothing from it is redistributed here. The Temple of Elemental Evil is (c) its publishers.

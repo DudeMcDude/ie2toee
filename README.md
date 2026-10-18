@@ -139,7 +139,13 @@ module overlay (`modules/ToEE`, `modules/ToEE_core`, `data/`) that it can also c
 
 In game: `import iwd; iwd.go()` in the Temple+ console travels to the town. The player package (Windows) wraps it
 in `preview/convert.bat` with `preview/requirements.txt`; `preview/README.txt` is the player README. The package
-also needs the Temple+ build with the dialog skin and the door hooks (`proto/runtime/templeplus-hooks.diff`).
+also needs the Temple+ build with the dialog skin and the door hooks: source on the fork branch
+[`feature/ie-dialog-skin`](https://github.com/DudeMcDude/TemplePlus/tree/feature/ie-dialog-skin), commit
+[`644ceb9f`](https://github.com/DudeMcDude/TemplePlus/commit/644ceb9fbc84c3aae7aa930f966c0b92767fcbed)
+(hooks alone: `proto/runtime/templeplus-hooks.diff`).
+
+**Players must have Python 3.9 or newer installed** (https://www.python.org/downloads/, tick "Add python.exe to
+PATH" in the installer); `convert.bat` installs numpy, pillow and fonttools itself.
 
 ## Files
 
