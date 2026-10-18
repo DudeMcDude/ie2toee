@@ -84,11 +84,21 @@ that only provides interaction.
 dialog skin, selectable per module and per dialogue. It needs a Temple+ build with dialog skin support
 (branch `feature/ie-dialog-skin` of DudeMcDude/TemplePlus). See [docs/dialog_skin.md](docs/dialog_skin.md).
 
+### Creatures (prototype)
+
+`proto/ie_creatures.py` surveys every creature an IE game places (area actors, rest spawns, `CreateCreature*` in
+scripts and dialogs) and converts an area's actors into Temple+ critters. Classic IWD (CRE V9.0) and IWD:EE (V1.0) are
+supported. Monsters map to ToEE models and template protos through an authored guidance table
+(`proto/guidance/creatures_iwd.json`); NPCs are converted by formula (AD&D 2e → 3.5, following the WotC Conversion
+Manual). `proto/runtime/ie_critters.py` spawns them in game. Rules, the adjudication list, the model coverage and
+the free-model candidates are in [docs/creatures.md](docs/creatures.md).
+
 ### Developer tools
 
 * `calibrate.py`: compares the converted blocking with a hand-made ToEE map of the same area (FFT alignment, then
   agreement statistics).
-* `run_ingame.sh` + `ingame_probe.py` / `ingame_doors_probe.py` / `ingame_doors_smoke.py`: automated in-game tests.
+* `run_ingame.sh` + `ingame_probe.py` / `ingame_doors_probe.py` / `ingame_doors_smoke.py` / `ingame_creatures_probe.py`
+  (`ingame_fields_test.py` dumps raw object fields): automated in-game tests.
   They need a Temple+ build with a small test harness that loads a save and runs Python from the `TP_AUTOLOAD` and
   `TP_AUTOEXEC` environment variables (not part of this repo). Runs in a private wine prefix.
 * `ingame_overlay.py`: aligns a screenshot with the ground art and draws the blocking and door rectangles over it.
@@ -105,4 +115,10 @@ dialog skin, selectable per module and per dialogue. It needs a Temple+ build wi
 | `proto/runtime/ie_doors.py` | Temple+ door runtime |
 | `proto/iegui.py` | CHU, MOS (V1/MOSC/V2) and BAM (V1/BAMC/V2) readers |
 | `proto/ie_dialog_skin.py` | IE dialogue window exporter (Temple+ dialog skins) |
+| `proto/iecre.py` | CRE (V1.0 / V9.0) and ITM readers |
+| `proto/ie_rules.py` | AD&D 2e → D&D 3.5 conversion rules and adjudication options |
+| `proto/ie_creatures.py` | creature survey + converter |
+| `proto/toeedata.py` | reads the player's ToEE install (dat archives, protos.tab, meshes, spell enum) |
+| `proto/runtime/ie_critters.py` | Temple+ creature spawner |
+| `proto/guidance/creatures_iwd.json` | authored creature/model/item mapping (ids and labels only) |
 | `proto/guidance/*.json` | guidance format example (placeholders only) |

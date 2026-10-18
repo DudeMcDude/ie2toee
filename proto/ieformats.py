@@ -186,11 +186,41 @@ class Are:
         anim_n, anim_off = u('<I', 0xac), u('<I', 0xb0)
         self.vertices = [struct.unpack_from('<hh', data, vtx_off + i * 4) for i in range(vtx_n)]
         V = self.vertices
-        self.actors = [dict(name=cstr(data[o:o + 32]), x=struct.unpack_from('<H', data, o + 0x20)[0],
-                            y=struct.unpack_from('<H', data, o + 0x22)[0],
-                            orient=struct.unpack_from('<H', data, o + 0x34)[0],
-                            cre=cstr(data[o + 0x80:o + 0x88]))
-                       for o in (act_off + i * 0x110 for i in range(act_n))]
+        self.actors = []
+        for o in (act_off + i * 0x110 for i in range(act_n)):
+            emb_off, emb_size = struct.unpack_from('<II', data, o + 0x88)
+            self.actors.append(dict(
+                name=cstr(data[o:o + 32]), x=struct.unpack_from('<H', data, o + 0x20)[0],
+                y=struct.unpack_from('<H', data, o + 0x22)[0],
+                dest=struct.unpack_from('<HH', data, o + 0x24),
+                flags=struct.unpack_from('<I', data, o + 0x28)[0],      # bit0: CRE not attached (resref used)
+                animation=struct.unpack_from('<I', data, o + 0x30)[0],
+                orient=struct.unpack_from('<H', data, o + 0x34)[0],
+                schedule=struct.unpack_from('<I', data, o + 0x40)[0] & 0xFFFFFF,
+                dialog=cstr(data[o + 0x48:o + 0x50]),
+                scripts=dict(zip(('override', 'general', 'class', 'race', 'default', 'specific'),
+                                 (cstr(data[k:k + 8]) for k in range(o + 0x50, o + 0x80, 8)))),
+                cre=cstr(data[o + 0x80:o + 0x88]),
+                embedded_cre=data[emb_off:emb_off + emb_size] if emb_off and emb_size else None))
+        # spawn points (0xC8 each) and the single rest-interruption record (0xE4): creature resrefs or
+        # SPAWNGRP.2DA group names
+        sp_off, sp_n = u('<I', 0x60), u('<I', 0x64)
+        self.spawn_points = []
+        for o in (sp_off + i * 0xC8 for i in range(sp_n if sp_off else 0)):
+            n = struct.unpack_from('<H', data, o + 0x74)[0]
+            self.spawn_points.append(dict(
+                name=cstr(data[o:o + 32]), x=struct.unpack_from('<H', data, o + 0x20)[0],
+                y=struct.unpack_from('<H', data, o + 0x22)[0],
+                creatures=[cstr(data[o + 0x24 + k * 8:o + 0x2c + k * 8]) for k in range(min(n, 10))],
+                base_count=struct.unpack_from('<H', data, o + 0x76)[0],
+                method=struct.unpack_from('<H', data, o + 0x7a)[0],
+                schedule=struct.unpack_from('<I', data, o + 0x88)[0] & 0xFFFFFF))
+        ri_off = u('<I', 0xc0)
+        self.rest_spawns = []
+        if ri_off and ri_off + 0xE4 <= len(data):
+            n = struct.unpack_from('<H', data, ri_off + 0x98)[0]
+            self.rest_spawns = [c for c in (cstr(data[ri_off + 0x48 + k * 8:ri_off + 0x50 + k * 8])
+                                            for k in range(min(n, 10))) if c]
         self.regions = []
         for i in range(reg_n):
             o = reg_off + i * 0xC4

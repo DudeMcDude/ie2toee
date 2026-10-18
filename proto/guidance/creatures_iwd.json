@@ -1,0 +1,1250 @@
+{
+ "_about": [
+  "ie2toee creature guidance for Icewind Dale (classic) and Icewind Dale: Enhanced Edition.",
+  "Authored mapping rules only: IE animation ids (engine constants, see IESDP ANIMATE.IDS) -> ToEE model ids (art/meshes/meshes.mes) and",
+  "ToEE prototype ids (rules/protos.tab), plus our own short labels. No game text, names, stats or art from either game.",
+  "status: match = a ToEE model of the same creature; stand-in = a similar ToEE model (tinted/scaled); missing = no usable ToEE model.",
+  "proto is the preferred template; the converter falls back to any player protos.tab entry using the same model.",
+  "co8_model: a better model that ships with Circle of Eight (Co8) / Temple+ content packs, used when present in the player's meshes.mes."
+ ],
+ "version": 1,
+ "class_based": {
+  "_about": "Track B: humanoid creatures built from their IE class/race/level by formula. proto = level-free template per race/gender.",
+  "anim_ranges": [
+   [
+    "0x4000",
+    "0x4fff"
+   ],
+   [
+    "0x5000",
+    "0x5fff"
+   ],
+   [
+    "0x6000",
+    "0x63ff"
+   ],
+   [
+    "0x6400",
+    "0x6402"
+   ],
+   [
+    "0x6404",
+    "0x64ff"
+   ],
+   [
+    "0x2000",
+    "0x23ff"
+   ],
+   [
+    "0xc600",
+    "0xcaff"
+   ]
+  ],
+  "race_protos": {
+   "HUMAN": [
+    14000,
+    14001
+   ],
+   "ELF": [
+    14201,
+    14072
+   ],
+   "HALF_ELF": [
+    14227,
+    14236
+   ],
+   "DWARF": [
+    14334,
+    14334
+   ],
+   "HALFLING": [
+    14335,
+    14335
+   ],
+   "GNOME": [
+    14073,
+    14071
+   ],
+   "HALFORC": [
+    14069,
+    14069
+   ],
+   "default": [
+    14000,
+    14001
+   ]
+  },
+  "race_models": {
+   "HUMAN": [
+    100,
+    101
+   ],
+   "ELF": [
+    100,
+    101
+   ],
+   "HALF_ELF": [
+    100,
+    101
+   ],
+   "DWARF": [
+    102,
+    103
+   ],
+   "HALFLING": [
+    100,
+    101
+   ],
+   "GNOME": [
+    100,
+    101
+   ],
+   "HALFORC": [
+    104,
+    105
+   ]
+  },
+  "race_scale": {
+   "HALFLING": 60,
+   "GNOME": 65,
+   "ELF": 95
+  },
+  "child_anims": [
+   "0xc700",
+   "0xc710"
+  ],
+  "child_scale": 65,
+  "default_garb": [
+   6142,
+   6143,
+   6144,
+   6145,
+   6146,
+   6147,
+   6148,
+   6149,
+   6150
+  ],
+  "default_boots": 6011,
+  "_garb_about": "Class-based humanoids without body armour get ToEE garb (picked deterministically per creature) and boots, so they are not rendered unclothed."
+ },
+ "families": [
+  {
+   "id": "goblin",
+   "label": "Goblin",
+   "classic": [
+    "0xe408",
+    "0xe412"
+   ],
+   "ee": [
+    "0xe400",
+    "0xe410"
+   ],
+   "model": 1058,
+   "proto": 14186,
+   "status": "match"
+  },
+  {
+   "id": "goblin_elite",
+   "label": "Goblin elite",
+   "classic": [
+    "0xe428",
+    "0xe432"
+   ],
+   "ee": [
+    "0xe420",
+    "0xe430",
+    "0xe270"
+   ],
+   "model": 1055,
+   "proto": 14183,
+   "status": "match"
+  },
+  {
+   "id": "orc",
+   "label": "Orc",
+   "classic": [
+    "0xe818",
+    "0xe822",
+    "0xe838",
+    "0xe842",
+    "0xe859"
+   ],
+   "ee": [
+    "0xe800",
+    "0xe810",
+    "0xe820",
+    "0xe830",
+    "0xe840"
+   ],
+   "model": 104,
+   "proto": 14069,
+   "status": "stand-in",
+   "notes": "half-orc body + orc gear; candidate for a free-model orc"
+  },
+  {
+   "id": "orog",
+   "label": "Orog",
+   "classic": [
+    "0xe868",
+    "0xe878",
+    "0xe88c"
+   ],
+   "ee": [
+    "0xe700",
+    "0xe710",
+    "0xe720"
+   ],
+   "model": 1077,
+   "proto": 14093,
+   "status": "stand-in",
+   "notes": "bugbear body"
+  },
+  {
+   "id": "hobgoblin",
+   "label": "Hobgoblin",
+   "classic": [],
+   "ee": [
+    "0x8100"
+   ],
+   "model": 1060,
+   "proto": 14188,
+   "status": "match"
+  },
+  {
+   "id": "gnoll",
+   "label": "Gnoll",
+   "classic": [],
+   "ee": [
+    "0x8000"
+   ],
+   "model": 1019,
+   "proto": 14067,
+   "status": "match"
+  },
+  {
+   "id": "kobold",
+   "label": "Kobold",
+   "classic": [],
+   "ee": [
+    "0x8200"
+   ],
+   "model": 1018,
+   "proto": 14084,
+   "scale": 70,
+   "status": "stand-in"
+  },
+  {
+   "id": "skeleton",
+   "label": "Skeleton",
+   "classic": [
+    "0x6403",
+    "0xf008",
+    "0xf019"
+   ],
+   "ee": [
+    "0x6403",
+    "0xeb10",
+    "0xeb00"
+   ],
+   "model": 1030,
+   "proto": 14107,
+   "status": "match"
+  },
+  {
+   "id": "skeleton_fiend",
+   "label": "Skeletal fiend",
+   "classic": [
+    "0xe62c"
+   ],
+   "ee": [
+    "0xeb20"
+   ],
+   "model": 1030,
+   "proto": 14107,
+   "scale": 120,
+   "status": "stand-in",
+   "co8_model": 1204
+  },
+  {
+   "id": "zombie",
+   "label": "Zombie",
+   "classic": [
+    "0xe338",
+    "0xe348"
+   ],
+   "ee": [
+    "0xee00",
+    "0xee10",
+    "0xe25f"
+   ],
+   "model": 1032,
+   "proto": 14092,
+   "status": "match"
+  },
+  {
+   "id": "ghoul",
+   "label": "Ghoul",
+   "classic": [
+    "0xe308"
+   ],
+   "ee": [
+    "0xe310"
+   ],
+   "model": 1042,
+   "proto": 14128,
+   "status": "match"
+  },
+  {
+   "id": "ghast",
+   "label": "Ghast",
+   "classic": [
+    "0xe318"
+   ],
+   "ee": [
+    "0xe320"
+   ],
+   "model": 1050,
+   "proto": 14135,
+   "status": "match"
+  },
+  {
+   "id": "wight",
+   "label": "Wight",
+   "classic": [
+    "0xe329",
+    "0xe359",
+    "0xe369"
+   ],
+   "ee": [
+    "0xec00",
+    "0xec10",
+    "0xec20",
+    "0xe25e"
+   ],
+   "model": 1052,
+   "proto": 14137,
+   "status": "stand-in",
+   "notes": "ghast body; candidate for a free model"
+  },
+  {
+   "id": "mummy",
+   "label": "Mummy",
+   "classic": [
+    "0xe388",
+    "0xe389",
+    "0xe39c"
+   ],
+   "ee": [
+    "0xe080",
+    "0xe040"
+   ],
+   "model": 1033,
+   "proto": 14123,
+   "status": "stand-in",
+   "co8_model": 1194
+  },
+  {
+   "id": "shadow",
+   "label": "Shadow",
+   "classic": [
+    "0xe908",
+    "0xe918"
+   ],
+   "ee": [
+    "0xea10",
+    "0xea20"
+   ],
+   "model": 1160,
+   "proto": 14289,
+   "status": "match"
+  },
+  {
+   "id": "ghost",
+   "label": "Ghost",
+   "classic": [
+    "0xe928"
+   ],
+   "ee": [
+    "0xe300",
+    "0xe0f2"
+   ],
+   "model": 1118,
+   "proto": 14280,
+   "status": "stand-in"
+  },
+  {
+   "id": "lich",
+   "label": "Lich",
+   "classic": [
+    "0xeb69",
+    "0xeb79"
+   ],
+   "ee": [
+    "0xe060",
+    "0xe050"
+   ],
+   "model": null,
+   "proto": null,
+   "status": "missing",
+   "co8_model": 1206
+  },
+  {
+   "id": "troll",
+   "label": "Troll",
+   "classic": [
+    "0xe718",
+    "0xe728",
+    "0xe738"
+   ],
+   "ee": [
+    "0xe0b0",
+    "0xe0a0",
+    "0xe0c0",
+    "0xe254",
+    "0x7f00"
+   ],
+   "model": 1109,
+   "proto": 14224,
+   "status": "match",
+   "notes": "ice/snow variants: tint"
+  },
+  {
+   "id": "umber_hulk",
+   "label": "Umber hulk",
+   "classic": [
+    "0xe759"
+   ],
+   "ee": [
+    "0xe0d0"
+   ],
+   "model": 1158,
+   "proto": 14260,
+   "status": "match"
+  },
+  {
+   "id": "vodyanoi",
+   "label": "Vodyanoi",
+   "classic": [],
+   "ee": [
+    "0xe25b"
+   ],
+   "model": 1159,
+   "proto": 14261,
+   "status": "match"
+  },
+  {
+   "id": "yeti",
+   "label": "Yeti",
+   "classic": [
+    "0xe76c"
+   ],
+   "ee": [
+    "0xe25d"
+   ],
+   "model": null,
+   "proto": null,
+   "status": "missing",
+   "notes": "free-model candidate; stand-in polar bear only as a last resort"
+  },
+  {
+   "id": "ogre",
+   "label": "Ogre",
+   "classic": [
+    "0x9000"
+   ],
+   "ee": [
+    "0x9000",
+    "0x7001"
+   ],
+   "model": 1154,
+   "proto": 14249,
+   "status": "match"
+  },
+  {
+   "id": "minotaur",
+   "label": "Minotaur",
+   "classic": [
+    "0xe708"
+   ],
+   "ee": [
+    "0xe070"
+   ],
+   "model": 1101,
+   "proto": 14241,
+   "status": "match"
+  },
+  {
+   "id": "ettin",
+   "label": "Ettin",
+   "classic": [
+    "0xe118"
+   ],
+   "ee": [
+    "0xe010"
+   ],
+   "model": 1098,
+   "proto": 14238,
+   "status": "match"
+  },
+  {
+   "id": "cyclops",
+   "label": "Cyclops",
+   "classic": [
+    "0xe108"
+   ],
+   "ee": [
+    "0xe000"
+   ],
+   "model": 1094,
+   "proto": 14218,
+   "status": "stand-in",
+   "notes": "hill giant body"
+  },
+  {
+   "id": "giant",
+   "label": "Giant (frost, fire, verbeeg)",
+   "classic": [
+    "0xe138",
+    "0xf308",
+    "0xe148"
+   ],
+   "ee": [
+    "0xe24f",
+    "0xe24e",
+    "0xe251"
+   ],
+   "model": 1093,
+   "proto": 14217,
+   "status": "stand-in",
+   "co8_model": 1195,
+   "notes": "hill giant body, tinted per kind"
+  },
+  {
+   "id": "elemental_earth",
+   "label": "Earth elemental",
+   "classic": [
+    "0xe218"
+   ],
+   "ee": [
+    "0xe24b",
+    "0x7300",
+    "0x7301"
+   ],
+   "model": 1131,
+   "proto": 14296,
+   "status": "match"
+  },
+  {
+   "id": "elemental_fire",
+   "label": "Fire elemental",
+   "classic": [
+    "0xe228"
+   ],
+   "ee": [
+    "0xe24c",
+    "0x7310",
+    "0x7311"
+   ],
+   "model": 1136,
+   "proto": 14298,
+   "status": "match"
+  },
+  {
+   "id": "elemental_water",
+   "label": "Water elemental",
+   "classic": [
+    "0xe238"
+   ],
+   "ee": [
+    "0xe24d",
+    "0xef10"
+   ],
+   "model": 1150,
+   "proto": 14302,
+   "status": "match"
+  },
+  {
+   "id": "elemental_air",
+   "label": "Air elemental",
+   "classic": [],
+   "ee": [
+    "0x7320",
+    "0x7321"
+   ],
+   "model": 1128,
+   "proto": 14292,
+   "status": "match"
+  },
+  {
+   "id": "salamander",
+   "label": "Salamander",
+   "classic": [
+    "0xebd8",
+    "0xebe8"
+   ],
+   "ee": [
+    "0xe900",
+    "0xe910"
+   ],
+   "model": 1026,
+   "proto": 14111,
+   "status": "match",
+   "notes": "frost variant: tint + cold subtype"
+  },
+  {
+   "id": "beetle",
+   "label": "Giant beetle",
+   "classic": [
+    "0xe000",
+    "0xe012",
+    "0xe022",
+    "0xe038",
+    "0xe048"
+   ],
+   "ee": [
+    "0xe200",
+    "0xe210",
+    "0xe220",
+    "0xe230"
+   ],
+   "model": null,
+   "proto": null,
+   "status": "missing",
+   "notes": "free-model candidate (vermin)"
+  },
+  {
+   "id": "spider",
+   "label": "Giant spider",
+   "classic": [
+    "0x7a00",
+    "0x7a01",
+    "0x7a02",
+    "0x7a03",
+    "0x7a04"
+   ],
+   "ee": [
+    "0x7a00",
+    "0x7a01",
+    "0x7a02",
+    "0x7a03",
+    "0x7a04"
+   ],
+   "model": 1001,
+   "proto": 14047,
+   "status": "match",
+   "co8_model": 1190,
+   "notes": "phase/sword/wraith variants: tint"
+  },
+  {
+   "id": "wolf",
+   "label": "Wolf",
+   "classic": [
+    "0x7b00",
+    "0x7b03"
+   ],
+   "ee": [
+    "0x7b00",
+    "0x7b01",
+    "0x7b02",
+    "0x7b03"
+   ],
+   "model": 1006,
+   "proto": 14050,
+   "status": "match",
+   "notes": "winter wolf: tint + cold subtype; dire/worg: scale"
+  },
+  {
+   "id": "dog",
+   "label": "Dog",
+   "classic": [],
+   "ee": [
+    "0x7400",
+    "0x7401"
+   ],
+   "model": 1003,
+   "proto": 14049,
+   "status": "match"
+  },
+  {
+   "id": "bear_black",
+   "label": "Black bear",
+   "classic": [
+    "0x7200"
+   ],
+   "ee": [
+    "0x7200"
+   ],
+   "model": 1004,
+   "proto": 14052,
+   "status": "match"
+  },
+  {
+   "id": "bear_brown",
+   "label": "Brown/cave bear",
+   "classic": [
+    "0x7202"
+   ],
+   "ee": [
+    "0x7201",
+    "0x7202"
+   ],
+   "model": 1005,
+   "proto": 14053,
+   "status": "match"
+  },
+  {
+   "id": "bear_polar",
+   "label": "Polar bear",
+   "classic": [
+    "0x7203"
+   ],
+   "ee": [
+    "0x7203"
+   ],
+   "model": 1010,
+   "proto": 14054,
+   "status": "match"
+  },
+  {
+   "id": "wyvern",
+   "label": "Wyvern",
+   "classic": [
+    "0xa000"
+   ],
+   "ee": [
+    "0xa000",
+    "0xa200",
+    "0x1000",
+    "0x1003"
+   ],
+   "model": null,
+   "proto": null,
+   "status": "missing",
+   "notes": "free-model candidate"
+  },
+  {
+   "id": "dragon_white",
+   "label": "White dragon",
+   "classic": [],
+   "ee": [
+    "0x1101"
+   ],
+   "model": 1028,
+   "proto": 14109,
+   "scale": 250,
+   "status": "stand-in"
+  },
+  {
+   "id": "carrion_crawler",
+   "label": "Carrion crawler",
+   "classic": [
+    "0xa100"
+   ],
+   "ee": [
+    "0xa100"
+   ],
+   "model": 1062,
+   "proto": 14190,
+   "status": "match"
+  },
+  {
+   "id": "myconid",
+   "label": "Myconid",
+   "classic": [
+    "0xeb99",
+    "0xeba9"
+   ],
+   "ee": [
+    "0xe600",
+    "0xe610"
+   ],
+   "model": 1111,
+   "proto": 14273,
+   "status": "stand-in",
+   "notes": "violet fungus body"
+  },
+  {
+   "id": "shrieker",
+   "label": "Shrieker",
+   "classic": [
+    "0xebb1"
+   ],
+   "ee": [
+    "0xea00"
+   ],
+   "model": 1120,
+   "proto": 14282,
+   "status": "match"
+  },
+  {
+   "id": "lizardfolk",
+   "label": "Lizardfolk",
+   "classic": [
+    "0xf209",
+    "0xf218",
+    "0xe899"
+   ],
+   "ee": [
+    "0xe500",
+    "0xe510",
+    "0xe520"
+   ],
+   "model": 1016,
+   "proto": 14086,
+   "status": "match",
+   "notes": "king: scale 130"
+  },
+  {
+   "id": "yuan_ti",
+   "label": "Yuan-ti",
+   "classic": [
+    "0xf10e",
+    "0xf11e",
+    "0xe8a1"
+   ],
+   "ee": [
+    "0xed00",
+    "0xed10",
+    "0xed20"
+   ],
+   "model": null,
+   "proto": null,
+   "status": "missing",
+   "notes": "free-model pipeline already produced a yuan-ti test model (Blender-ToEE PR #3)"
+  },
+  {
+   "id": "svirfneblin",
+   "label": "Deep gnome",
+   "classic": [
+    "0xe449",
+    "0xe459"
+   ],
+   "ee": [
+    "0xe259",
+    "0xe25a"
+   ],
+   "model": 102,
+   "proto": 14334,
+   "scale": 80,
+   "status": "stand-in",
+   "notes": "dwarf body, grey skin"
+  },
+  {
+   "id": "animated_plate",
+   "label": "Animated armor",
+   "classic": [
+    "0xeb08",
+    "0xeb18",
+    "0xeb28"
+   ],
+   "ee": [
+    "0xe240",
+    "0xe241",
+    "0xe242"
+   ],
+   "model": 100,
+   "proto": 14000,
+   "status": "stand-in",
+   "notes": "human body hidden under full plate + great helm"
+  },
+  {
+   "id": "golem",
+   "label": "Golem",
+   "classic": [
+    "0xe51d"
+   ],
+   "ee": [
+    "0xe250",
+    "0x7f04",
+    "0x7f07",
+    "0xe0f0"
+   ],
+   "model": 1104,
+   "proto": 14244,
+   "status": "stand-in",
+   "co8_model": 1235
+  },
+  {
+   "id": "demon_large",
+   "label": "Large demon",
+   "classic": [
+    "0xeb39",
+    "0xeb49",
+    "0xebcd"
+   ],
+   "ee": [
+    "0xe256",
+    "0xe257",
+    "0xe25c",
+    "0x1103",
+    "0x1104"
+   ],
+   "model": 1123,
+   "proto": 14286,
+   "status": "stand-in"
+  },
+  {
+   "id": "glabrezu",
+   "label": "Glabrezu",
+   "classic": [],
+   "ee": [
+    "0xe0f1"
+   ],
+   "model": 1110,
+   "proto": 14263,
+   "status": "match"
+  },
+  {
+   "id": "devil",
+   "label": "Devil",
+   "classic": [],
+   "ee": [
+    "0xe0e0"
+   ],
+   "model": null,
+   "proto": null,
+   "status": "missing",
+   "co8_model": 1183
+  },
+  {
+   "id": "harpy",
+   "label": "Harpy",
+   "classic": [],
+   "ee": [
+    "0xe252"
+   ],
+   "model": 1103,
+   "proto": 14243,
+   "status": "match"
+  },
+  {
+   "id": "remorhaz",
+   "label": "Remorhaz",
+   "classic": [],
+   "ee": [
+    "0xe253"
+   ],
+   "model": null,
+   "proto": null,
+   "status": "missing"
+  },
+  {
+   "id": "sahuagin",
+   "label": "Sahuagin",
+   "classic": [],
+   "ee": [
+    "0xe261",
+    "0xe262"
+   ],
+   "model": 1018,
+   "proto": 14084,
+   "status": "stand-in",
+   "notes": "lizardfolk body"
+  },
+  {
+   "id": "creeping_doom",
+   "label": "Insect swarm",
+   "classic": [
+    "0xea20"
+   ],
+   "ee": [
+    "0xe260"
+   ],
+   "model": null,
+   "proto": null,
+   "status": "missing",
+   "notes": "particle effect rather than a model"
+  },
+  {
+   "id": "unique_seer",
+   "label": "Unique NPC with a dedicated animation (seer)",
+   "classic": [],
+   "ee": [
+    "0xe255"
+   ],
+   "model": 101,
+   "proto": 14001,
+   "status": "stand-in"
+  },
+  {
+   "id": "unique_druid",
+   "label": "Unique NPC with a dedicated animation (druid)",
+   "classic": [
+    "0xebf1"
+   ],
+   "ee": [
+    "0xe243"
+   ],
+   "model": 100,
+   "proto": 14000,
+   "status": "stand-in",
+   "track": "class"
+  },
+  {
+   "id": "barbarian",
+   "label": "Northern barbarian",
+   "classic": [],
+   "ee": [
+    "0xe244",
+    "0xe245",
+    "0xe246",
+    "0xe247",
+    "0xe248",
+    "0xe249",
+    "0xe24a"
+   ],
+   "model": 100,
+   "proto": 14000,
+   "status": "stand-in",
+   "track": "class"
+  },
+  {
+   "id": "boar",
+   "label": "Boar",
+   "classic": [],
+   "ee": [
+    "0xe265"
+   ],
+   "model": 1149,
+   "proto": 14369,
+   "status": "stand-in"
+  },
+  {
+   "id": "snake",
+   "label": "Snake",
+   "classic": [],
+   "ee": [
+    "0x7f13"
+   ],
+   "model": 1138,
+   "proto": 14088,
+   "scale": 40,
+   "status": "stand-in"
+  },
+  {
+   "id": "rat",
+   "label": "Rat",
+   "classic": [],
+   "ee": [
+    "0xc300"
+   ],
+   "model": 1008,
+   "proto": 14056,
+   "scale": 50,
+   "status": "stand-in"
+  },
+  {
+   "id": "chicken",
+   "label": "Chicken",
+   "classic": [
+    "0xc200"
+   ],
+   "ee": [
+    "0xc200"
+   ],
+   "model": 1139,
+   "proto": 14362,
+   "status": "match"
+  },
+  {
+   "id": "livestock",
+   "label": "Cow / horse",
+   "classic": [
+    "0xb000"
+   ],
+   "ee": [
+    "0xb000",
+    "0xb100"
+   ],
+   "model": null,
+   "proto": null,
+   "status": "missing",
+   "notes": "ambient; ToEE has sheep/pigs only"
+  },
+  {
+   "id": "small_animal",
+   "label": "Cat / squirrel / rabbit / groundhog",
+   "classic": [
+    "0xc100",
+    "0xc400"
+   ],
+   "ee": [
+    "0xc100",
+    "0xc400",
+    "0x7f17",
+    "0x7f20"
+   ],
+   "model": 1008,
+   "proto": 14056,
+   "scale": 35,
+   "status": "stand-in",
+   "notes": "ambient critters: rat body"
+  },
+  {
+   "id": "bird",
+   "label": "Bird / bat",
+   "classic": [
+    "0xd400"
+   ],
+   "ee": [
+    "0xd300",
+    "0xd400",
+    "0xc000"
+   ],
+   "model": null,
+   "proto": null,
+   "status": "missing",
+   "notes": "ambient; could be a particle/2D effect"
+  },
+  {
+   "id": "basilisk",
+   "label": "Basilisk",
+   "classic": [],
+   "ee": [
+    "0x7100"
+   ],
+   "model": 1125,
+   "proto": 14295,
+   "status": "match"
+  },
+  {
+   "id": "great_cat",
+   "label": "Great cat",
+   "classic": [],
+   "ee": [
+    "0x7f0a",
+    "0x7f0b"
+   ],
+   "model": null,
+   "proto": null,
+   "status": "missing"
+  },
+  {
+   "id": "werewolf",
+   "label": "Werewolf",
+   "classic": [],
+   "ee": [
+    "0x7e00",
+    "0x7e01"
+   ],
+   "model": 1031,
+   "proto": 14138,
+   "status": "stand-in"
+  },
+  {
+   "id": "ooze",
+   "label": "Ooze / slime",
+   "classic": [],
+   "ee": [
+    "0x7901",
+    "0x7902",
+    "0x7903",
+    "0x7f39"
+   ],
+   "model": 1044,
+   "proto": 14091,
+   "status": "match"
+  },
+  {
+   "id": "shambling_mound",
+   "label": "Shambling mound",
+   "classic": [],
+   "ee": [
+    "0x7302"
+   ],
+   "model": 1119,
+   "proto": 14281,
+   "status": "stand-in"
+  },
+  {
+   "id": "outsider_misc",
+   "label": "Other BG2-engine extras (imp, djinni, rakshasa, beholder, mind flayer, devas ...)",
+   "classic": [],
+   "ee": [
+    "0x7f01",
+    "0x7f02",
+    "0x7f03",
+    "0x7f05",
+    "0x7f06",
+    "0x7f10",
+    "0x7f19",
+    "0x7f22",
+    "0x7f2b",
+    "0x7f2d",
+    "0x7f33",
+    "0x7f34",
+    "0x7f38",
+    "0x7f3c",
+    "0x7f41",
+    "0x7f49",
+    "0x7f4c",
+    "0x7f4d",
+    "0x7f50",
+    "0x7f51",
+    "0x7600",
+    "0x7701",
+    "0x2000",
+    "0x2300"
+   ],
+   "model": null,
+   "proto": null,
+   "status": "missing",
+   "notes": "mostly summons/cameos in EE-only content; judge case by case"
+  }
+ ],
+ "items": {
+  "_about": "IE item type (ITM 0x1c, IESDP item types) -> mundane ToEE item proto. Enchantment (ITM 0x60) is applied as a Weapon/Armor Enhancement Bonus condition. two_handed_by_type is used instead when the ITM is two-handed (flags bit 1). Slots selected_weapon/selected_ability are bookkeeping, not items.",
+  "by_type": {
+   "2": 6013,
+   "7": 6032,
+   "12": 6076,
+   "15": 4087,
+   "16": 4060,
+   "17": 4071,
+   "18": 4115,
+   "19": 4043,
+   "20": 4036,
+   "21": 4077,
+   "22": 4070,
+   "23": 4207,
+   "24": 4127,
+   "25": 4062,
+   "26": 4110,
+   "27": 4096,
+   "29": 4117,
+   "30": 4113,
+   "41": 6059,
+   "44": 4074,
+   "47": 6060,
+   "49": 6060,
+   "53": 6076,
+   "57": 4015,
+   "69": 4015,
+   "5": 5004,
+   "31": 5005,
+   "14": 5007
+  },
+  "armor_by_anim": {
+   "2A": 6013,
+   "3A": 6019,
+   "4A": 6039,
+   "2W": 6081,
+   "3W": 6081,
+   "4W": 6081
+  },
+  "bow_by_name_hint": {
+   "short": 4201,
+   "long": 4087
+  },
+  "two_handed_by_type": {
+   "57": 4010,
+   "25": 4064,
+   "21": 4203
+  }
+ },
+ "spells": {
+  "_about": "Spell resref overrides (IE resref -> Temple+ spell enum name). Most spells match by the player's own spell names plus the WotC Conversion Manual rename list (docs/creatures.md); list only exceptions here.",
+  "overrides": {}
+ }
+}
