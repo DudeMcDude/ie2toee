@@ -129,6 +129,18 @@ folder, because the UI reads them before modules mount. At runtime (`proto/runti
 creatures carry their converted items, IE containers are filled, and IE stores open the ToEE barter screen. The
 ITEM-ADJ adjudication list, coverage and open items are in [docs/items.md](docs/items.md).
 
+## Player preview
+
+`proto/ie2toee_preview.py` is a one-command build for players: it runs the map, spell, item, creature, dialogue,
+dialog-skin and bake steps for the town area AR1000 on the player's own IWD or IWD:EE install, and assembles a ToEE
+module overlay (`modules/ToEE`, `modules/ToEE_core`, `data/`) that it can also copy into a ToEE folder:
+
+    python proto/ie2toee_preview.py --iwd "<IWD or IWD:EE>" --toee "<ToEE copy>" --tp "<preview Temple+>" --install
+
+In game: `import iwd; iwd.go()` in the Temple+ console travels to the town. The player package (Windows) wraps it
+in `preview/convert.bat` with `preview/requirements.txt`; `preview/README.txt` is the player README. The package
+also needs the Temple+ build with the dialog skin and the door hooks (`proto/runtime/templeplus-hooks.diff`).
+
 ## Files
 
 | file | purpose |
