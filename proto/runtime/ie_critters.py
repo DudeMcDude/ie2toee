@@ -110,10 +110,19 @@ def apply(o, s):
     got = []
     for it in s.get('items') or ():
         try:
-            item = game.obj_create(int(it['proto']), o.location)
+            item = None
+            if it.get('res'):
+                try:
+                    import ie_itemrt
+                    ie_itemrt.LOG[0] = LOG[0]
+                    item = ie_itemrt.make(it['res'], o.location)
+                except ImportError:
+                    item = None
+            if item is None:
+                item = game.obj_create(int(it['proto']), o.location)
             r = o.item_get(item)
             got.append((it, item, r))
-            _log('  item_get %s -> %s' % (it['proto'], r))
+            _log('  item_get %s %s -> %s' % (it['proto'], it.get('res', ''), r))
         except Exception, e:
             _log('  item %s failed: %s' % (it, e))
     wear(o, s)

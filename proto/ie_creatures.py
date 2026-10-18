@@ -487,8 +487,15 @@ class Converter(object):
         # ---- gear
         items = []
         ib = self.gd.g['items']
+        im = self.item_mapper
         for slot, ref, it in gear:
             pid2 = None
+            if im is not None and self.opt.get('gear', 'items') == 'items':     # ITEMS phase: real converted items
+                e = im.map(ref)
+                if e.get('proto'):
+                    items.append({'slot': slot, 'proto': e['proto'], 'res': ref, 'ie_type': it.type_name,
+                                  'enchantment': it.enchantment, 'status': e['status']})
+                    continue
             if it.type == 2:
                 pid2 = ib['armor_by_anim'].get(it.anim.upper())
             if pid2 is None and it.flags & 2:
@@ -522,6 +529,18 @@ class Converter(object):
         spec['status'] = 'ok'
         spec['notes'] = notes
         return spec
+
+    @property
+    def item_mapper(self):
+        """ie_items.ItemMapper (docs/items.md) when the item guidance is there; None -> the creatures-phase stand-in gear."""
+        if getattr(self, '_items', False) is False:
+            try:
+                import ie_items
+                self._items = ie_items.ItemMapper(self.game, self.toee.td.root, self.tp_root)
+            except Exception as e:
+                print('item mapper unavailable (%s): stand-in gear' % e)
+                self._items = None
+        return self._items
 
     @property
     def spells(self):

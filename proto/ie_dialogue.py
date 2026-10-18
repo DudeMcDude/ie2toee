@@ -103,6 +103,8 @@ class DlgConv(object):
                                      % (fn, self.g.action_list(acts or []), pystr(jour) if jour else 'None'))
                         effect = '%s(npc, pc)' % fn
                     ans = 0 if t['end'] else self.line(t['next_dlg'] or r, t['next_state'])
+                    if any(getattr(a_, 'name', '').lower() == 'startstore' for a_ in acts):
+                        pt = 'B:' + pt      # ToEE opens the barter screen on "B:" responses (vanilla merchants)
                     out_lines.append('{%d}{%s}{}{1}{%s}{%d}{%s}' % (tl, pt, test, ans, effect))
                 out_lines.append('')
         # entry: states with triggers, in state-trigger-table order (the IE checks them in that order)

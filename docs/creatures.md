@@ -207,6 +207,13 @@ or are class-based; only about 10–13 % need new art. The report itself stays l
 * Converted names are written to both the description and the "unknown description" field, because IE shows names
   without an introduction.
 
+- Items phase changes:
+  - `toeedata.py` now mounts only what Temple+ mounts. It dropped `ToEESteam*.dat`, so some Steam-only protos that
+    Temple+ can't create no longer appear as choices.
+  - It reads `protos.tab` split on `\n` only.
+  - Creature gear defaults to the real converted items (`gear=items`, see [items.md](items.md)). The stand-in gear
+    is the fallback.
+
 ## Prototype: the first town area (AR1000)
 
 `out/local_tests.sh cre_ar1000 IWD|IWDEE` (local) runs the test as follows:

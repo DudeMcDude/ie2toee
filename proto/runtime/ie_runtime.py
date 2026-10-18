@@ -360,16 +360,13 @@ class _Triggers(object):
     def PartyGoldGT(self, c, n): return _party_gold() > n
     def PartyGoldLT(self, c, n): return _party_gold() < n
     def PartyHasItem(self, c, res):
-        p = item_proto(res)
-        if p is None:
-            return False
         for pc in _party():
-            if pc.item_find_by_proto(p):
+            if item_find(pc, res):
                 return True
         return False
     def HasItem(self, c, res, obj=None):
-        p = item_proto(res); o = obj if obj is not None else c.me
-        return bool(p and o and o.item_find_by_proto(p))
+        o = obj if obj is not None else c.me
+        return bool(item_find(o, res))
     def Gender(self, c, obj, g):
         try:   # IE gender.ids 1 MALE 2 FEMALE; ToEE stat_gender: gender_male = 1, gender_female = 0
             return {1: 1, 2: 0}.get(g, -1) == obj.stat_level_get(stat_gender)
@@ -472,19 +469,27 @@ def _ie_stat(obj, stat):
         return 0
     return obj.stat_level_get(globals()[n])
 
-# items: IE resref -> ToEE proto number (guidance data written by the TC; unknown items are logged)
-ITEMS = {}
+# items: IE resref -> converted item (ie_itemrt + the generated ie_itemmap; docs/items.md). Unknown items are logged.
 try:
-    import ie_items
-    ITEMS = ie_items.ITEMS
+    import ie_itemrt
 except ImportError:
-    pass
+    ie_itemrt = None
 
 def item_proto(res):
-    p = ITEMS.get(res.lower())
-    if p is None:
+    if ie_itemrt is None:
         log_once('item:' + res.lower(), 'IE_ITEM_UNMAPPED %s' % res)
-    return p
+        return None
+    return ie_itemrt.proto(res)
+
+def item_find(holder, res):
+    if ie_itemrt is None or holder is None:
+        return None
+    return ie_itemrt.find(holder, res)
+
+def item_give(res, holder):
+    if ie_itemrt is None or holder is None:
+        return None
+    return ie_itemrt.give(res, holder)
 
 # ------------------------------------------------------------------------------------------------ dialogue
 def times_talked(c):
@@ -633,7 +638,10 @@ class _Actions(object):
     def StartStore(self, c, store, obj):
         log('STORE %s' % store)
         try:
-            (obj or _pc(c)).barter(c.me)
+            if ie_itemrt is not None and ie_itemrt.STORES.has_key(store.lower()):
+                ie_itemrt.open_store(store, c.me, obj or _pc(c))
+            else:
+                (obj or _pc(c)).barter(c.me)
         except Exception as e:
             log('IE_ERR StartStore: %s' % e)
     def Enemy(self, c):
@@ -682,25 +690,22 @@ class _Actions(object):
     AddXpVar = AddXPVar
     def AddexperienceParty(self, c, xp): self.AddXPVar(c, '', xp)
     def GiveItem(self, c, res, obj):
-        p = item_proto(res)
-        if p and obj is not None and IN_GAME:
-            it = c.me.item_find_by_proto(p)
+        if obj is not None and IN_GAME:
+            it = item_find(c.me, res)
             if it:
-                it.item_transfer_to(obj) if hasattr(it, 'item_transfer_to') else c.me.item_transfer_to(obj, p)
+                obj.item_get(it)
             else:
-                create_item_in_inventory(p, obj)
+                item_give(res, obj)
         log('GIVE %s -> %s' % (res, obj is not None and 'target' or 'none'))
     def GiveItemCreate(self, c, res, obj, a=0, b=0, d=0):
-        p = item_proto(res)
-        if p and obj is not None and IN_GAME:
-            create_item_in_inventory(p, obj)
+        if obj is not None and IN_GAME:
+            item_give(res, obj)
         log('CREATE_ITEM %s' % res)
     def TakePartyItem(self, c, res):
-        p = item_proto(res)
         log('TAKE %s' % res)
-        if p and IN_GAME:
+        if IN_GAME:
             for pc in _party():
-                it = pc.item_find_by_proto(p)
+                it = item_find(pc, res)
                 if it:
                     it.destroy(); return
     def TakePartyGold(self, c, gp):

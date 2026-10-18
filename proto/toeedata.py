@@ -46,7 +46,9 @@ class ToEEData(object):
         mdir = os.path.join(root, 'modules')
         if os.path.isdir(mdir):
             for n in sorted(os.listdir(mdir)):
-                if n.lower().startswith(module.lower()) and n.lower().endswith('.dat'):
+                # Temple+ mounts <module>_core.dat and <module>.dat only (TemplePlus.log), not the Steam
+                # edition's ToEESteam*.dat, so protos that only exist there cannot be created in game
+                if n.lower() in ((module + '_core.dat').lower(), (module + '.dat').lower()):
                     self.sources.append(DatArchive(os.path.join(mdir, n)))
         self.loose = [os.path.join(root, 'data'), os.path.join(root, 'modules', module)]
 
@@ -75,7 +77,7 @@ class ToEEData(object):
     def protos(self):
         """{proto id: list of 334 column strings} for every row in rules/protos.tab."""
         rows = {}
-        for line in self.read('rules/protos.tab').decode('latin-1').splitlines():
+        for line in self.read('rules/protos.tab').decode('latin-1').split('\n'):
             r = line.split('\t')
             if r and r[0].isdigit():
                 rows.setdefault(int(r[0]), r + [''] * (334 - len(r)))

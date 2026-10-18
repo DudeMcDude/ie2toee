@@ -112,6 +112,17 @@ list and the plan for IWD-only spells are in [docs/spells.md](docs/spells.md).
   `TP_AUTOEXEC` environment variables (not part of this repo). Runs in a private wine prefix.
 * `ingame_overlay.py`: aligns a screenshot with the ground art and draws the blocking and door rectangles over it.
 
+### Items (prototype)
+
+`proto/ie_items.py` surveys every item an IE game uses: creature inventories, area containers, stores, and
+`GiveItem` / `CreateItem` in scripts and dialogs. It reads ITM / STO with `proto/ieitm.py` and maps each item to a
+ToEE proto, either directly or as a base proto plus Temple+ item conditions. The mapping uses an authored guidance
+table of resref → ToEE proto ids (`proto/guidance/items_iwd.json`), and the spells guidance for scrolls, potions and
+wands. `convert` exports the IE inventory icons to ToEE TGAs on the player's machine. These go in the game's `data/`
+folder, because the UI reads them before modules mount. At runtime (`proto/runtime/ie_itemrt.py`), converted
+creatures carry their converted items, IE containers are filled, and IE stores open the ToEE barter screen. The
+ITEM-ADJ adjudication list, coverage and open items are in [docs/items.md](docs/items.md).
+
 ## Files
 
 | file | purpose |
@@ -134,4 +145,8 @@ list and the plan for IWD-only spells are in [docs/spells.md](docs/spells.md).
 | `proto/ie_spells.py` | spell survey, coverage, mapper and runtime map writer; SPL-ADJ options |
 | `proto/runtime/ie_spellrt.py` | Temple+ spell runtime (spell lists, IE casting actions) |
 | `proto/guidance/spells_iwd.json` | authored IE resref → Temple+ spell mapping per flavour (ids and Temple+ labels only) |
+| `proto/ieitm.py` | ITM V1 (classic + EE), STO and ARE container-item readers |
+| `proto/ie_items.py` | item survey, coverage, mapper and runtime map / icon / name writer; ITEM-ADJ options |
+| `proto/runtime/ie_itemrt.py` | Temple+ item runtime (create, give, find, containers, stores) |
+| `proto/guidance/items_iwd.json` | authored IE resref → ToEE proto mapping (ids and ToEE labels only) |
 | `proto/guidance/*.json` | guidance format example (placeholders only) |

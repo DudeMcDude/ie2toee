@@ -1,0 +1,865 @@
+{
+ "about": "IE item -> ToEE / Temple+ item guidance (docs/items.md). Ids are ToEE proto numbers; labels are ToEE's own proto names. Rules are matched first-to-last; 'overrides' (IE resrefs) win over rules. Contains no IE names, text or numbers. Proto ids are the ones Temple+ loads (ToEE*.dat + modules/ToEE.dat; the Steam edition's ToEESteam*.dat is not mounted).",
+ "weapons": [
+  {
+   "types": [
+    20,
+    57,
+    69
+   ],
+   "prof": [
+    89
+   ],
+   "proto": 4015,
+   "label": "Bastard sword"
+  },
+  {
+   "types": [
+    20,
+    57
+   ],
+   "prof": [
+    93
+   ],
+   "proto": 4010,
+   "label": "Greatsword"
+  },
+  {
+   "types": [
+    20,
+    19
+   ],
+   "prof": [
+    94
+   ],
+   "proto": 4034,
+   "label": "Katana"
+  },
+  {
+   "types": [
+    20,
+    19
+   ],
+   "prof": [
+    95
+   ],
+   "proto": 4045,
+   "label": "Scimitar"
+  },
+  {
+   "types": [
+    20
+   ],
+   "prof": [
+    90
+   ],
+   "proto": 4036,
+   "label": "Longsword"
+  },
+  {
+   "types": [
+    69
+   ],
+   "proto": 4015,
+   "label": "Bastard sword"
+  },
+  {
+   "types": [
+    20,
+    57
+   ],
+   "anim": [
+    "S1",
+    "S0",
+    "FS"
+   ],
+   "dice": [
+    "2d4"
+   ],
+   "proto": 4015,
+   "label": "Bastard sword"
+  },
+  {
+   "types": [
+    20,
+    57
+   ],
+   "anim": [
+    "S2"
+   ],
+   "proto": 4010,
+   "label": "Greatsword"
+  },
+  {
+   "types": [
+    57
+   ],
+   "proto": 4010,
+   "label": "Greatsword"
+  },
+  {
+   "types": [
+    20
+   ],
+   "anim": [
+    "S3"
+   ],
+   "proto": 4034,
+   "label": "Katana"
+  },
+  {
+   "types": [
+    20
+   ],
+   "anim": [
+    "SC"
+   ],
+   "proto": 4045,
+   "label": "Scimitar"
+  },
+  {
+   "types": [
+    20
+   ],
+   "proto": 4036,
+   "label": "Longsword"
+  },
+  {
+   "types": [
+    19
+   ],
+   "proto": 4049,
+   "label": "Shortsword"
+  },
+  {
+   "types": [
+    16
+   ],
+   "proto": 4060,
+   "label": "Dagger"
+  },
+  {
+   "types": [
+    25
+   ],
+   "two_handed": true,
+   "proto": 4064,
+   "label": "Greataxe"
+  },
+  {
+   "types": [
+    25
+   ],
+   "anim": [
+    "HB"
+   ],
+   "proto": 4064,
+   "label": "Greataxe"
+  },
+  {
+   "types": [
+    25
+   ],
+   "attack": [
+    "ranged"
+   ],
+   "proto": 4067,
+   "label": "Handaxe"
+  },
+  {
+   "types": [
+    25
+   ],
+   "dice": [
+    "1d6"
+   ],
+   "proto": 4067,
+   "label": "Handaxe"
+  },
+  {
+   "types": [
+    25
+   ],
+   "proto": 4114,
+   "label": "Battleaxe"
+  },
+  {
+   "types": [
+    17,
+    44
+   ],
+   "prof": [
+    115
+   ],
+   "proto": 4074,
+   "label": "Club"
+  },
+  {
+   "types": [
+    17,
+    44
+   ],
+   "anim": [
+    "CL"
+   ],
+   "proto": 4074,
+   "label": "Club"
+  },
+  {
+   "types": [
+    44
+   ],
+   "proto": 4074,
+   "label": "Club"
+  },
+  {
+   "types": [
+    17
+   ],
+   "proto": 4068,
+   "label": "Heavy mace"
+  },
+  {
+   "types": [
+    21
+   ],
+   "proto": 4077,
+   "label": "Warhammer"
+  },
+  {
+   "types": [
+    22
+   ],
+   "proto": 4070,
+   "label": "Morningstar"
+  },
+  {
+   "types": [
+    23
+   ],
+   "two_handed": true,
+   "proto": 4207,
+   "label": "Heavy flail"
+  },
+  {
+   "types": [
+    23
+   ],
+   "proto": 4207,
+   "label": "Heavy flail"
+  },
+  {
+   "types": [
+    26
+   ],
+   "proto": 4110,
+   "label": "Quarterstaff"
+  },
+  {
+   "types": [
+    29
+   ],
+   "proto": 4117,
+   "label": "Spear"
+  },
+  {
+   "types": [
+    30
+   ],
+   "proto": 4118,
+   "label": "Glaive"
+  },
+  {
+   "types": [
+    15
+   ],
+   "prof": [
+    105
+   ],
+   "proto": 4201,
+   "label": "Shortbow"
+  },
+  {
+   "types": [
+    15
+   ],
+   "proto": 4087,
+   "label": "Longbow"
+  },
+  {
+   "types": [
+    27
+   ],
+   "speed_min": 7,
+   "proto": 4097,
+   "label": "Heavy crossbow"
+  },
+  {
+   "types": [
+    27
+   ],
+   "proto": 4096,
+   "label": "Light crossbow"
+  },
+  {
+   "types": [
+    18
+   ],
+   "proto": 4115,
+   "label": "Sling"
+  },
+  {
+   "types": [
+    24
+   ],
+   "proto": 4127,
+   "label": "Dart"
+  }
+ ],
+ "ammo": {
+  "5": {
+   "0": [
+    5004,
+    "Quiver of arrows"
+   ],
+   "1": [
+    5006,
+    "Quiver of arrows +1"
+   ],
+   "2": [
+    5009,
+    "Quiver of arrows +2"
+   ],
+   "3": [
+    5010,
+    "Quiver of arrows +3"
+   ]
+  },
+  "31": {
+   "0": [
+    5005,
+    "Quarrel of bolts"
+   ],
+   "1": [
+    5011,
+    "Quarrel of bolts +1"
+   ],
+   "2": [
+    5012,
+    "Quarrel of bolts +2"
+   ],
+   "3": [
+    5013,
+    "Quarrel of bolts +3"
+   ]
+  },
+  "14": {
+   "0": [
+    5007,
+    "Pouch of bullets"
+   ]
+  }
+ },
+ "armor": [
+  {
+   "anim": [
+    "2A"
+   ],
+   "has_mod": [
+    [
+     -2,
+     4
+    ]
+   ],
+   "mundane_ac": 8,
+   "proto": 6013,
+   "label": "Leather armor"
+  },
+  {
+   "anim": [
+    "2A"
+   ],
+   "mundane_ac": 7,
+   "proto": 6056,
+   "label": "Studded leather"
+  },
+  {
+   "anim": [
+    "3A"
+   ],
+   "has_mod": [
+    [
+     2,
+     1
+    ],
+    [
+     1,
+     4
+    ]
+   ],
+   "mundane_ac": 4,
+   "proto": 6096,
+   "label": "Splint mail"
+  },
+  {
+   "anim": [
+    "3A"
+   ],
+   "mundane_ac": 5,
+   "proto": 6019,
+   "label": "Chainmail armor"
+  },
+  {
+   "anim": [
+    "4A"
+   ],
+   "has_mod": [
+    [
+     3,
+     4
+    ]
+   ],
+   "mundane_ac": 1,
+   "proto": 6039,
+   "label": "Full plate armor"
+  },
+  {
+   "anim": [
+    "4A"
+   ],
+   "mundane_ac": 3,
+   "proto": 6158,
+   "label": "Half-plate"
+  },
+  {
+   "anim": [
+    "2W",
+    "3W",
+    "4W"
+   ],
+   "mundane_ac": 10,
+   "robe": true,
+   "proto": 6081,
+   "label": "Robes"
+  }
+ ],
+ "shields": {
+  "41": [
+   6059,
+   "Buckler"
+  ],
+  "47": [
+   6074,
+   "Small steel shield"
+  ],
+  "49": [
+   6060,
+   "Large steel shield"
+  ],
+  "53": [
+   6060,
+   "Large steel shield"
+  ],
+  "12": [
+   6074,
+   "Small steel shield"
+  ]
+ },
+ "shield_tower": [
+  6078,
+  "Metal tower shield"
+ ],
+ "accessory_base": {
+  "ring": [
+   6182,
+   "Gold Ring"
+  ],
+  "amulet": [
+   6194,
+   "Silver necklace"
+  ],
+  "boots": [
+   6011,
+   "Leather boots"
+  ],
+  "bracers": [
+   6012,
+   "Leather gloves"
+  ],
+  "helmet": [
+   6032,
+   "Generic helm"
+  ],
+  "cloak": [
+   6233,
+   "Black Cloak"
+  ]
+ },
+ "named": {
+  "ring_of_protection": {
+   "1": [
+    6082,
+    "Ring of protection +1"
+   ],
+   "2": [
+    6083,
+    "Ring of protection +2"
+   ],
+   "3": [
+    6084,
+    "Ring of protection +3"
+   ]
+  },
+  "cloak_of_resistance": {
+   "1": [
+    6085,
+    "Cloak of resistance +1"
+   ],
+   "2": [
+    6086,
+    "Cloak of resistance +2"
+   ],
+   "3": [
+    6087,
+    "Cloak of resistance +3"
+   ],
+   "4": [
+    6162,
+    "Cloak of resistance +4"
+   ]
+  },
+  "bracers_of_armor": {
+   "3": [
+    6119,
+    "Bracers of armor +3"
+   ],
+   "5": [
+    6115,
+    "Bracers of armor +5"
+   ]
+  },
+  "strength_gloves": {
+   "2": [
+    6245,
+    "Gauntlets of Ogre Power"
+   ]
+  },
+  "strength_belt": {
+   "4": [
+    6243,
+    "Gloves of Giant Strength +4"
+   ],
+   "6": [
+    6244,
+    "Gloves of Giant Strength +6"
+   ]
+  },
+  "dexterity_gloves": {
+   "2": [
+    6199,
+    "Gloves of Dexterity +2"
+   ],
+   "4": [
+    6200,
+    "Gloves of Dexterity +4"
+   ],
+   "6": [
+    6201,
+    "Gloves of Dexterity +6"
+   ]
+  },
+  "boots_of_speed": [
+   6137,
+   "Boots of speed"
+  ],
+  "ring_of_invisibility": [
+   6088,
+   "Ring of invisibility"
+  ]
+ },
+ "potion_opcodes": [
+  {
+   "op": 17,
+   "max": 9,
+   "proto": 8014,
+   "label": "Potion of cure light wounds"
+  },
+  {
+   "op": 17,
+   "max": 18,
+   "proto": 8006,
+   "label": "Potion of cure moderate wounds"
+  },
+  {
+   "op": 17,
+   "max": 27,
+   "proto": 8007,
+   "label": "Potion of cure serious wounds"
+  },
+  {
+   "op": 17,
+   "proto": 8007,
+   "label": "Potion of cure serious wounds"
+  },
+  {
+   "op": 44,
+   "proto": 8013,
+   "label": "Potion of bull's strength"
+  },
+  {
+   "op": 6,
+   "proto": 8022,
+   "label": "Potion of eagle's splendor"
+  },
+  {
+   "op": 16,
+   "proto": 8008,
+   "label": "Potion of haste"
+  },
+  {
+   "op": 20,
+   "proto": 8010,
+   "label": "Potion of invisibility"
+  },
+  {
+   "op": 18,
+   "proto": 8015,
+   "label": "Potion of heroism"
+  },
+  {
+   "op": 11,
+   "proto": 8017,
+   "label": "Potion of neutralize poison"
+  },
+  {
+   "op": 40,
+   "proto": 8017,
+   "label": "Potion of neutralize poison"
+  },
+  {
+   "op": 30,
+   "proto": 8020,
+   "label": "Potion of protection from energy (fire)"
+  },
+  {
+   "op": 29,
+   "proto": 8033,
+   "label": "Potion of protection from electricity"
+  },
+  {
+   "op": 166,
+   "proto": 8003,
+   "label": "Potion of protection from magic"
+  },
+  {
+   "op": 25,
+   "proto": 8019,
+   "label": "Poison"
+  }
+ ],
+ "gems_by_worth_gp": [
+  [
+   10,
+   12043,
+   "Rhodochrosite"
+  ],
+  [
+   50,
+   12041,
+   "Carnelian"
+  ],
+  [
+   100,
+   12040,
+   "Amber"
+  ],
+  [
+   500,
+   12039,
+   "Aquamarine"
+  ],
+  [
+   1000,
+   12038,
+   "Blue Sapphire"
+  ],
+  [
+   5000,
+   12036,
+   "Diamond"
+  ]
+ ],
+ "money": {
+  "copper": [
+   7000,
+   "Copper"
+  ],
+  "silver": [
+   7001,
+   "Silver"
+  ],
+  "gold": [
+   7002,
+   "Gold"
+  ],
+  "platinum": [
+   7003,
+   "Platinum"
+  ]
+ },
+ "misc": {
+  "key": [
+   10000,
+   "Gold key"
+  ],
+  "book": [
+   11000,
+   "Book"
+  ],
+  "note": [
+   11001,
+   "Note"
+  ],
+  "generic": [
+   12011,
+   "Rope"
+  ],
+  "food": [
+   8004,
+   "Ale"
+  ]
+ },
+ "containers": {
+  "default": [
+   1004,
+   "Chest"
+  ],
+  "1": [
+   1004,
+   "Chest"
+  ],
+  "2": [
+   1004,
+   "Chest"
+  ],
+  "4": [
+   1000,
+   "Junk Pile"
+  ],
+  "11": [
+   1049,
+   "Barrel"
+  ],
+  "12": [
+   1004,
+   "Chest"
+  ],
+  "8": [
+   1001,
+   "TreasureChest"
+  ]
+ },
+ "store_container": [
+  1001,
+  "TreasureChest"
+ ],
+ "overrides": {
+  "bow05": {
+   "proto": 4201,
+   "label": "Shortbow"
+  },
+  "bow06": {
+   "proto": 4201,
+   "label": "Shortbow"
+  },
+  "hqsbow": {
+   "proto": 4201,
+   "label": "Shortbow"
+  },
+  "wand02": {
+   "proto": 12002,
+   "label": "Wand of fear",
+   "status": "direct"
+  },
+  "wand03": {
+   "proto": 12007,
+   "label": "Wand of magic missiles",
+   "status": "direct"
+  },
+  "wand12": {
+   "proto": 12007,
+   "label": "Wand of magic missiles",
+   "status": "direct"
+  },
+  "wandmis": {
+   "proto": 12007,
+   "label": "Wand of magic missiles",
+   "status": "direct"
+  },
+  "wand04": {
+   "proto": 12228,
+   "label": "Wand of hold person",
+   "status": "direct"
+  },
+  "wand05": {
+   "proto": 12006,
+   "label": "Wand of fireballs",
+   "status": "direct"
+  },
+  "wand06": {
+   "proto": 12072,
+   "label": "Wand of cone of cold",
+   "status": "direct"
+  },
+  "wandfre": {
+   "proto": 12072,
+   "label": "Wand of cone of cold",
+   "status": "direct"
+  },
+  "wand07": {
+   "proto": 12275,
+   "label": "Wand of lightning bolt",
+   "status": "direct"
+  },
+  "wandfak": {
+   "proto": 12275,
+   "label": "Wand of lightning bolt",
+   "status": "direct"
+  },
+  "wandrea": {
+   "proto": 12275,
+   "label": "Wand of lightning bolt",
+   "status": "direct"
+  },
+  "wand08": {
+   "proto": 12438,
+   "label": "Wand of sleep",
+   "status": "direct"
+  },
+  "wand10": {
+   "proto": 12469,
+   "label": "Wand of summon monster III",
+   "status": "direct"
+  },
+  "spawn": {
+   "proto": 12469,
+   "label": "Wand of summon monster III",
+   "status": "direct"
+  },
+  "wand11": {
+   "proto": 12178,
+   "label": "Wand of flame strike",
+   "status": "direct"
+  },
+  "wand19": {
+   "proto": 12538,
+   "label": "Wand of bestow curse",
+   "status": "direct"
+  },
+  "wandcor": {
+   "proto": 12304,
+   "label": "Wand of melf's acid arrow",
+   "status": "direct"
+  }
+ }
+}
