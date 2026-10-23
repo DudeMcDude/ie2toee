@@ -56,7 +56,7 @@ each interior's `ie_doors_<area>.py` is copied next to the town's.
   to the region's anchor tile and then to the interior's exit anchor.
 
 ## Not done / judgment calls
-* Interiors are empty: creatures, containers, shops, area scripts, journal, info regions, ambient sound.
+* Interiors: actors, containers and stores are baked (ie2toee_preview.py, verified with proto/ingame_interior_probe.py: talk / container / shop). Still missing: area scripts, journal, info regions, ambient sound.
 * The road exit (AR1200) and AR1015/AR1016 only show the note. Converting AR1200 would make a first outdoor area.
 * IE entrances have no facing in ToEE: the party arrives at the tile with default facing (`orient` is kept in the data).
 * Real-time (not game-time) polling: travel does not happen while the game is paused.
