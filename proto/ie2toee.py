@@ -376,6 +376,32 @@ def write_doors(g, are, wed, tis_for, pl, guidance, sr, bbox, outdir, name, door
     return dict(count=len(doors), closed=sum(not x['open'] for x in doors), with_patches=sum(bool(x['patches']) for x in doors))
 
 
+def _walkable(kind, bbox, a, b, strict=True):
+    """tile (a, b) in the bbox-relative grid: all 9 subtiles walkable (strict) or the centre one plus >= 5 of 9."""
+    if not (0 <= a < kind.shape[0] and 0 <= b < kind.shape[1]):
+        return False
+    k = kind[a, b]
+    return bool((k == 0).all()) if strict else bool(k[1, 1] == 0 and (k == 0).sum() >= 5)
+
+
+def arrival_tile(kind, bbox, u, v, radius=5):
+    """(tile u, tile v, moved) where a party arriving at IE entrance (u, v) is put: the entrance's own tile if it is
+    walkable, else the nearest walkable tile within `radius` tiles (fully walkable tiles first, then mostly walkable
+    ones); (floor u, floor v, None) if there is none (the entrance stays where it is)."""
+    iu, iv = int(math.floor(u)), int(math.floor(v))
+    for strict in (True, False):
+        best = None
+        for du in range(-radius, radius + 1):
+            for dv in range(-radius, radius + 1):
+                d = math.hypot(iu + du + 0.5 - u, iv + dv + 0.5 - v)
+                if d <= radius + 0.5 and _walkable(kind, bbox, iu + du - bbox[0], iv + dv - bbox[2], strict):
+                    if best is None or d < best[0]:
+                        best = (d, iu + du, iv + dv)
+        if best:
+            return best[1], best[2], (best[1], best[2]) != (iu, iv)
+    return iu, iv, None
+
+
 def load_area(game, area, guidance, closed_doors=False):
     g = IEGame(game) if isinstance(game, str) else game
     are = Are(g.read(area, 'are'))
@@ -464,9 +490,15 @@ def convert(game, area, outdir, map_id, ground_id, guidance, preview=False, clos
     sn += ['# rules/MapList.mes', f'{{{map_id}}}{{{name}, {start[0]}, {start[1]}' + ''.join(', ' + f for f in flags_s) + '}',
            '# mes/map_names.mes', f'{{{map_id}}}{{{name}}}']
     open(os.path.join(outdir, f'{name}_snippets.txt'), 'w').write('\n'.join(sn) + '\n')
+    def _arrival(e):
+        u, v = tl(e['x'], e['y'])
+        au, av, moved = arrival_tile(kind, bbox, u, v)
+        if moved is None:
+            print(f'warning: {name} entrance {e["name"]} has no walkable tile within 5 tiles', file=sys.stderr)
+        return dict(arrival=[au, av], arrival_moved=bool(moved))
     objs = dict(
         placement=dict(canvas_offset=[pl.cx, pl.cy], scale=pl.scale, cal=[pl.calx - CAL_X0, pl.caly - CAL_Y0]),
-        entrances=[dict(e, toee=tl(e['x'], e['y'])) for e in are.entrances],
+        entrances=[dict(e, toee=tl(e['x'], e['y']), **_arrival(e)) for e in are.entrances],
         actors=[dict(a, toee=tl(a['x'], a['y'])) for a in are.actors],
         containers=[dict(c, toee=tl(c['x'], c['y']), poly=[tl(*p) for p in c['poly']]) for c in are.containers],
         regions=[dict(r, poly=[tl(*p) for p in r['poly']]) for r in are.regions],
