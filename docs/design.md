@@ -35,11 +35,16 @@ TC ships code + per-area guidance JSON; player runs the converter on their IWD/I
   them on the way (ToEE behaviour: they path through doors and open them); the 250 ms poll could become an
   engine callback.
 
+## Travel (2026-10-24)
+Travel regions of the converted areas become a poll in the runtime (`runtime/ie_travel.py`) driven by data collected at
+convert time (`ie_exits.py` -> `ie_travel_data.py`); the preview converter also converts Easthaven's 14 interiors
+(AR1001-AR1014). Details, limits and the in-game result: [travel.md](travel.md).
+
 ## Hard parts / open issues
 - Semantics: IE "impassable" (SR 0 obstacles, SR 8 water/sidewall) vs ToEE Block vs FlyOver; hand maps paint obstacles as FlyOver.
   Choose per game in guidance; edge fringes / exits need per-area fixes (searchmap_fix rects).
 - Animations (BAM), lighting (LM -> global.lit/lights), height map (HT),
-  ambient sound, travel regions -> jump points, actors -> protos: not done.
+  ambient sound, actors -> protos: not done. (Travel regions: Easthaven only, see docs/travel.md.)
 - Pathing: no clearance.bin is generated yet (Temple+ falls back to tile-flag checks); generating one would also
   require recomputing it when a door switches.
 - IWD2: ARE V9.1 offsets (+0x10) handled; CRE V9.0 and IWD2 TIS/WED specifics untested on real data.

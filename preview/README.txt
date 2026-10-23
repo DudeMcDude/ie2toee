@@ -14,12 +14,15 @@ first town, Easthaven (IE area AR1000), from YOUR OWN copy of Icewind Dale and l
   * the IE area art, walkable and blocked tiles
   * IE doors: the door art opens and closes, and closed doors block movement
   * the town's creatures, converted to ToEE critters with their IE equipment, some of them on IE patrol routes
-  * IE items with their own inventory icons (the town's shops are in its interiors, which aren't in this preview)
+  * IE items with their own inventory icons (the town's shops are in its interiors, which are still empty)
+  * the 14 building interiors (AR1001-AR1014): walk into a building's door and the whole party enters it, walk
+    into the interior's exit and it is back in town. Interiors are bare maps with their doors: no people, no
+    furniture objects, no shops, no scripts yet
   * dialogue in an IE-style dialogue window (IWD look for classic, IWD:EE look for the Enhanced Edition)
   * IE spells mapped to ToEE/Temple+ spells where an equivalent exists, and IE creature/area scripts
   * everything is baked into the map files, so it survives saving and loading like a normal ToEE map
 
-This is NOT a playable conversion of Icewind Dale. There is no campaign, no travel to other IE areas, no quests
+This is NOT a playable conversion of Icewind Dale. There is no campaign, no travel beyond Easthaven's buildings, no quests
 beyond what the town's scripts and dialogue happen to do, and many rules are approximations. It's a technology
 preview to try out and to send feedback on.
 
@@ -63,13 +66,18 @@ HOW TO START
      import iwd; iwd.go()
 
    and press Enter. Press Shift+~ again to close the console. The party travels to Easthaven.
-4. Click townsfolk to talk to them (IE dialogue window) and click doors to open and close them. Save and load
-   as usual. To leave Easthaven, load a save from before the trip.
+4. Click townsfolk to talk to them (IE dialogue window) and click doors to open and close them. Walk into a
+   building's doorway to go inside, and into the exit area inside to come out. Save and load as usual.
+   To leave Easthaven for good, load a save from before the trip.
 
 KNOWN ISSUES
 ------------
-  * Only the outdoor town of Easthaven is converted: no building interiors (so no shops), its exits don't lead
-    anywhere, and the world map doesn't know it.
+  * Easthaven and its 14 building interiors are converted, but the interiors are empty (no people, shops or
+    scripts yet). The road south (to AR1200) and two interior side doors (AR1015, AR1016) lead to areas that are
+    not in the preview: you get a one-time "This exit (ARxxxx) is not in the preview" note and stay put. The world
+    map doesn't know Easthaven.
+  * Travel is a 4-times-a-second check of where your party is, so it works in a loaded save too; after arriving
+    (or loading) it only fires once the party has stepped out of every exit area, so it never bounces you back.
   * Rules are approximations: IE stats, THAC0 and saves are mapped to D&D 3.5 equivalents. Some IE spells have no
     ToEE counterpart yet and are left out (the creature just doesn't cast them). Item usability restrictions are
     dropped, and some weapons map to their nearest ToEE type.

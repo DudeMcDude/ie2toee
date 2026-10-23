@@ -137,7 +137,7 @@ module overlay (`modules/ToEE`, `modules/ToEE_core`, `data/`) that it can also c
 
     python proto/ie2toee_preview.py --iwd "<IWD or IWD:EE>" --toee "<ToEE copy>" --tp "<preview Temple+>" --install
 
-In game: `import iwd; iwd.go()` in the Temple+ console travels to the town. The player package (Windows) wraps it
+In game: `import iwd; iwd.go()` in the Temple+ console travels to the town (and starts the travel poll between the town and its 14 interiors: docs/travel.md). The player package (Windows) wraps it
 in `preview/convert.bat` with `preview/requirements.txt`; `preview/README.txt` is the player README. The package
 also needs the Temple+ build with the dialog skin and the door hooks: source on the fork branch
 [`feature/ie-dialog-skin`](https://github.com/DudeMcDude/TemplePlus/tree/feature/ie-dialog-skin), commit
