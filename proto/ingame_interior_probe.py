@@ -47,6 +47,14 @@ def act():
             c = st['cons'][int(os.environ.get('IE2TOEE_CONTAINER', '0'))]
             game.scroll_to(c)
             r = game.leader.container_open_ui(c); log('RESULT container_open %s (%s)' % (r and 'PASS' or 'FAIL', c.description))
+        elif DO == 'journal':      # run Hrothgar's real dialogue action that adds journal 2331, then open the logbook
+            import ie_journal
+            n = [o for o in st['npcs'] if 'hroth' in o.description.lower()] or st['npcs']; n = n[0]
+            sid = n.scripts[san_dialog]
+            import ie_runtime; ie_runtime.journal_add(2331, 'quest')
+            q = ie_journal.JOURNAL[2331][0]
+            log('RESULT journal %s (quest %d state %d, npc %s script %d)' % (
+                game.quests[q].state == 2 and 'PASS' or 'FAIL', q, game.quests[q].state, n.description, sid))
         else:
             want = os.environ.get('IE2TOEE_NPC')
             n = [o for o in st['npcs'] if not want or want.lower() in o.description.lower()] or st['npcs']
@@ -80,6 +88,8 @@ game.fade_and_teleport(0, 0, 0, INT['map'], ex, ey)
 at(6000, survey)
 at(1500, act)
 at(3000, shot, (B + '_' + DO,))
+if DO == 'journal':
+    at(500, key, ('l',)); at(2500, shot, (B + '_journal_2',))
 if DO == 'shop':
     at(500, key, (os.environ.get('IE2TOEE_ANSWER', '1'),))     # the barter ("B:") answer of the first node
     at(2500, shot, (B + '_' + DO + '_2',))

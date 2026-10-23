@@ -186,9 +186,13 @@ def main():
                 '    import ie_travel\n    ie_travel.start()      # walk into a building door / the road exit: the party travels (docs/travel.md)\n'
                 '    game.fade_and_teleport(0, 0, 0, %d, %d, %d)\n' % (MAP_ID, MAP_ID, START[0], START[1]))
     sn = {}
-    for ar in [AREA] + list(interiors):          # merge the snippets of the town and every converted interior
+    snips = [os.path.join(w, ar + '_snippets.txt') for ar in [AREA] + list(interiors)]   # town + every interior
+    snips.append(os.path.join(cre, 'dialogue', 'journal_snippets.txt'))      # IE journal -> logbook quests
+    for sp in snips:
         cur = None
-        for l in open(os.path.join(w, ar + '_snippets.txt')):
+        if not os.path.isfile(sp):
+            continue
+        for l in open(sp, encoding='latin-1'):
             l = l.rstrip('\r\n')
             if l.startswith('# '):
                 cur = l[2:].strip(); continue
@@ -196,7 +200,9 @@ def main():
                 sn.setdefault(cur, []).append(l)
     td = toeedata.ToEEData(toee)
     for rel, lines in sn.items():
-        mes_with(td, rel, lines, os.path.join(M, rel))
+        # the quest texts are only read from ToEE_core (a modules/ToEE copy is ignored: verified in game)
+        dst = C if os.path.basename(rel) in ('gamequestlog.mes', 'gamequest.mes') else M
+        mes_with(td, rel, lines, os.path.join(dst, rel))
     print('module overlay: %s  (%d areas: %s + %d interiors)' % (inst, 1 + len(interiors), AREA, len(interiors)))
     if a.install:
         copytree(inst, toee)

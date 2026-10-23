@@ -96,11 +96,16 @@ class DlgConv(object):
                                          % (fn, self.g.condition(calls)))
                             test = '%s(npc, pc)' % fn
                     acts = self.parse(d.trans_action(ti)) if t['action'] is not None else []
-                    jour = subst(self.text(t['journal']), False) if t['journal'] is not None else None
+                    jour = None
+                    if t['journal'] is not None and t['journal'] > 0:    # flags: bit 6 unsolved quest, 7 info, 8 solved
+                        fl_ = t['flags']
+                        kind = 'done' if fl_ & 256 else 'info' if fl_ & 128 else 'quest'
+                        self.g.journals.setdefault(t['journal'], kind); self.g.strrefs.add(t['journal'])
+                        jour = (t['journal'], kind)
                     if acts or jour:
                         fn = 'ie_a%d' % tl
                         funcs.append('def %s(npc, pc):\n    return rt.dlg_do(npc, pc, IDENT, AREA, %s, journal=%s)\n'
-                                     % (fn, self.g.action_list(acts or []), pystr(jour) if jour else 'None'))
+                                     % (fn, self.g.action_list(acts or []), repr(jour) if jour else 'None'))
                         effect = '%s(npc, pc)' % fn
                     ans = 0 if t['end'] else self.line(t['next_dlg'] or r, t['next_state'])
                     if any(getattr(a_, 'name', '').lower() == 'startstore' for a_ in acts):
@@ -167,6 +172,8 @@ def main():
     ap.add_argument('--tlk'); ap.add_argument('--lang', help='EE locale, e.g. en_US'); ap.add_argument('--fallback'); ap.add_argument('--slot-base', type=int, default=1000)
     ap.add_argument('--area-map', action='append', default=[], help='AREA:TOEE_MAP[:canvas_x,canvas_y]')
     ap.add_argument('--slot-max', type=int, default=1999)
+    ap.add_argument('--quest-base', type=int, default=120, help='first ToEE quest id for IE journal entries (vanilla: 0-60)')
+    ap.add_argument('--quest-max', type=int, default=199, help='last one (the logbook has 200 quests)')
     a = ap.parse_args()
     game = iefs.IEGame(a.game)
     ids = S.IdsSet(game, json.load(open(a.fallback)) if a.fallback else None)
@@ -181,7 +188,7 @@ def main():
     for d in (scr, dlgd):
         os.makedirs(d, exist_ok=True)
     rep = {'tlk': bool(tlk), 'ids_missing': ids.missing, 'actors': [], 'area_scripts': [], 'unknown': {}}
-    allvars = set(); strrefs = set()
+    allvars = set(); strrefs = set(); journals = {}
     def w(path, s):
         # ToEE reads Windows-1252 text; EE text outside it becomes '?'
         open(path, 'w', encoding='cp1252', errors='replace', newline='\r\n' if path.endswith('.dlg') else '\n').write(s)
@@ -193,7 +200,7 @@ def main():
         if ident.startswith('area_'):
             m += '_area'
         w(os.path.join(scr, m + '.py'), src)
-        allvars.update(g.vars); rep['unknown'].update(g.unknown); strrefs.update(g.strrefs)
+        allvars.update(g.vars); rep['unknown'].update(g.unknown); strrefs.update(g.strrefs); journals.update(g.journals)
         return m, nb, unk
     for spec in a.actor:
         parts = spec.split(':') + ['', '']
@@ -209,7 +216,7 @@ def main():
         for res in [x for x in bl.split(',') if x]:
             m, nb, unk = bcs(res, ident, area); mods.append(m)
         w(os.path.join(scr, 'py%05die_%s.py' % (sid, ident.lower())), actor_script(sid, ident, area, dlg_parts, mods))
-        allvars.update(g.vars); rep['unknown'].update(g.unknown); strrefs.update(g.strrefs)
+        allvars.update(g.vars); rep['unknown'].update(g.unknown); strrefs.update(g.strrefs); journals.update(g.journals)
         rep['actors'].append({'ident': ident, 'area': area, 'script_id': sid, 'dlg': dlg, 'bcs': mods,
                               'lines': len([l for l in (dlg_parts[0] if dlg_parts else []) if l]),
                               'entry_states': len(dlg_parts[2]) if dlg_parts else 0, 'notes': notes})
@@ -226,6 +233,24 @@ def main():
     rep['vars'] = len(keys)
     w(os.path.join(scr, 'ie_strings.py'), HEADER + 'STRINGS = {\n%s\n}\n' %
       '\n'.join('    %d: %s,' % (r, pystr(subst(text(r), False))) for r in sorted(strrefs)))
+    # journal entries -> ToEE logbook quests (mes/gamequestlog.mes: title at id, description at id + 200)
+    qids = list(range(a.quest_base, a.quest_max + 1)); jmap = {}; jl = []
+    for r in sorted(journals):
+        if not qids:
+            print('warning: more journal entries than quest slots %d..%d: %d dropped' % (a.quest_base, a.quest_max, len(journals) - len(jmap)))
+            break
+        q = qids.pop(0); body = subst(text(r), False).replace('{', '(').replace('}', ')')
+        lines_ = [x.strip() for x in body.replace('\r', '').split('\n') if x.strip()]
+        title = lines_[0] if lines_ else 'Journal'
+        if len(title) > 60:
+            title = title[:57].rsplit(' ', 1)[0] + '...'
+        jmap[r] = (q, journals[r])
+        jl += ['{%d}{%s}' % (q, title), '{%d}{%s}' % (q + 200, ' '.join(lines_))]
+    w(os.path.join(scr, 'ie_journal.py'), HEADER + 'JOURNAL = %r   # strref -> (ToEE quest id, kind)\n' % jmap)
+    with open(os.path.join(a.out, 'journal_snippets.txt'), 'w', encoding='cp1252', errors='replace') as f:
+        f.write('# mes/gamequestlog.mes\n' + '\n'.join(l for l in jl if True) + '\n')
+        f.write('# rules/gamequest.mes\n' + '\n'.join('{%d}{1}' % q for q, _ in jmap.values()) + '\n')
+    rep['journal'] = len(jmap)
     am = {}; pl = {}
     for spec in a.area_map:     # AREA:MAP[:cx,cy]
         f = spec.split(':')

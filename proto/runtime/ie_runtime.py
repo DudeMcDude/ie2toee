@@ -542,7 +542,7 @@ def dlg_do(npc, pc, ident, area, actions, journal=None):
     """Dialogue transition effect: run the IE actions (queued on the NPC, like the IE) and note journal text."""
     c = Ctx(npc, pc, ident, area)
     if journal is not None:
-        log('JOURNAL %s' % journal)
+        journal_add(journal[0], journal[1]) if isinstance(journal, tuple) else log('JOURNAL %s' % journal)
     run_actions(c, actions)
     return 1
 
@@ -772,9 +772,11 @@ class _Actions(object):
     def AttackReevaluate(self, c, obj, ticks): self.Attack(c, obj); return max(1, ticks // 15)
     def DisplayStringNoNameDlg(self, c, obj, strref): return self.DisplayStringHead(c, obj, strref)
     DisplayStringNoName = DisplayStringNoNameDlg
-    def AddJournalEntry(self, c, strref, kind=0): log('JOURNAL %s' % text(strref))
-    def EraseJournalEntry(self, c, strref): log('JOURNAL_ERASE %d' % strref)
-    def SetQuestDone(self, c, strref): log('QUEST_DONE %d' % strref)
+    def AddJournalEntry(self, c, strref, kind=0):
+        k = str(kind).upper()
+        journal_add(strref, 'done' if 'DONE' in k or k == '2' else 'info' if 'INFO' in k or k == '4' else 'quest')
+    def EraseJournalEntry(self, c, strref): journal_add(strref, 'erase')
+    def SetQuestDone(self, c, strref): journal_add(strref, 'done')
     def AddXP2DA(self, c, row):
         xp = XP2DA.get(row.upper())
         log('XP2DA %s -> %s' % (row, xp))
@@ -905,6 +907,32 @@ try:
     STRINGS = ie_strings.STRINGS
 except ImportError:
     pass
+
+# IE journal -> ToEE logbook: every journal strref is one ToEE quest (ie_journal.py, mes/gamequestlog.mes)
+JOURNAL = {}
+try:
+    import ie_journal
+    JOURNAL = ie_journal.JOURNAL
+except ImportError:
+    pass
+
+def journal_add(strref, kind=None):
+    q = JOURNAL.get(strref)
+    kind = kind or (q and q[1]) or 'quest'
+    log('JOURNAL %s %d -> quest %s: %s' % (kind, strref, q and q[0], text(strref)[:60]))
+    if q is None or not IN_GAME:
+        return 0
+    try:
+        cur = game.quests[q[0]].state
+        if kind == 'erase':                        # superseded IE entry: hide it (qs_unknown)
+            game.quests[q[0]].state = 0
+            return 1
+        want = 4 if kind == 'done' else 2          # qs_completed / qs_accepted
+        if cur < want:
+            game.quests[q[0]].state = want
+    except Exception as e:
+        log('IE_ERR journal %d: %s' % (strref, e))
+    return 1
 
 def text(strref):
     return STRINGS.get(strref, '[strref %d]' % strref)

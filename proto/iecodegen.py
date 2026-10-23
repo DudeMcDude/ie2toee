@@ -36,6 +36,7 @@ class Gen(object):
         self.vars = set()          # var keys as ie_runtime.var_key would build them
         self.unknown = {}          # name -> count (not in TRIGGER/ACTION.IDS)
         self.strrefs = set()       # strrefs used by actions (FloatMessage...) -> ie_strings.py
+        self.journals = {}         # journal strref -> kind ('quest' / 'info' / 'done') -> ToEE logbook quests
 
     # -------------------------------------------------------------- names / signatures
     def _canon(self, kind, name):
@@ -161,6 +162,10 @@ class Gen(object):
                     self.strrefs.add(a)
         if name.lower() in STRREF_ACTIONS:
             self.strrefs.update(a for a in call.args if isinstance(a, int) and a > 0)
+        if name.lower() in ('addjournalentry', 'setquestdone') and call.args and isinstance(call.args[0], int) and call.args[0] > 0:
+            ka = str(call.args[1]).upper() if len(call.args) > 1 else ''
+            k = 'done' if name.lower() == 'setquestdone' or 'DONE' in ka or ka == '2' else 'info' if 'INFO' in ka or ka == '4' else 'quest'
+            self.journals.setdefault(call.args[0], k); self.strrefs.add(call.args[0])
         if name.lower() == 'actionoverride' and len(call.args) == 2:
             for x in S.walk_calls([call.args[1]]):
                 self._note_var(x, 'A')
