@@ -44,7 +44,7 @@ def survey():
 def act():
     try:
         if DO == 'container':
-            c = st['cons'][0]
+            c = st['cons'][int(os.environ.get('IE2TOEE_CONTAINER', '0'))]
             game.scroll_to(c)
             r = game.leader.container_open_ui(c); log('RESULT container_open %s (%s)' % (r and 'PASS' or 'FAIL', c.description))
         else:
