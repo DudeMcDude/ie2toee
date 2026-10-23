@@ -803,9 +803,15 @@ def convert(game, out, toee, tp=None, options=None, areas=(), stores=(), objects
                         for k, v in sorted(names.items())))
     # containers + stores
     cons = {}
-    objs = json.load(open(objects)) if objects else {}
+    if isinstance(objects, str):
+        objects = [objects]
+    objmap = {}         # area -> objects json ('AREA=path'; a plain path counts for every area without its own)
+    for spec in objects or ():
+        ar_, _, pth = spec.rpartition('=') if '=' in spec and not os.path.exists(spec) else ('', '', spec)
+        objmap[ar_.upper()] = json.load(open(pth))
     for ar in areas:
         cl = ieitm.are_container_items(game.read(ar.lower(), 'are'))
+        objs = objmap.get(ar.upper(), objmap.get(''))
         oc = {c['name']: c for c in objs.get('containers', [])} if objs else {}
         lst = []
         for c in cl:
@@ -816,7 +822,10 @@ def convert(game, out, toee, tp=None, options=None, areas=(), stores=(), objects
         cons[ar.upper()] = lst
     sto = {}
     for s in stores:
-        S_ = ieitm.Sto(game.read(s.lower(), 'sto'), s)
+        try:
+            S_ = ieitm.Sto(game.read(s.lower(), 'sto'), s)
+        except Exception as ex:
+            log('warning: store %s not converted (%s)' % (s, ex)); continue
         sto[s.lower()] = dict(type=S_.type, sell=S_.sell_markup, buy=S_.buy_markup, allow=S_.allow,
                               items=[[i['resref'], (5 if i['infinite'] else max(1, i['stock']))] for i in S_.items],
                               cures=len(S_.cures), container=m.g['store_container'][0])
@@ -844,7 +853,7 @@ def main(argv=None):
     c.add_argument('--tp'); c.add_argument('--option', action='append', default=[])
     v = sub.add_parser('convert'); v.add_argument('ie'); v.add_argument('out'); v.add_argument('--toee', required=True)
     v.add_argument('--tp'); v.add_argument('--area', action='append', default=[]); v.add_argument('--store', action='append', default=[])
-    v.add_argument('--objects'); v.add_argument('--no-icons', action='store_true'); v.add_argument('--option', action='append', default=[])
+    v.add_argument('--objects', action='append', default=[], help='[AREA=]objects.json (repeatable)'); v.add_argument('--no-icons', action='store_true'); v.add_argument('--option', action='append', default=[])
     o = ap.parse_args(argv)
     opts = lambda l: dict(x.split('=', 1) for x in l)
     if o.cmd == 'survey' or o.cmd == 'coverage':

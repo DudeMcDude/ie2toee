@@ -114,6 +114,8 @@ class Baker(object):
         self.items = load_py(a.items)['ITEMS'] if a.items else {}
         self.containers = (load_py(a.items).get('CONTAINERS') or {}).get(self.area, []) if a.items else []
         self.specs = load_py(a.specs)['CREATURES'] if a.specs else []
+        self.stores = (load_py(a.items).get('STORES') or {}) if a.items else {}
+        self.shops = json.load(open(a.shops)) if getattr(a, 'shops', None) else {}    # actor ident -> IE store resref
         self.doors = load_py(a.doors)['DOORS'] if a.doors else []
         self.mobs = []          # GameObjects
         self.sec_objs = {}      # sector id -> [GameObject]
@@ -243,10 +245,42 @@ class Baker(object):
         if inv:
             o.set('critter_inventory_num', len(inv))
             o.set('critter_inventory_list_idx', T.obj_array(inv))
+        st = self.shops.get(s.get('ident') or '')
+        if st:
+            box = self.store_box(i, st, u, v)
+            if box is not None:
+                o.set('npc_substitute_inventory', box.id)
         self.mobs.append(o)
         keep = ('ident', 'resref', 'hp', 'conditions', 'spells', 'ai_strategy', 'to_hit_bonus')
         self.runtime[T.guid_name(o.id)] = {'k': 'npc', 'spec': {k: s[k] for k in keep if s.get(k) not in (None, [], '')}}
         self.report['npcs'] += 1
+        return o
+
+    # ---------------------------------------------------------------- stores (the merchant's barter stock)
+    def store_box(self, i, store, x, y):
+        """IE store -> a hidden container MOB on the merchant's tile, set as his npc_substitute_inventory (ToEE's
+        barter screen sells from it, like vanilla merchants). Infinite IE stock -> 5 of each (ie_items)."""
+        sd = self.stores.get(store.lower())
+        if not sd:
+            self.report['unbaked'].append('store %s: not converted' % store); return None
+        pid = int(sd.get('container') or 1001)
+        o = T.GameObject(1, pid, self.gid('store', i, store.lower()))
+        o.set('location', T.location(x, y))
+        o.set('flags', CRITTER_OF | OF['DONTDRAW'] | OF['CLICK_THROUGH'] | OF['NO_BLOCK'] | self.proto_flags(pid, 20, OF, 'OF_'))
+        inv = []
+        for k, (res, q) in enumerate(sd.get('items') or ()):
+            e = self.items.get(res.lower())
+            if not e:
+                self.report['unbaked'].append('store %s item %s: unmapped' % (store, res)); continue
+            for n in range(1 if e.get('q') else int(q)):          # stackables: one stack of q
+                io = self.item(('s', i, store.lower(), k, n), e['p'], res, o, len(inv), x, y,
+                               int(q) if e.get('q') and q > 1 else None)
+                if io is not None:
+                    inv.append(io.id)
+        if inv:
+            o.set('container_inventory_num', len(inv)); o.set('container_inventory_list_idx', T.obj_array(inv))
+        self.mobs.append(o)
+        self.report.setdefault('stores', {})[store.lower()] = len(inv)
         return o
 
     # ---------------------------------------------------------------- containers (MOBs, like vanilla)
@@ -370,6 +404,7 @@ def main():
     b = sub.add_parser('bake')
     b.add_argument('--area', required=True); b.add_argument('--flavour', required=True)
     b.add_argument('--specs'); b.add_argument('--items'); b.add_argument('--doors')
+    b.add_argument('--shops', help='json {actor ident: IE store resref}: bake the store stock as the merchant\'s barter inventory')
     b.add_argument('--maps', required=True, help='converted map dir (ie2toee.py output, the .sec files)')
     b.add_argument('--map-dir', help='ToEE map directory name (default: the area)')
     b.add_argument('--map-id', type=int, required=True); b.add_argument('--placement', default='0,0')

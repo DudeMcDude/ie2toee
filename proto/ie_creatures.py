@@ -659,8 +659,11 @@ def convert_area(game, toee_root, out, area, name_base=27000, options=None, scri
         specs.append(s)
     os.makedirs(out, exist_ok=True)
     mesd = os.path.join(out, 'modules', 'ToEE', 'mes', 'description'); os.makedirs(mesd, exist_ok=True)
-    open(os.path.join(mesd, 'ie2toee_%s.mes' % area.lower()), 'w', encoding='cp1252', errors='replace').write(
-        ''.join('{%d}{%s}\n' % kv for kv in sorted(names.items())))
+    if names:      # (an empty .mes in mes/description hangs the game at "Loading game system Description")
+        open(os.path.join(mesd, 'ie2toee_%s.mes' % area.lower()), 'w', encoding='cp1252', errors='replace').write(
+            ''.join('{%d}{%s}\n' % kv for kv in sorted(names.items())))
+    elif os.path.exists(os.path.join(mesd, 'ie2toee_%s.mes' % area.lower())):
+        os.remove(os.path.join(mesd, 'ie2toee_%s.mes' % area.lower()))
     keep = ('actor', 'resref', 'status', 'track', 'family', 'proto', 'model', 'scale', 'x', 'y', 'orient', 'gender',
             'alignment', 'hostility', 'abilities', 'levels', 'monster_hd', 'hp', 'natural_ac', 'bab', 'to_hit_bonus',
             'save_bonus', 'conditions', 'no_flee', 'invulnerable', 'ident', 'cr', 'items', 'spells', 'ai_strategy', 'name_id',

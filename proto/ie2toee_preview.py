@@ -17,8 +17,9 @@ sys.path.insert(0, HERE)
 import toeedata
 
 AREA, MAP_ID, GROUND_ID, START = 'AR1000', 5900, 900, (482, 424)
-SCRIPT_BASE = 1100
-# Easthaven's 14 building interiors: map ids 5901.., ground ids 901.. (map + doors only; no creatures/items yet)
+SCRIPT_BASE = 1100      # town actors 1100.., interior n: 1120+10n.. (<= 1269)
+GENERIC_BASE = 1280    # interior n's baked-object script (the town's is 1099)
+# Easthaven's 14 building interiors: map ids 5901.., ground ids 901.. (map, doors, baked actors + containers)
 INTERIORS = ['AR10%02d' % i for i in range(1, 15)]
 RUNTIME = ['ie_runtime', 'ie_critters', 'ie_spellrt', 'ie_combat', 'ie_doors', 'ie_bakert', 'ie_itemrt', 'ie_travel']
 
@@ -96,22 +97,58 @@ def main():
             print('warning: interior %s failed to convert and is skipped (its door stays a dead end)' % ar, flush=True)
     px, py = json.load(open(os.path.join(w, AREA + '_objects.json')))['placement']['canvas_offset']
     run('spells', ['ie_spells.py', 'convert', ie, os.path.join(w, 'spells'), '--toee', toee] + tpa)
-    run('items', ['ie_items.py', 'convert', ie, os.path.join(w, 'items'), '--toee', toee, '--area', AREA,
-                  '--objects', os.path.join(w, AREA + '_objects.json')] + tpa)
     cre = os.path.join(w, 'cre')
     run('creatures', ['ie_creatures.py', 'convert', ie, toee, cre, '--area', AREA, '--script-base', str(SCRIPT_BASE)] + tpa)
     actors = open(os.path.join(cre, 'dialogue_actors.txt')).read().split()
+    icre = {}           # interior -> its creature dir (actors baked like the town's: prefab .mob, permanent ids)
+    for ar, mid in sorted(interiors.items()):
+        i = mid - MAP_ID; d = os.path.join(w, 'cre_' + ar.lower())
+        if run_soft('creatures %s' % ar, ['ie_creatures.py', 'convert', ie, toee, d, '--area', ar,
+                                         '--script-base', str(SCRIPT_BASE + 20 + 10 * i),
+                                         '--name-base', str(27000 + 20 * i + 80)] + tpa):
+            icre[ar] = d
+            actors += open(os.path.join(d, 'dialogue_actors.txt')).read().split()
     run('dialogue', ['ie_dialogue.py', ie, os.path.join(cre, 'dialogue')] + actors +
         ['--area-script', '%s:%s' % (AREA, a1), '--area-map', '%s:%d:%d,%d' % (AREA, MAP_ID, px, py)] +
         sum((['--area-map', '%s:%d:%d,%d' % ((ar, mid) + tuple(json.load(open(os.path.join(w, ar + '_objects.json')))
                                                               ['placement']['canvas_offset']))]      # (merges the interiors into ie_areas.py)
              for ar, mid in sorted(interiors.items())), []))
+    stores, shop_of = set(), {}   # the IE stores the converted dialogues open (StartStore) -> ToEE barter stock
+    for root, _, fs in os.walk(os.path.join(cre, 'dialogue')):
+        for fn in fs:
+            m_ = re.match(r'py(\d{5})ie_\w+\.py$', fn)
+            if m_:
+                found = re.findall(r'StartStore\(c, "(\w+)"', open(os.path.join(root, fn), encoding='latin-1').read())
+                stores |= {x.lower() for x in found}
+                if found:
+                    shop_of[int(m_.group(1))] = found[0].lower()      # script id -> the store its dialogue opens
+    stores = sorted(stores)
+
+    def shops(specs_py, ar):      # bake input: actor ident -> store, for the area's merchants
+        g = {}
+        if specs_py and os.path.isfile(specs_py):
+            exec(open(specs_py, encoding='latin-1').read(), g)
+        d = {c['ident']: shop_of[c['script_id']] for c in g.get('CREATURES', []) if c.get('script_id') in shop_of}
+        p_ = os.path.join(w, 'shops_%s.json' % ar.lower()); json.dump(d, open(p_, 'w'), indent=1)
+        return ['--shops', p_]
+    run('items', ['ie_items.py', 'convert', ie, os.path.join(w, 'items'), '--toee', toee] +
+        sum((['--area', ar, '--objects', '%s=%s' % (ar, os.path.join(w, ar + '_objects.json'))]
+             for ar in [AREA] + sorted(interiors)), []) +
+        sum((['--store', st] for st in stores), []) + tpa)
     run('dialog skin', ['ie_dialog_skin.py', ie, os.path.join(w, 'skin'), '--skin', skin, '--default', skin])
     bake = os.path.join(w, 'bake')
-    run('bake', ['ie_bake.py', 'bake', '--area', AREA, '--flavour', F, '--specs', os.path.join(cre, 'ie_creatures_%s.py' % a1),
+    run('bake', ['ie_bake.py', 'bake', '--area', AREA, '--flavour', F, '--specs', os.path.join(cre, 'ie_creatures_%s.py' % a1)] + shops(os.path.join(cre, 'ie_creatures_%s.py' % a1), AREA) + [
                  '--items', os.path.join(w, 'items', 'ie_itemmap.py'), '--doors', os.path.join(w, 'ie_doors_%s.py' % a1),
                  '--maps', os.path.join(w, 'maps', AREA), '--map-id', str(MAP_ID), '--placement', '%d,%d' % (px, py),
                  '--toee', toee, '--ie', ie, '--out', bake])
+
+    for ar, mid in sorted(interiors.items()):
+        al = ar.lower(); ox, oy = json.load(open(os.path.join(w, ar + '_objects.json')))['placement']['canvas_offset']
+        spec = os.path.join(icre[ar], 'ie_creatures_%s.py' % al) if ar in icre else None
+        run('bake %s' % ar, ['ie_bake.py', 'bake', '--area', ar, '--flavour', F] + (['--specs', spec] + shops(spec, ar) if spec else []) +
+            ['--items', os.path.join(w, 'items', 'ie_itemmap.py'), '--maps', os.path.join(w, 'maps', ar),
+             '--map-id', str(mid), '--placement', '%d,%d' % (ox, oy), '--generic-script', str(GENERIC_BASE + mid - MAP_ID),
+             '--toee', toee, '--ie', ie, '--out', bake])
 
     run('travel exits', ['ie_exits.py', w, '--out', os.path.join(w, 'ie_travel_data.py'), '--area', '%s:%d' % (AREA, MAP_ID)] +
         sum((['--area', '%s:%d' % kv] for kv in sorted(interiors.items())), []))
@@ -125,7 +162,7 @@ def main():
         copytree(os.path.join(w, 'art', 'ground', g), os.path.join(M, 'art', 'ground', g))
     copytree(os.path.join(w, 'art', 'clip', AREA), os.path.join(M, 'art', 'clip', AREA))
     for ar in interiors:
-        copytree(os.path.join(w, 'maps', ar), os.path.join(M, 'maps', ar))
+        copytree(os.path.join(bake, 'modules', 'ToEE', 'maps', ar), os.path.join(M, 'maps', ar))
         for g in (ar, ar + '_doors', ar + '_night'):
             copytree(os.path.join(w, 'art', 'ground', g), os.path.join(M, 'art', 'ground', g))
         copytree(os.path.join(w, 'art', 'clip', ar), os.path.join(M, 'art', 'clip', ar))
@@ -133,14 +170,16 @@ def main():
     copytree(os.path.join(cre, 'dialogue', 'modules', 'ToEE', 'dlg'), os.path.join(C, 'dlg'))
     copytree(os.path.join(cre, 'dialogue', 'modules', 'ToEE', 'scr'), os.path.join(C, 'scr'))
     copytree(os.path.join(bake, 'modules', 'ToEE', 'scr'), os.path.join(C, 'scr'))
-    copytree(os.path.join(cre, 'modules', 'ToEE', 'mes', 'description'), os.path.join(C, 'mes', 'description'))
+    for d in [cre] + list(icre.values()):
+        copytree(os.path.join(d, 'modules', 'ToEE', 'mes', 'description'), os.path.join(C, 'mes', 'description'))
     copytree(os.path.join(w, 'items', 'modules', 'ToEE', 'mes', 'description'), os.path.join(C, 'mes', 'description'))
     copytree(os.path.join(w, 'items', 'data'), os.path.join(inst, 'data'))
     scr = os.path.join(C, 'scr')
     for f in [os.path.join(HERE, 'runtime', m + '.py') for m in RUNTIME] + [
             os.path.join(w, 'spells', 'ie_spellmap.py'), os.path.join(w, 'items', 'ie_itemmap.py'),
             os.path.join(w, 'ie_doors_%s.py' % a1), os.path.join(bake, 'ie_bake_%s.py' % a1),
-            os.path.join(w, 'ie_travel_data.py')] + [os.path.join(w, 'ie_doors_%s.py' % ar.lower()) for ar in interiors]:
+            os.path.join(w, 'ie_travel_data.py')] + [os.path.join(w, 'ie_doors_%s.py' % ar.lower()) for ar in interiors] + [
+            os.path.join(bake, 'ie_bake_%s.py' % ar.lower()) for ar in interiors]:
         shutil.copy(f, scr)
     with open(os.path.join(scr, 'iwd.py'), 'w') as f:      # console helper:  import iwd; iwd.go()
         f.write('from toee import *\n\ndef go():\n    """Travel to the converted town (map %d)."""\n'

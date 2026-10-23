@@ -214,6 +214,12 @@ def stock_store(npc, store):
         box = npc.substitute_inventory
     except Exception:
         box = None
+    if box is not None and box != OBJ_HANDLE_NULL:
+        try:
+            if box.inventory_item(0) != OBJ_HANDLE_NULL:      # baked (ie_bake.store_box) or stocked before: keep it
+                return box
+        except Exception:
+            pass
     if box is None or box == OBJ_HANDLE_NULL:
         box = game.obj_create(s.get('container') or 1001, npc.location)
         box.object_flag_set(OF_DONTDRAW)
