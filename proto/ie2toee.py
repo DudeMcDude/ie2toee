@@ -435,26 +435,36 @@ def region_anchors(kind_open, bbox, regions, start, near=0.8, limit=6.0, avoid=N
     from collections import deque
     walk = (kind_open == 0).all((-1, -2))
     su, sv = start[0] - bbox[0], start[1] - bbox[2]
-    if not (0 <= su < walk.shape[0] and 0 <= sv < walk.shape[1] and walk[su, sv]):
-        return {}
-    seen = np.zeros(walk.shape, bool); seen[su, sv] = True
-    q = deque([(su, sv)]); tiles = []
-    while q:
-        a, b = q.popleft(); tiles.append((a, b))
-        for da in (-1, 0, 1):
-            for db in (-1, 0, 1):
-                x, y = a + da, b + db
-                if 0 <= x < walk.shape[0] and 0 <= y < walk.shape[1] and walk[x, y] and not seen[x, y]:
-                    seen[x, y] = True; q.append((x, y))
-    if avoid is not None:     # keep the anchor off the door frames (a click on a blocked tile does not move the party)
-        free = [t for t in tiles if not avoid[t]]
-        tiles = free or tiles
+
+    def reach(mask):
+        if not (0 <= su < mask.shape[0] and 0 <= sv < mask.shape[1] and mask[su, sv]):
+            return []
+        seen = np.zeros(mask.shape, bool); seen[su, sv] = True
+        q = deque([(su, sv)]); tiles = []
+        while q:
+            a, b = q.popleft(); tiles.append((a, b))
+            for da in (-1, 0, 1):
+                for db in (-1, 0, 1):
+                    x, y = a + da, b + db
+                    if 0 <= x < mask.shape[0] and 0 <= y < mask.shape[1] and mask[x, y] and not seen[x, y]:
+                        seen[x, y] = True; q.append((x, y))
+        return tiles
+
+    def nearest(tiles, r):
+        return min(((_poly_dist(a + bbox[0] + 0.5, b + bbox[2] + 0.5, r['poly']), a + bbox[0], b + bbox[2]) for a, b in tiles),
+                   default=None)
+
+    every = reach(walk)
+    # keep the anchor off the door frames and on the near side of every door (a click on a blocked tile does not
+    # move the party, and a tile behind a frame may be unreachable for ToEE pathing); fall back to any reachable tile
+    clear = reach(walk & ~avoid) if avoid is not None else []
     out = {}
     for k, r in enumerate(regions):
         if r['type'] != 'travel':
             continue
-        best = min(((_poly_dist(a + bbox[0] + 0.5, b + bbox[2] + 0.5, r['poly']), a + bbox[0], b + bbox[2]) for a, b in tiles),
-                   default=None)
+        best = nearest(clear, r) if clear else None
+        if not (best and best[0] <= limit):
+            best = nearest(every, r)
         if best and near < best[0] <= limit:   # (near < 0: every region)
             out[k] = [int(best[1]), int(best[2])]
     return out
