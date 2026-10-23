@@ -18,7 +18,9 @@ import toeedata
 
 AREA, MAP_ID, GROUND_ID, START = 'AR1000', 5900, 900, (482, 424)
 SCRIPT_BASE = 1100
-RUNTIME = ['ie_runtime', 'ie_critters', 'ie_spellrt', 'ie_combat', 'ie_doors', 'ie_bakert', 'ie_itemrt']
+# Easthaven's 14 building interiors: map ids 5901.., ground ids 901.. (map + doors only; no creatures/items yet)
+INTERIORS = ['AR10%02d' % i for i in range(1, 15)]
+RUNTIME = ['ie_runtime', 'ie_critters', 'ie_spellrt', 'ie_combat', 'ie_doors', 'ie_bakert', 'ie_itemrt', 'ie_travel']
 
 
 def flavour(ie):
@@ -36,6 +38,13 @@ def run(step, args):
     r = subprocess.run(cmd, cwd=HERE)
     if r.returncode:
         sys.exit('step "%s" failed (exit %d): %s' % (step, r.returncode, ' '.join(cmd)))
+
+
+def run_soft(step, args):
+    """like run(), but a failing step only returns False (one broken interior must not stop the whole preview)"""
+    print('== %s' % step, flush=True)
+    r = subprocess.run([sys.executable, os.path.join(HERE, args[0])] + args[1:], cwd=HERE)
+    return r.returncode == 0
 
 
 def copytree(src, dst):
@@ -78,6 +87,13 @@ def main():
 
     run('map', ['ie2toee.py', '--game', ie, '--area', AREA, '--out', w, '--map-id', str(MAP_ID), '--ground-id', str(GROUND_ID)])
     import json
+    interiors = {}      # area -> map id, for the interiors that converted
+    for i, ar in enumerate(INTERIORS, 1):
+        if run_soft('interior %s' % ar, ['ie2toee.py', '--game', ie, '--area', ar, '--out', w,
+                                         '--map-id', str(MAP_ID + i), '--ground-id', str(GROUND_ID + i)]):
+            interiors[ar] = MAP_ID + i
+        else:
+            print('warning: interior %s failed to convert and is skipped (its door stays a dead end)' % ar, flush=True)
     px, py = json.load(open(os.path.join(w, AREA + '_objects.json')))['placement']['canvas_offset']
     run('spells', ['ie_spells.py', 'convert', ie, os.path.join(w, 'spells'), '--toee', toee] + tpa)
     run('items', ['ie_items.py', 'convert', ie, os.path.join(w, 'items'), '--toee', toee, '--area', AREA,
@@ -94,6 +110,8 @@ def main():
                  '--maps', os.path.join(w, 'maps', AREA), '--map-id', str(MAP_ID), '--placement', '%d,%d' % (px, py),
                  '--toee', toee, '--ie', ie, '--out', bake])
 
+    run('travel exits', ['ie_exits.py', w, '--out', os.path.join(w, 'ie_travel_data.py'), '--area', '%s:%d' % (AREA, MAP_ID)] +
+        sum((['--area', '%s:%d' % kv] for kv in sorted(interiors.items())), []))
     print('== assemble', flush=True)
     inst = os.path.join(out, 'install'); shutil.rmtree(inst, ignore_errors=True)
     M = os.path.join(inst, 'modules', 'ToEE'); C = os.path.join(inst, 'modules', 'ToEE_core')
@@ -103,6 +121,11 @@ def main():
     for g in (AREA, AREA + '_doors', AREA + '_night'):
         copytree(os.path.join(w, 'art', 'ground', g), os.path.join(M, 'art', 'ground', g))
     copytree(os.path.join(w, 'art', 'clip', AREA), os.path.join(M, 'art', 'clip', AREA))
+    for ar in interiors:
+        copytree(os.path.join(w, 'maps', ar), os.path.join(M, 'maps', ar))
+        for g in (ar, ar + '_doors', ar + '_night'):
+            copytree(os.path.join(w, 'art', 'ground', g), os.path.join(M, 'art', 'ground', g))
+        copytree(os.path.join(w, 'art', 'clip', ar), os.path.join(M, 'art', 'clip', ar))
     copytree(os.path.join(w, 'skin', 'modules', 'ToEE'), M)
     copytree(os.path.join(cre, 'dialogue', 'modules', 'ToEE', 'dlg'), os.path.join(C, 'dlg'))
     copytree(os.path.join(cre, 'dialogue', 'modules', 'ToEE', 'scr'), os.path.join(C, 'scr'))
@@ -113,22 +136,26 @@ def main():
     scr = os.path.join(C, 'scr')
     for f in [os.path.join(HERE, 'runtime', m + '.py') for m in RUNTIME] + [
             os.path.join(w, 'spells', 'ie_spellmap.py'), os.path.join(w, 'items', 'ie_itemmap.py'),
-            os.path.join(w, 'ie_doors_%s.py' % a1), os.path.join(bake, 'ie_bake_%s.py' % a1)]:
+            os.path.join(w, 'ie_doors_%s.py' % a1), os.path.join(bake, 'ie_bake_%s.py' % a1),
+            os.path.join(w, 'ie_travel_data.py')] + [os.path.join(w, 'ie_doors_%s.py' % ar.lower()) for ar in interiors]:
         shutil.copy(f, scr)
     with open(os.path.join(scr, 'iwd.py'), 'w') as f:      # console helper:  import iwd; iwd.go()
         f.write('from toee import *\n\ndef go():\n    """Travel to the converted town (map %d)."""\n'
+                '    import ie_travel\n    ie_travel.start()      # walk into a building door / the road exit: the party travels (docs/travel.md)\n'
                 '    game.fade_and_teleport(0, 0, 0, %d, %d, %d)\n' % (MAP_ID, MAP_ID, START[0], START[1]))
-    sn = {}; cur = None
-    for l in open(os.path.join(w, AREA + '_snippets.txt')):
-        l = l.rstrip('\r\n')
-        if l.startswith('# '):
-            cur = l[2:].strip(); continue
-        if l.strip() and cur:
-            sn.setdefault(cur, []).append(l)
+    sn = {}
+    for ar in [AREA] + list(interiors):          # merge the snippets of the town and every converted interior
+        cur = None
+        for l in open(os.path.join(w, ar + '_snippets.txt')):
+            l = l.rstrip('\r\n')
+            if l.startswith('# '):
+                cur = l[2:].strip(); continue
+            if l.strip() and cur:
+                sn.setdefault(cur, []).append(l)
     td = toeedata.ToEEData(toee)
     for rel, lines in sn.items():
         mes_with(td, rel, lines, os.path.join(M, rel))
-    print('module overlay: %s' % inst)
+    print('module overlay: %s  (%d areas: %s + %d interiors)' % (inst, 1 + len(interiors), AREA, len(interiors)))
     if a.install:
         copytree(inst, toee)
         print('installed into %s' % toee)

@@ -133,6 +133,13 @@ def first_heartbeat(o, area):
     """Called from every baked critter's san_first_heartbeat (directly or through ie_runtime.bind). The engine runs
     first heartbeats once per object per map load, so the first call, or a second call for the same critter (= the
     map was loaded again: new visit or a loaded save), starts an area pass."""
+    try:      # the Easthaven travel poll (ie_travel.start() is idempotent); it needs the map's travel data
+        import ie_travel
+        ie_travel.start()
+    except ImportError:
+        pass
+    except Exception, e:
+        _log('IE_BAKE travel start failed: %s' % e)
     a = area.upper(); g = _guid(o)
     seen = _members.get(a)
     now = time.time()
