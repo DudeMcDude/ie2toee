@@ -81,6 +81,6 @@ at(6000, survey)
 at(1500, act)
 at(3000, shot, (B + '_' + DO,))
 if DO == 'shop':
-    at(500, key, ('1',))        # first answer; the probe log shows the dialog lines (TemplePlus.log)
+    at(500, key, (os.environ.get('IE2TOEE_ANSWER', '1'),))     # the barter ("B:") answer of the first node
     at(2500, shot, (B + '_' + DO + '_2',))
 at(1500, done)
