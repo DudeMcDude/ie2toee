@@ -102,7 +102,10 @@ def main():
     run('creatures', ['ie_creatures.py', 'convert', ie, toee, cre, '--area', AREA, '--script-base', str(SCRIPT_BASE)] + tpa)
     actors = open(os.path.join(cre, 'dialogue_actors.txt')).read().split()
     run('dialogue', ['ie_dialogue.py', ie, os.path.join(cre, 'dialogue')] + actors +
-        ['--area-script', '%s:%s' % (AREA, a1), '--area-map', '%s:%d:%d,%d' % (AREA, MAP_ID, px, py)])
+        ['--area-script', '%s:%s' % (AREA, a1), '--area-map', '%s:%d:%d,%d' % (AREA, MAP_ID, px, py)] +
+        sum((['--area-map', '%s:%d:%d,%d' % ((ar, mid) + tuple(json.load(open(os.path.join(w, ar + '_objects.json')))
+                                                              ['placement']['canvas_offset']))]      # (merges the interiors into ie_areas.py)
+             for ar, mid in sorted(interiors.items())), []))
     run('dialog skin', ['ie_dialog_skin.py', ie, os.path.join(w, 'skin'), '--skin', skin, '--default', skin])
     bake = os.path.join(w, 'bake')
     run('bake', ['ie_bake.py', 'bake', '--area', AREA, '--flavour', F, '--specs', os.path.join(cre, 'ie_creatures_%s.py' % a1),
