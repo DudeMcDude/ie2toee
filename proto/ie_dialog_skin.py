@@ -175,7 +175,8 @@ class Exporter:
         self.g = IEGame(root)
         self.pvrz = pvrz_loader_for(self.g)
         self.out = out
-        self.ee = self.g.exists('ui', 'menu')
+        # EE 'gamelog' skin needs both ui.menu and bgee.lua; older EE 2.x installs lack them
+        self.ee = self.g.exists('ui', 'menu') and self.g.exists('bgee', 'lua')
         self.lang = lang
         self.written = []
 
@@ -360,6 +361,12 @@ class Exporter:
 
     def run(self, which, dialogs, default, portraits):
         skins = {}
+        if which == 'iwdee' and not self.ee:
+            print('WARNING: this install has no ui.menu/bgee.lua (older IWD:EE); using the classic "iwd" dialogue skin instead.')
+            which = 'iwd'
+            if default == 'iwdee':
+                default = 'iwd'
+            dialogs = [d.replace(':iwdee', ':iwd') for d in dialogs]
         if self.ee:
             fontcolors, styles = lua_tables(self.g.read('bgee', 'lua').decode('latin-1'))
             menu_src = self.g.read('ui', 'menu').decode('latin-1')
