@@ -424,7 +424,7 @@ def _poly_dist(px, py, poly):
     return best
 
 
-def region_anchors(kind_open, bbox, regions, start, near=0.8, limit=6.0):
+def region_anchors(kind_open, bbox, regions, start, near=0.8, limit=6.0, avoid=None):
     """{region index: [tile u, tile v]} for the travel regions a party cannot get within `near` tiles of.
     ToEE critters have a body radius and the IE search map is coarser than the walls, so the party often cannot
     stand on (or next to) a region's polygon. The anchor is the fully walkable tile, reachable from `start` with
@@ -446,6 +446,9 @@ def region_anchors(kind_open, bbox, regions, start, near=0.8, limit=6.0):
                 x, y = a + da, b + db
                 if 0 <= x < walk.shape[0] and 0 <= y < walk.shape[1] and walk[x, y] and not seen[x, y]:
                     seen[x, y] = True; q.append((x, y))
+    if avoid is not None:     # keep the anchor off the door frames (a click on a blocked tile does not move the party)
+        free = [t for t in tiles if not avoid[t]]
+        tiles = free or tiles
     out = {}
     for k, r in enumerate(regions):
         if r['type'] != 'travel':
@@ -558,7 +561,13 @@ def convert(game, area, outdir, map_id, ground_id, guidance, preview=False, clos
             if 0 <= cy < sr_open.shape[0] and 0 <= cx < sr_open.shape[1]:
                 sr_open[cy, cx] = DOOR_BLOCK_VALUE
     kind_open = build_tile_grid(sr_open, pl, guidance, bbox)[4]
-    anchors = region_anchors(kind_open, bbox, regions_t, start, near=-1)   # every travel region (see region_anchors)
+    kind_nod = build_tile_grid(are.sr_nodoors, pl, guidance, bbox)[4]
+    dt = ((kind != kind_nod) | (kind_open != kind_nod)).any((-1, -2))          # tiles a door changes
+    near_door = dt.copy()
+    for da in (-1, 0, 1):
+        for db in (-1, 0, 1):
+            near_door |= np.roll(np.roll(dt, da, 0), db, 1)
+    anchors = region_anchors(kind_open, bbox, regions_t, start, near=-1, avoid=near_door)   # every travel region
     for k, a in anchors.items():
         regions_t[k]['anchor'] = a
     objs = dict(
