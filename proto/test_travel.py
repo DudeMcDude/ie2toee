@@ -39,6 +39,7 @@ data = types.ModuleType('ie_travel_data')
 data.AREAS = {
  'AR1000': dict(map=5900, entrances={'FR1001': [100, 100, 0]}, regions=[
     dict(name='To1001', poly=[[110, 90], [114, 90], [114, 94], [110, 94]], dest_area='AR1001', dest_entrance='FR1000', dest_map=5901),
+    dict(name='To1003', poly=[[300, 300], [302, 300], [302, 302], [300, 302]], anchor=[305, 300], dest_area='AR1001', dest_entrance='FR1000', dest_map=5901),
     dict(name='To1200', poly=[[50, 50], [54, 50]], dest_area='AR1200', dest_entrance='FR1000', dest_map=0)]),
  'AR1001': dict(map=5901, entrances={'FR1000': [200, 200, 0]}, regions=[
     dict(name='To1000', poly=[[200, 205], [204, 205], [204, 207], [200, 207]], dest_area='AR1000', dest_entrance='FR1001', dest_map=5900)])}
@@ -99,10 +100,17 @@ put_party(5900, 100, 100); run_events(2)
 game.party[2].location = location_from_axis(111, 92); run_events(1)
 check('one member in a region is enough', game.teleports[-1] == (5901, 200, 200) and len(game.teleports) == 3)
 
+# 2b. anchor: a region the party can't get next to fires near its anchor tile
+clock[0] += 5; put_party(5900, 100, 100); run_events(2)
+put_party(5900, 305, 300); run_events(1)
+check('anchor tile triggers its region', game.teleports[-1] == (5901, 200, 200) and len(game.teleports) == 4)
+put_party(5900, 308, 300); T._armed = True; n = len(game.teleports); run_events(2)
+check('2 tiles from the anchor does not trigger', len(game.teleports) == n)
+
 # 3. unconverted exit: one-time note, party stays
 clock[0] += 5; put_party(5900, 100, 100); run_events(2)
 put_party(5900, 52, 50); run_events(2)
-check('unconverted exit: note once, no teleport', game.leader.floats == ['This exit (AR1200) is not in the preview'] and len(game.teleports) == 3)
+check('unconverted exit: note once, no teleport', game.leader.floats == ['This exit (AR1200) is not in the preview'] and len(game.teleports) == 4)
 put_party(5900, 100, 100); run_events(2); put_party(5900, 52, 50); run_events(2)
 check('note is one-time', len(game.leader.floats) == 1)
 
@@ -112,7 +120,7 @@ T._last_poll = 0.0; T._gen = 0; T._armed = True; T._map = 5900; T._noted.clear()
 put_party(5900, 112, 92)                          # loaded right in a region
 game.events.append((T.poll, (7,)))                # the event restored from the save (gen 7)
 run_events(3)
-check('restored poll adopted (gen 7), disarmed in the region', T._gen == 7 and not T._armed and len(game.teleports) == 3)
+check('restored poll adopted (gen 7), disarmed in the region', T._gen == 7 and not T._armed and len(game.teleports) == 4)
 n0 = len(game.events)
 T.start()
 check('start() after adopt does not add a second poll', len(game.events) == n0)
@@ -136,6 +144,14 @@ check('ie_exits: reports the unconverted destination, flags dest_map 0',
 out = os.path.join(d, 'ie_travel_data.py'); ie_exits.write(got, out)
 ns = {}; exec(open(out).read(), ns)
 check('ie_exits: written module imports', ns['BY_MAP'] == {5900: 'AR1000', 5901: 'AR1001'})
+
+import ie2toee
+# 5b. region_anchors
+kk = np.ones((10, 10, 3, 3), np.int8); kk[0:6, 0:3] = 0      # walkable strip, tiles u 0..5, v 0..2 (bbox origin 0,0)
+regs = [dict(type='travel', poly=[[8, 1], [9, 1], [9, 2], [8, 2]]), dict(type='travel', poly=[[5.2, 1.5], [5.8, 1.5]]), dict(type='info', poly=[[8, 1], [9, 1]])]
+an = ie2toee.region_anchors(kk, (0, 10, 0, 10), regs, (0, 0))
+check('anchors: far region gets the nearest walkable tile, near region and info region none', an == {0: [5, 1]})
+check('anchors: unreachable start -> none', ie2toee.region_anchors(kk, (0, 10, 0, 10), regs, (9, 9)) == {})
 
 # 6. ie2toee.arrival_tile
 import ie2toee

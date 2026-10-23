@@ -27,7 +27,8 @@ def collect(workdir, areas):
                 continue
             dest = r['dest_area'].upper()
             r_ent = (r.get('dest_entrance') or '').upper()
-            regs.append(dict(name=r['name'], poly=[[round(float(x), 2), round(float(y), 2)] for x, y in r['poly']],
+            extra = dict((k, r[k]) for k in ('anchor',) if r.get(k))
+            regs.append(dict(extra, name=r['name'], poly=[[round(float(x), 2), round(float(y), 2)] for x, y in r['poly']],
                              dest_area=dest, dest_entrance=r_ent))
         data[area] = dict(map=mid, entrances=ents, regions=regs)
     for area, d in sorted(data.items()):

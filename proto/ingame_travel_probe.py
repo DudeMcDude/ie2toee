@@ -14,6 +14,9 @@ exit_r = [r for r in EXT['regions'] if r['dest_area'] == B][0]
 back_r = [r for r in INT['regions'] if r['dest_area'] == 'AR1000'][0]
 ent = EXT['entrances']['FR' + B[2:]]          # town entrance of this building
 def centre(r):
+    a = r.get('anchor')    # a walkable tile at the region (a blocked click target does not move the party)
+    if a:
+        return a[0], a[1]
     xs = [p[0] for p in r['poly']]; ys = [p[1] for p in r['poly']]
     return int(round(sum(xs) / len(xs))), int(round(sum(ys) / len(ys)))
 
@@ -23,6 +26,14 @@ def log(s):
 def where(tag):
     l = game.leader; x, y = location_to_axis(l.location)
     log("%s map=%d leader=(%d,%d) party=%s" % (tag, l.map, x, y, [(location_to_axis(o.location)[0], location_to_axis(o.location)[1], o.map) for o in game.party]))
+    try:
+        import ie_travel as T
+        pts = [T._pos(o) for o in game.party]
+        a = T.D.BY_MAP.get(l.map) if hasattr(T, 'D') else T._data().BY_MAP.get(l.map)
+        log("  pos=%s armed=%s busy_left=%.1f hit=%s" % ([(round(p[0], 2), round(p[1], 2)) for p in pts], T._armed,
+            T._busy_until - __import__('time').time(), (T.hit_region(T._data().AREAS[a], pts) or {}).get('name')))
+    except Exception as e:
+        log("  (no travel state: %s)" % e)
     return 0
 
 def look(tag):
@@ -68,8 +79,10 @@ def at(dt, fn, args=()):
 
 log("travel probe %s: exit region %s centre %s -> interior entrance %s; back region %s centre %s" % (
     B, exit_r['name'], centre(exit_r), D.AREAS[B]['entrances'], back_r['name'], centre(back_r)))
-import iwd
-iwd.go()
+def go():
+    import iwd
+    iwd.go(); return 0
+at(2000, go)      # (not at import time: that sometimes hung the game on its legal screen)
 at(9000, look, ('town_start',))
 at(500, place, (5900, ent[0], ent[1], 'at_town_entrance'))
 at(2500, open_door, ('d',))
@@ -79,6 +92,7 @@ at(9000, expect, ('entered_building', INT['map']))
 at(5000, look, ('interior_arrival',))
 at(4000, expect, ('no_bounce_in_interior', INT['map']))
 at(300, run_to, (centre(back_r)[0], centre(back_r)[1], 'out'))
-at(9000, expect, ('back_in_town', 5900))
+at(7000, where, ('mid_out',))
+at(7000, expect, ('back_in_town', 5900))
 at(4000, look, ('town_after_exit',))
 at(500, done)

@@ -24,6 +24,7 @@ except ImportError:                      # (the test mock provides them in toee)
 
 POLL_MS = 250
 NEAR = 0.8              # tiles: "inside" also counts this close to a region's outline
+ANCHOR_NEAR = 0.9       # tiles: a region the party cannot get next to has an anchor tile (ie2toee region_anchors)
 INCH_PER_TILE = 28.284271247461900976
 BUSY_S = 4.0            # wall seconds after a teleport during which no new travel is started (fade + map load)
 ALIVE_S = 2.0           # a poll that ran this recently means a poll is alive: start() does nothing
@@ -110,6 +111,9 @@ def hit_region(area_data, pts):
     for r in area_data['regions']:
         for (px, py) in pts:
             if near_region(px, py, r['poly']):
+                return r
+            a = r.get('anchor')
+            if a and ((px - a[0] - 0.5) ** 2 + (py - a[1] - 0.5) ** 2) ** 0.5 <= ANCHOR_NEAR:
                 return r
     return None
 

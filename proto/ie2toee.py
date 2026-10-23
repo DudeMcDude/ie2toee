@@ -402,6 +402,61 @@ def arrival_tile(kind, bbox, u, v, radius=5):
     return iu, iv, None
 
 
+def _poly_dist(px, py, poly):
+    """distance from a point to a polygon (0 inside; 1-2 point regions are points/segments)"""
+    n = len(poly)
+    if n >= 3:
+        inside, j = False, n - 1
+        for i in range(n):
+            (xi, yi), (xj, yj) = poly[i], poly[j]
+            if (yi > py) != (yj > py) and px < (xj - xi) * (py - yi) / (yj - yi) + xi:
+                inside = not inside
+            j = i
+        if inside:
+            return 0.0
+    best = 1e9
+    for i in range(n if n > 1 else 1):
+        (ax, ay), (bx, by) = poly[i], poly[(i + 1) % n]
+        dx, dy = bx - ax, by - ay
+        L = dx * dx + dy * dy
+        t = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / L)) if L else 0.0
+        best = min(best, math.hypot(px - ax - t * dx, py - ay - t * dy))
+    return best
+
+
+def region_anchors(kind_open, bbox, regions, start, near=0.8, limit=6.0):
+    """{region index: [tile u, tile v]} for the travel regions a party cannot get within `near` tiles of.
+    ToEE critters have a body radius and the IE search map is coarser than the walls, so the party often cannot
+    stand on (or next to) a region's polygon. The anchor is the fully walkable tile, reachable from `start` with
+    every door open, nearest to the polygon (at most `limit` tiles away); the runtime also fires when a party
+    member is within ~0.9 tile of the anchor (docs/travel.md). ToEE critters stand on 1/3-tile slots, up to ~0.8 tile
+    from a tile's centre, so a region a tile centre is 'near' (<= 0.8) may still be out of reach: the convert passes
+    near=-1 and gives every reachable travel region an anchor."""
+    from collections import deque
+    walk = (kind_open == 0).all((-1, -2))
+    su, sv = start[0] - bbox[0], start[1] - bbox[2]
+    if not (0 <= su < walk.shape[0] and 0 <= sv < walk.shape[1] and walk[su, sv]):
+        return {}
+    seen = np.zeros(walk.shape, bool); seen[su, sv] = True
+    q = deque([(su, sv)]); tiles = []
+    while q:
+        a, b = q.popleft(); tiles.append((a, b))
+        for da in (-1, 0, 1):
+            for db in (-1, 0, 1):
+                x, y = a + da, b + db
+                if 0 <= x < walk.shape[0] and 0 <= y < walk.shape[1] and walk[x, y] and not seen[x, y]:
+                    seen[x, y] = True; q.append((x, y))
+    out = {}
+    for k, r in enumerate(regions):
+        if r['type'] != 'travel':
+            continue
+        best = min(((_poly_dist(a + bbox[0] + 0.5, b + bbox[2] + 0.5, r['poly']), a + bbox[0], b + bbox[2]) for a, b in tiles),
+                   default=None)
+        if best and near < best[0] <= limit:   # (near < 0: every region)
+            out[k] = [int(best[1]), int(best[2])]
+    return out
+
+
 def load_area(game, area, guidance, closed_doors=False):
     g = IEGame(game) if isinstance(game, str) else game
     are = Are(g.read(area, 'are'))
@@ -496,12 +551,22 @@ def convert(game, area, outdir, map_id, ground_id, guidance, preview=False, clos
         if moved is None:
             print(f'warning: {name} entrance {e["name"]} has no walkable tile within 5 tiles', file=sys.stderr)
         return dict(arrival=[au, av], arrival_moved=bool(moved))
+    regions_t = [dict(r, poly=[tl(*p) for p in r['poly']]) for r in are.regions]
+    sr_open = are.sr_nodoors.copy()          # every door open: what a party can reach once it has opened the doors
+    for d in are.doors:
+        for cx, cy in d['open_cells']:
+            if 0 <= cy < sr_open.shape[0] and 0 <= cx < sr_open.shape[1]:
+                sr_open[cy, cx] = DOOR_BLOCK_VALUE
+    kind_open = build_tile_grid(sr_open, pl, guidance, bbox)[4]
+    anchors = region_anchors(kind_open, bbox, regions_t, start, near=-1)   # every travel region (see region_anchors)
+    for k, a in anchors.items():
+        regions_t[k]['anchor'] = a
     objs = dict(
         placement=dict(canvas_offset=[pl.cx, pl.cy], scale=pl.scale, cal=[pl.calx - CAL_X0, pl.caly - CAL_Y0]),
         entrances=[dict(e, toee=tl(e['x'], e['y']), **_arrival(e)) for e in are.entrances],
         actors=[dict(a, toee=tl(a['x'], a['y'])) for a in are.actors],
         containers=[dict(c, toee=tl(c['x'], c['y']), poly=[tl(*p) for p in c['poly']]) for c in are.containers],
-        regions=[dict(r, poly=[tl(*p) for p in r['poly']]) for r in are.regions],
+        regions=regions_t,
         doors=[dict(d, wed=next((dict(cells=len(w['cells']), closed_polys=len(w['closed_polys'])) for w in wed.doors
                                  if w['name'].lower() == d['wed_id'].lower()), None)) for d in are.doors],
         animations=[dict(a, toee=tl(a['x'], a['y'])) for a in are.animations])
