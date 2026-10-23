@@ -229,7 +229,8 @@ class Are:
             self.regions.append(dict(name=cstr(data[o:o + 32]), type=('trap', 'info', 'travel')[typ] if typ < 3 else typ,
                                      poly=V[fv:fv + nv], dest_area=cstr(data[o + 0x38:o + 0x40]),
                                      dest_entrance=cstr(data[o + 0x40:o + 0x60]),
-                                     script=cstr(data[o + 0x7c:o + 0x84])))
+                                     script=cstr(data[o + 0x7c:o + 0x84]),
+                                     info=struct.unpack_from('<I', data, o + 0x64)[0]))     # info point text strref
         self.entrances = [dict(name=cstr(data[o:o + 32]), x=struct.unpack_from('<H', data, o + 0x20)[0],
                                y=struct.unpack_from('<H', data, o + 0x22)[0],
                                orient=struct.unpack_from('<H', data, o + 0x24)[0])

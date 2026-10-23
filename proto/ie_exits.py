@@ -12,8 +12,8 @@ Output is Python 2.7-compatible (it is imported inside Temple+) and derived from
 import argparse, json, os, sys
 
 
-def collect(workdir, areas):
-    """areas: {AREA: map_id}. Returns (data dict, [problem strings])."""
+def collect(workdir, areas, text=None):
+    """areas: {AREA: map_id}; text: strref -> str (info point texts). Returns (data dict, [problem strings])."""
     data, problems = {}, []
     for area, mid in sorted(areas.items()):
         o = json.load(open(os.path.join(workdir, area + '_objects.json')))
@@ -21,8 +21,14 @@ def collect(workdir, areas):
         for e in o['entrances']:
             au, av = e.get('arrival') or [int(e['toee'][0]), int(e['toee'][1])]
             ents[e['name'].upper()] = [au, av, e.get('orient', 0)]
-        regs = []
+        regs, infos = [], []
         for r in o['regions']:
+            if r['type'] == 'info' and text and r.get('info') not in (None, 0, 0xFFFFFFFF):
+                t = text(r['info'])
+                if t and not t.startswith('[strref'):
+                    infos.append(dict(name=r['name'], poly=[[round(float(x), 2), round(float(y), 2)] for x, y in r['poly']],
+                                      text=t))
+                continue
             if r['type'] != 'travel' or not r.get('dest_area'):
                 continue
             dest = r['dest_area'].upper()
@@ -30,7 +36,7 @@ def collect(workdir, areas):
             extra = dict((k, r[k]) for k in ('anchor',) if r.get(k))
             regs.append(dict(extra, name=r['name'], poly=[[round(float(x), 2), round(float(y), 2)] for x, y in r['poly']],
                              dest_area=dest, dest_entrance=r_ent))
-        data[area] = dict(map=mid, entrances=ents, regions=regs)
+        data[area] = dict(map=mid, entrances=ents, regions=regs, infos=infos)
     for area, d in sorted(data.items()):
         for r in d['regions']:
             dst = data.get(r['dest_area'])
@@ -58,12 +64,18 @@ def main():
     ap.add_argument('workdir')
     ap.add_argument('--area', action='append', required=True, help='AREA:map_id (repeat)')
     ap.add_argument('--out', required=True)
+    ap.add_argument('--ie', help='IE install (dialog.tlk for the info point texts)')
     a = ap.parse_args()
+    text = None
+    if a.ie:
+        import iescript as S
+        p = S.find_tlk(a.ie)
+        text = S.StrrefText(S.Tlk.load(p)) if p else None
     areas = {x.split(':')[0].upper(): int(x.split(':')[1]) for x in a.area}
-    data, problems = collect(a.workdir, areas)
+    data, problems = collect(a.workdir, areas, text)
     write(data, a.out)
     n = sum(len(d['regions']) for d in data.values())
-    print('ie_exits: %d areas, %d travel regions -> %s' % (len(data), n, a.out))
+    print('ie_exits: %d areas, %d travel regions, %d info points -> %s' % (len(data), n, sum(len(d['infos']) for d in data.values()), a.out))
     for p in problems:
         print('  exit not usable: ' + p)
     return 0

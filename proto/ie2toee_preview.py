@@ -150,7 +150,7 @@ def main():
              '--map-id', str(mid), '--placement', '%d,%d' % (ox, oy), '--generic-script', str(GENERIC_BASE + mid - MAP_ID),
              '--toee', toee, '--ie', ie, '--out', bake])
 
-    run('travel exits', ['ie_exits.py', w, '--out', os.path.join(w, 'ie_travel_data.py'), '--area', '%s:%d' % (AREA, MAP_ID)] +
+    run('travel exits', ['ie_exits.py', w, '--out', os.path.join(w, 'ie_travel_data.py'), '--ie', ie, '--area', '%s:%d' % (AREA, MAP_ID)] +
         sum((['--area', '%s:%d' % kv] for kv in sorted(interiors.items())), []))
     print('== assemble', flush=True)
     inst = os.path.join(out, 'install'); shutil.rmtree(inst, ignore_errors=True)

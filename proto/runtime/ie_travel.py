@@ -164,6 +164,26 @@ def travel(r):
     game.fade_and_teleport(0, 0, 0, dst['map'], u, v)
 
 
+_in_info = set()
+
+
+def info_points(area_data, pts):
+    """show the text of every info point (IE Trigger Point) a party member just stepped into: floating text over the
+    leader + the message log; once per entry (shown again after the party has left the region)"""
+    inside = set()
+    for k, r in enumerate(area_data.get('infos') or ()):
+        if [1 for px, py in pts if near_region(px, py, r['poly'], 0)]:
+            inside.add(k)
+            if k not in _in_info:
+                _log('info %s: %s' % (r['name'], r['text'][:60]))
+                try:
+                    game.create_history_freeform(r['text'] + '\n\n')
+                    game.leader.float_text_line(r['text'], 5)   # light blue: white is lost on snow
+                except Exception as e:
+                    _log('info show: %s' % e)
+    _in_info.clear(); _in_info.update(inside)
+
+
 def tick(gen):
     """one poll of the party. Returns 1 if the poll must go on, 0 if it must stop."""
     global _gen, _last_poll, _armed, _map
@@ -187,6 +207,7 @@ def tick(gen):
     d = _data()
     if cur != _map:
         _map = cur
+        _in_info.clear()
         _armed = False                # (re)arm only after leaving every region on this map
         area = d.BY_MAP.get(cur)
         if area:
@@ -197,6 +218,7 @@ def tick(gen):
     if not area:
         return 1
     pts = [_pos(p) for p in party]
+    info_points(d.AREAS[area], pts)
     r = hit_region(d.AREAS[area], pts)
     if r is None:
         _armed = True
