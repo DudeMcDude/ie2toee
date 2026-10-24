@@ -32,7 +32,54 @@ def subst(text, female):
         t = TOKENS.get(m.group(1).upper())
         return t[1 if female else 0] if t else m.group(0)
     t = re.sub(r'<([A-Z_0-9]+)>', rep, text)
-    return t.replace('{', '(').replace('}', ')').replace('\r', '').replace('\n', ' ')
+    t = t.replace('{', '(').replace('}', ')').replace('\r', '').replace('\n', ' ')
+    return ascii_text(t)
+
+# ToEE's fonts are plain ASCII: fold the IE (EE: Unicode) typography so no '?'/box glyphs show up
+_FOLD = [(re.compile(r'\s*[\u2014\u2015]\s*'), ' - '), (re.compile(r'\s*\u2013\s*'), ' - '),
+         (re.compile('[\u2018\u2019\u201a\u2032]'), "'"), (re.compile('[\u201c\u201d\u201e\u2033]'), '"'),
+         (re.compile('\u2026'), '...'), (re.compile('[\u00a0\u2009\u200a\u2002\u2003]'), ' ')]
+
+def ascii_text(t):
+    for rx, r in _FOLD:
+        t = rx.sub(r, t)
+    return t
+
+# The logbook (temple.dll) hangs on long quest descriptions (vanilla's longest is 214 chars): cut at a sentence end
+DESC_MAX = 250
+
+def cap_desc(t, n=DESC_MAX):
+    if len(t) <= n:
+        return t
+    cut = t[:n]
+    i = max(cut.rfind('. '), cut.rfind('! '), cut.rfind('? '))
+    return cut[:i + 1] if i > n // 3 else cut[:n - 3].rsplit(' ', 1)[0] + '...'
+
+_STOP = set('the a an and or of to in on at for with we us our was were is be been that this his her he she it its from by as but have has had they them their there into out not will would who which what when then than so'.split())
+
+def _words(t):
+    return set(w for w in re.findall(r"[a-z][a-z'-]{2,}", t.lower()) if w not in _STOP)
+
+def merge_journals(journals, origin, text):
+    """IE has one journal entry per step; ToEE one quest per id. A solved ('done') entry joins the opening ('quest')
+    entry from the same dialogue/script that shares the most words with it. Returns {done strref: opening strref}."""
+    opens = [r for r, k in journals.items() if k == 'quest']
+    out = {}
+    for r, k in journals.items():
+        if k != 'done':
+            continue
+        wr = _words(text(r)); best = (0.0, None); second = 0.0
+        for o in opens:     # same dialogue/script: 0.12 overlap is enough; elsewhere (often a BCS sets it) 0.14
+            same = bool(origin.get(o, set()) & origin.get(r, set()))
+            wo = _words(text(o)); sc = len(wr & wo) / float(len(wr | wo) or 1) - (0 if same else 0.02)
+            if sc > best[0]:
+                best, second = (sc, o), best[0]
+            elif sc > second:
+                second = sc
+        # clear winner: >= 0.12, or >= 0.08 and 1.5x the runner-up
+        if best[1] is not None and (best[0] >= 0.12 or (best[0] >= 0.08 and best[0] >= 1.5 * second)):
+            out[r] = best[1]
+    return out
 
 def _stride(dlg):
     m = max([s['count'] for s in dlg.states] + [1])
@@ -188,7 +235,7 @@ def main():
     for d in (scr, dlgd):
         os.makedirs(d, exist_ok=True)
     rep = {'tlk': bool(tlk), 'ids_missing': ids.missing, 'actors': [], 'area_scripts': [], 'unknown': {}}
-    allvars = set(); strrefs = set(); journals = {}
+    allvars = set(); strrefs = set(); journals = {}; origin = {}
     def w(path, s):
         # ToEE reads Windows-1252 text; EE text outside it becomes '?'
         open(path, 'w', encoding='cp1252', errors='replace', newline='\r\n' if path.endswith('.dlg') else '\n').write(s)
@@ -200,7 +247,7 @@ def main():
         if ident.startswith('area_'):
             m += '_area'
         w(os.path.join(scr, m + '.py'), src)
-        allvars.update(g.vars); rep['unknown'].update(g.unknown); strrefs.update(g.strrefs); journals.update(g.journals)
+        allvars.update(g.vars); rep['unknown'].update(g.unknown); strrefs.update(g.strrefs); journals.update(g.journals); [origin.setdefault(r_, set()).add(ident) for r_ in g.journals]
         return m, nb, unk
     for spec in a.actor:
         parts = spec.split(':') + ['', '']
@@ -216,7 +263,7 @@ def main():
         for res in [x for x in bl.split(',') if x]:
             m, nb, unk = bcs(res, ident, area); mods.append(m)
         w(os.path.join(scr, 'py%05die_%s.py' % (sid, ident.lower())), actor_script(sid, ident, area, dlg_parts, mods))
-        allvars.update(g.vars); rep['unknown'].update(g.unknown); strrefs.update(g.strrefs); journals.update(g.journals)
+        allvars.update(g.vars); rep['unknown'].update(g.unknown); strrefs.update(g.strrefs); journals.update(g.journals); [origin.setdefault(r_, set()).add(ident) for r_ in g.journals]
         rep['actors'].append({'ident': ident, 'area': area, 'script_id': sid, 'dlg': dlg, 'bcs': mods,
                               'lines': len([l for l in (dlg_parts[0] if dlg_parts else []) if l]),
                               'entry_states': len(dlg_parts[2]) if dlg_parts else 0, 'notes': notes})
@@ -235,7 +282,8 @@ def main():
       '\n'.join('    %d: %s,' % (r, pystr(subst(text(r), False))) for r in sorted(strrefs)))
     # journal entries -> ToEE logbook quests (mes/gamequestlog.mes: title at id, description at id + 200)
     qids = list(range(a.quest_base, a.quest_max + 1)); jmap = {}; jl = []
-    for r in sorted(journals):
+    merged = merge_journals(journals, origin, text)
+    for r in sorted(r for r in journals if r not in merged):
         if not qids:
             print('warning: more journal entries than quest slots %d..%d: %d dropped' % (a.quest_base, a.quest_max, len(journals) - len(jmap)))
             break
@@ -245,11 +293,15 @@ def main():
         if len(title) > 60:
             title = title[:57].rsplit(' ', 1)[0] + '...'
         jmap[r] = (q, journals[r])
-        jl += ['{%d}{%s}' % (q, title), '{%d}{%s}' % (q + 200, ' '.join(lines_))]
+        jl += ['{%d}{%s}' % (q, title), '{%d}{%s}' % (q + 200, cap_desc(' '.join(lines_)))]
+    for r, o in sorted(merged.items()):
+        if o in jmap:
+            jmap[r] = (jmap[o][0], journals[r])
+    rep['journal_merged'] = len([r for r in merged if r in jmap])
     w(os.path.join(scr, 'ie_journal.py'), HEADER + 'JOURNAL = %r   # strref -> (ToEE quest id, kind)\n' % jmap)
     with open(os.path.join(a.out, 'journal_snippets.txt'), 'w', encoding='cp1252', errors='replace') as f:
         f.write('# mes/gamequestlog.mes\n' + '\n'.join(l for l in jl if True) + '\n')
-        f.write('# rules/gamequest.mes\n' + '\n'.join('{%d}{1}' % q for q, _ in jmap.values()) + '\n')
+        f.write('# rules/gamequest.mes\n' + '\n'.join('{%d}{1}' % q for q in sorted(set(q for q, _ in jmap.values()))) + '\n')
     rep['journal'] = len(jmap)
     am = {}; pl = {}
     for spec in a.area_map:     # AREA:MAP[:cx,cy]
