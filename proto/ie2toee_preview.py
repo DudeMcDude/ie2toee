@@ -17,7 +17,7 @@ sys.path.insert(0, HERE)
 import toeedata
 
 AREA, MAP_ID, GROUND_ID, START = 'AR1000', 5900, 900, (482, 424)
-MODULE = 'IWD'          # Temple+ module: modules\IWD.dat (empty marker) + modules\IWD (maps, art, rules, mes) +
+MODULE = 'IWD'          # Temple+ module: modules\IWD.dat (link to your ToEE.dat) + modules\IWD (maps, art, rules, mes) +
                         # modules\IWD_core (dlg, scr, quest texts); chosen in TemplePlusConfig (defaultModule=IWD)
 QUEST_BASE = 1          # IE journal entries -> ToEE quests 1.. (vanilla quests are not kept in the IWD module)
 SCRIPT_BASE = 1100      # town actors 1100.., interior n: 1120+10n.. (<= 1269)
