@@ -17,6 +17,9 @@ sys.path.insert(0, HERE)
 import toeedata
 
 AREA, MAP_ID, GROUND_ID, START = 'AR1000', 5900, 900, (482, 424)
+MODULE = 'IWD'          # Temple+ module: modules\IWD.dat (empty marker) + modules\IWD (maps, art, rules, mes) +
+                        # modules\IWD_core (dlg, scr, quest texts); chosen in TemplePlusConfig (defaultModule=IWD)
+QUEST_BASE = 1          # IE journal entries -> ToEE quests 1.. (vanilla quests are not kept in the IWD module)
 SCRIPT_BASE = 1100      # town actors 1100.., interior n: 1120+10n.. (<= 1269)
 GENERIC_BASE = 1280    # interior n's baked-object script (the town's is 1099)
 # Easthaven's 14 building interiors: map ids 5901.., ground ids 901.. (map, doors, baked actors + containers)
@@ -108,7 +111,7 @@ def main():
                                          '--name-base', str(27000 + 20 * i + 80)] + tpa):
             icre[ar] = d
             actors += open(os.path.join(d, 'dialogue_actors.txt')).read().split()
-    run('dialogue', ['ie_dialogue.py', ie, os.path.join(cre, 'dialogue')] + actors +
+    run('dialogue', ['ie_dialogue.py', ie, os.path.join(cre, 'dialogue'), '--quest-base', str(QUEST_BASE)] + actors +
         ['--area-script', '%s:%s' % (AREA, a1), '--area-map', '%s:%d:%d,%d' % (AREA, MAP_ID, px, py)] +
         sum((['--area-map', '%s:%d:%d,%d' % ((ar, mid) + tuple(json.load(open(os.path.join(w, ar + '_objects.json')))
                                                               ['placement']['canvas_offset']))]      # (merges the interiors into ie_areas.py)
@@ -154,7 +157,8 @@ def main():
         sum((['--area', '%s:%d' % kv] for kv in sorted(interiors.items())), []))
     print('== assemble', flush=True)
     inst = os.path.join(out, 'install'); shutil.rmtree(inst, ignore_errors=True)
-    M = os.path.join(inst, 'modules', 'ToEE'); C = os.path.join(inst, 'modules', 'ToEE_core')
+    M = os.path.join(inst, 'modules', MODULE); C = os.path.join(inst, 'modules', MODULE + '_core')
+    os.makedirs(os.path.join(inst, 'modules'), exist_ok=True)   # modules\IWD.dat: see the install step
     for d in ('maps', 'art/ground', 'art/clip', 'rules', 'mes', 'dlg', 'scr', 'mes/description'):
         os.makedirs(os.path.join(C if d in ('dlg', 'scr', 'mes/description') else M, d), exist_ok=True)
     copytree(os.path.join(bake, 'modules', 'ToEE', 'maps', AREA), os.path.join(M, 'maps', AREA))
@@ -181,7 +185,7 @@ def main():
             os.path.join(w, 'ie_travel_data.py')] + [os.path.join(w, 'ie_doors_%s.py' % ar.lower()) for ar in interiors] + [
             os.path.join(bake, 'ie_bake_%s.py' % ar.lower()) for ar in interiors]:
         shutil.copy(f, scr)
-    with open(os.path.join(scr, 'iwd.py'), 'w') as f:      # console helper:  import iwd; iwd.go()
+    with open(os.path.join(scr, 'iwd.py'), 'w') as f:      # (optional now: new games start in Easthaven)      # console helper:  import iwd; iwd.go()
         f.write('from toee import *\n\ndef go():\n    """Travel to the converted town (map %d)."""\n'
                 '    import ie_travel\n    ie_travel.start()      # walk into a building door / the road exit: the party travels (docs/travel.md)\n'
                 '    game.fade_and_teleport(0, 0, 0, %d, %d, %d)\n' % (MAP_ID, MAP_ID, START[0], START[1]))
@@ -200,14 +204,38 @@ def main():
                 sn.setdefault(cur, []).append(l)
     td = toeedata.ToEEData(toee)
     for rel, lines in sn.items():
-        # the quest texts are only read from ToEE_core (a modules/ToEE copy is ignored: verified in game)
+        # the quest texts are only read from <module>_core (a copy in the module folder is ignored: verified in game)
         dst = C if os.path.basename(rel) in ('gamequestlog.mes', 'gamequest.mes') else M
         mes_with(td, rel, lines, os.path.join(dst, rel))
+    # new game -> Easthaven: Temple+ MapList flag (module-support build; docs/modding-start-map.md in the Temple+ fork)
+    ml = os.path.join(M, 'rules', 'MapList.mes')
+    t = open(ml, encoding='latin-1').read().split('\n')
+    for i, l in enumerate(t):
+        if l.startswith('{%d}' % MAP_ID):
+            l = re.sub(r',\s*Flag:\s*NEW_GAME_START.*?(?=,\s*\w+:|}\s*$)', '', l.rstrip('\r'))
+            t[i] = l[:l.rindex('}')] + ', Flag: NEW_GAME_START, NewGameX: %d, NewGameY: %d}' % START
+            break
+    else:
+        raise SystemExit('MapList.mes: no entry for map %d' % MAP_ID)
+    open(ml, 'w', encoding='latin-1', newline='').write('\n'.join(t))
     print('module overlay: %s  (%d areas: %s + %d interiors)' % (inst, 1 + len(interiors), AREA, len(interiors)))
     if a.install:
         copytree(inst, toee)
+        # The module archive: the player's own modules\ToEE.dat (base module data: rules, protos' scripts, ...),
+        # hard-linked (or copied) as modules\IWD.dat. It makes the module selectable in TemplePlusConfig; the IWD
+        # folders override it. (An empty .dat makes Temple+ hang at "Module archive".) Never shipped: local data only.
+        src, dst = os.path.join(toee, 'modules', 'ToEE.dat'), os.path.join(toee, 'modules', MODULE + '.dat')
+        if not os.path.isfile(src):
+            raise SystemExit('no modules\\ToEE.dat in %s' % toee)
+        if not (os.path.isfile(dst) and os.path.getsize(dst) == os.path.getsize(src)):
+            if os.path.exists(dst):
+                os.remove(dst)
+            try:
+                os.link(src, dst)
+            except OSError:
+                shutil.copyfile(src, dst)
         print('installed into %s' % toee)
-    print('done. In game: load or start a game, press Shift+~ (console), type   import iwd; iwd.go()')
+    print('done. Run TemplePlusConfig, pick the module "%s", then start a NEW game: it begins in Easthaven.' % MODULE)
 
 
 if __name__ == '__main__':

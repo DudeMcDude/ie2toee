@@ -18,5 +18,5 @@ where py >nul 2>nul && set PY=py -3
 %PY% converter\ie2toee_preview.py --iwd "%~1" --toee "%~2" --tp TemplePlus --out output --install
 if errorlevel 1 ( echo Conversion FAILED - see the messages above. & exit /b 1 )
 echo.
-echo Done. Start TemplePlus\TemplePlus.exe, load a game, press Shift+~ and type:  import iwd; iwd.go()
+echo Done. In TemplePlus\TemplePlusConfig.exe pick the module "IWD", then start a NEW game in TemplePlus\TemplePlus.exe.
 endlocal

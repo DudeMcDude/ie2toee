@@ -59,13 +59,12 @@ INSTALL
 
 HOW TO START
 ------------
-1. Start TemplePlus\TemplePlus.exe (or "Play" in TemplePlusConfig).
-2. Start a new game with any party, or load any save. You need to be in the game world, not in the menu.
-3. Press Shift+~ (Shift and the key left of 1) to open the console, type
-
-     import iwd; iwd.go()
-
-   and press Enter. Press Shift+~ again to close the console. The party travels to Easthaven.
+The converter installs Icewind Dale as its own Temple+ module, "IWD" (modules\IWD.dat, modules\IWD and
+modules\IWD_core in the ToEE copy). Your normal ToEE module is left alone.
+1. In TemplePlus\TemplePlusConfig.exe, pick the module "IWD" in the module list and save.
+2. Start TemplePlus\TemplePlus.exe and start a NEW game with any party. It begins in Easthaven; no console
+   command is needed. (To play normal ToEE again, pick the module "ToEE" in TemplePlusConfig.)
+3. (Old saves from before this version: load one and type  import iwd; iwd.go()  in the Shift+~ console.)
 4. Click townsfolk to talk to them (IE dialogue window) and click doors to open and close them. Walk into a
    building's doorway to go inside, and into the exit area inside to come out. Save and load as usual.
    To leave Easthaven for good, load a save from before the trip.
