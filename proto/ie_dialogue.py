@@ -60,25 +60,45 @@ _STOP = set('the a an and or of to in on at for with we us our was were is be be
 def _words(t):
     return set(w for w in re.findall(r"[a-z][a-z'-]{2,}", t.lower()) if w not in _STOP)
 
-def merge_journals(journals, origin, text):
-    """IE has one journal entry per step; ToEE one quest per id. A solved ('done') entry joins the opening ('quest')
-    entry from the same dialogue/script that shares the most words with it. Returns {done strref: opening strref}."""
+def merge_journals(journals, origin, text, jvars=None, jerase=None):
+    """IE has one journal entry per step; ToEE one quest per id. A solved ('done') entry joins an opening ('quest')
+    entry. First by trace: the opening that the same action list erases (AddJournalEntry(done) +
+    EraseJournalEntry(opening), IE's own "this step replaces that one"); then the openings whose dialogue/script tests or sets a variable that the done entry's own
+    dialogue/script also tests or sets (vars seen beside more than 4 entries are too generic and ignored); several
+    such openings -> most shared words. Fallback, no shared variable: word similarity (clear winner only).
+    Returns {done strref: (opening strref, 'vars' | 'words')}."""
+    jvars = jvars or {}
     opens = [r for r, k in journals.items() if k == 'quest']
+    cnt = {}
+    for r in journals:
+        for v in jvars.get(r, ()):
+            cnt[v] = cnt.get(v, 0) + 1
+    jv = dict((r, set(v for v in jvars.get(r, ()) if cnt[v] <= 4)) for r in journals)
+    def sim(a, b):
+        wa, wb = _words(text(a)), _words(text(b))
+        return len(wa & wb) / float(len(wa | wb) or 1)
     out = {}
     for r, k in journals.items():
         if k != 'done':
             continue
-        wr = _words(text(r)); best = (0.0, None); second = 0.0
-        for o in opens:     # same dialogue/script: 0.12 overlap is enough; elsewhere (often a BCS sets it) 0.14
+        er = [o for o in opens if o in (jerase or {}).get(r, ())]
+        if er:
+            out[r] = (max(er, key=lambda o: sim(r, o)), 'erase')
+            continue
+        traced = [o for o in opens if jv[r] & jv[o]]
+        if traced:
+            out[r] = (max(traced, key=lambda o: (len(jv[r] & jv[o]), sim(r, o))), 'vars')
+            continue
+        best = (0.0, None); second = 0.0
+        for o in opens:     # same dialogue/script: 0.12 overlap is enough; elsewhere 0.14
             same = bool(origin.get(o, set()) & origin.get(r, set()))
-            wo = _words(text(o)); sc = len(wr & wo) / float(len(wr | wo) or 1) - (0 if same else 0.02)
+            sc = sim(r, o) - (0 if same else 0.02)
             if sc > best[0]:
                 best, second = (sc, o), best[0]
             elif sc > second:
                 second = sc
-        # clear winner: >= 0.12, or >= 0.08 and 1.5x the runner-up
         if best[1] is not None and (best[0] >= 0.12 or (best[0] >= 0.08 and best[0] >= 1.5 * second)):
-            out[r] = best[1]
+            out[r] = (best[1], 'words')
     return out
 
 def _stride(dlg):
@@ -149,6 +169,8 @@ class DlgConv(object):
                         kind = 'done' if fl_ & 256 else 'info' if fl_ & 128 else 'quest'
                         self.g.journals.setdefault(t['journal'], kind); self.g.strrefs.add(t['journal'])
                         jour = (t['journal'], kind)
+                        self.g.note_journal_vars(t['journal'], (acts or []) + (self.parse(d.trans_trigger(ti)) or [] if t['trigger'] is not None else [])
+                                                 + (self.parse(d.state_trigger(si)) or [] if s['trigger'] is not None else []))
                     if acts or jour:
                         fn = 'ie_a%d' % tl
                         funcs.append('def %s(npc, pc):\n    return rt.dlg_do(npc, pc, IDENT, AREA, %s, journal=%s)\n'
@@ -235,7 +257,7 @@ def main():
     for d in (scr, dlgd):
         os.makedirs(d, exist_ok=True)
     rep = {'tlk': bool(tlk), 'ids_missing': ids.missing, 'actors': [], 'area_scripts': [], 'unknown': {}}
-    allvars = set(); strrefs = set(); journals = {}; origin = {}
+    allvars = set(); strrefs = set(); journals = {}; origin = {}; jvars = {}; jerase = {}
     def w(path, s):
         # ToEE reads Windows-1252 text; EE text outside it becomes '?'
         open(path, 'w', encoding='cp1252', errors='replace', newline='\r\n' if path.endswith('.dlg') else '\n').write(s)
@@ -247,7 +269,7 @@ def main():
         if ident.startswith('area_'):
             m += '_area'
         w(os.path.join(scr, m + '.py'), src)
-        allvars.update(g.vars); rep['unknown'].update(g.unknown); strrefs.update(g.strrefs); journals.update(g.journals); [origin.setdefault(r_, set()).add(ident) for r_ in g.journals]
+        allvars.update(g.vars); rep['unknown'].update(g.unknown); strrefs.update(g.strrefs); journals.update(g.journals); [jvars.setdefault(r_, set()).update(v_) for r_, v_ in g.jvars.items()]; [jerase.setdefault(r_, set()).update(v_) for r_, v_ in g.jerase.items()]; [origin.setdefault(r_, set()).add(ident) for r_ in g.journals]
         return m, nb, unk
     for spec in a.actor:
         parts = spec.split(':') + ['', '']
@@ -263,7 +285,7 @@ def main():
         for res in [x for x in bl.split(',') if x]:
             m, nb, unk = bcs(res, ident, area); mods.append(m)
         w(os.path.join(scr, 'py%05die_%s.py' % (sid, ident.lower())), actor_script(sid, ident, area, dlg_parts, mods))
-        allvars.update(g.vars); rep['unknown'].update(g.unknown); strrefs.update(g.strrefs); journals.update(g.journals); [origin.setdefault(r_, set()).add(ident) for r_ in g.journals]
+        allvars.update(g.vars); rep['unknown'].update(g.unknown); strrefs.update(g.strrefs); journals.update(g.journals); [jvars.setdefault(r_, set()).update(v_) for r_, v_ in g.jvars.items()]; [jerase.setdefault(r_, set()).update(v_) for r_, v_ in g.jerase.items()]; [origin.setdefault(r_, set()).add(ident) for r_ in g.journals]
         rep['actors'].append({'ident': ident, 'area': area, 'script_id': sid, 'dlg': dlg, 'bcs': mods,
                               'lines': len([l for l in (dlg_parts[0] if dlg_parts else []) if l]),
                               'entry_states': len(dlg_parts[2]) if dlg_parts else 0, 'notes': notes})
@@ -282,7 +304,7 @@ def main():
       '\n'.join('    %d: %s,' % (r, pystr(subst(text(r), False))) for r in sorted(strrefs)))
     # journal entries -> ToEE logbook quests (mes/gamequestlog.mes: title at id, description at id + 200)
     qids = list(range(a.quest_base, a.quest_max + 1)); jmap = {}; jl = []
-    merged = merge_journals(journals, origin, text)
+    merged = merge_journals(journals, origin, text, jvars, jerase)
     for r in sorted(r for r in journals if r not in merged):
         if not qids:
             print('warning: more journal entries than quest slots %d..%d: %d dropped' % (a.quest_base, a.quest_max, len(journals) - len(jmap)))
@@ -294,10 +316,10 @@ def main():
             title = title[:57].rsplit(' ', 1)[0] + '...'
         jmap[r] = (q, journals[r])
         jl += ['{%d}{%s}' % (q, title), '{%d}{%s}' % (q + 200, cap_desc(' '.join(lines_)))]
-    for r, o in sorted(merged.items()):
+    for r, (o, how) in sorted(merged.items()):
         if o in jmap:
             jmap[r] = (jmap[o][0], journals[r])
-    rep['journal_merged'] = len([r for r in merged if r in jmap])
+    rep['journal_merged'] = dict((r, list(merged[r])) for r in merged if r in jmap)
     w(os.path.join(scr, 'ie_journal.py'), HEADER + 'JOURNAL = %r   # strref -> (ToEE quest id, kind)\n' % jmap)
     with open(os.path.join(a.out, 'journal_snippets.txt'), 'w', encoding='cp1252', errors='replace') as f:
         f.write('# mes/gamequestlog.mes\n' + '\n'.join(l for l in jl if True) + '\n')

@@ -36,6 +36,8 @@ class Gen(object):
         self.vars = set()          # var keys as ie_runtime.var_key would build them
         self.unknown = {}          # name -> count (not in TRIGGER/ACTION.IDS)
         self.strrefs = set()       # strrefs used by actions (FloatMessage...) -> ie_strings.py
+        self.jerase = {}           # journal strref -> entries EraseJournalEntry'd in the same action list
+        self.jvars = {}            # journal strref -> var keys tested/set where it is added (pairs done -> opening)
         self.journals = {}         # journal strref -> kind ('quest' / 'info' / 'done') -> ToEE logbook quests
 
     # -------------------------------------------------------------- names / signatures
@@ -121,6 +123,19 @@ class Gen(object):
                 isinstance(call.args[0], int):
             self.vars.add(self.var_key('#timer%d' % call.args[0], 'LOCALS'))
 
+    def vars_in(self, calls):
+        """Variable keys named by Global/SetGlobal-style triggers and actions in calls (recursing into ActionOverride)."""
+        out = set()
+        for c in S.walk_calls(list(calls or [])):
+            n = c.name.lower()
+            if (n in VAR_TRIGGERS or n in VAR_ACTIONS) and len(c.args) >= 2 and isinstance(c.args[0], str) \
+                    and isinstance(c.args[1], str):
+                out.add(self.var_key(c.args[0], c.args[1]))
+        return out
+
+    def note_journal_vars(self, strref, calls):
+        self.jvars.setdefault(strref, set()).update(self.vars_in(calls))
+
     def var_key(self, name, scope):
         s = scope.upper(); n = name.lower()
         if s == 'GLOBAL':
@@ -173,6 +188,12 @@ class Gen(object):
         return 'A.%s(%s)' % (name, ', '.join(['c'] + self._args(call, sig)))
 
     def action_list(self, calls):
+        js = [a.args[0] for a in calls if a.name.lower() in ('addjournalentry', 'setquestdone') and a.args
+              and isinstance(a.args[0], int) and a.args[0] > 0]
+        er = set(a.args[0] for a in calls if a.name.lower() == 'erasejournalentry' and a.args and isinstance(a.args[0], int))
+        for j in js:       # BCS / dialogue actions: the variables set and the entries erased beside the journal entry
+            self.note_journal_vars(j, calls)
+            self.jerase.setdefault(j, set()).update(er - {j})
         items = []
         for a in calls:
             if a.name.lower() == 'continue':
