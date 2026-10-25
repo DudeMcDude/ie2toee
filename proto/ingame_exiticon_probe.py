@@ -100,8 +100,8 @@ else:
         r = region(b, 'AR1000')                  # the interior's way out lands on this town entrance
         u, v = D.AREAS['AR1000']['entrances'][r['dest_entrance']][:2]
         at(1000, lambda u=u, v=v: (game.fade_and_teleport(0, 0, 0, 5900, u, v), 0)[1])
-        at(6000, look, ('town->' + b, b)); at(4000, press, ('',)); at(1200, shot, ('exit-icon-town-to-' + b,)); at(12000, check, ('enter ' + b + ' via icon',)); at(15000, check, ('enter ' + b + ' (after fallback)', 0))
+        at(6000, look, ('town->' + b, b)); at(4000, shot, ('exit-icon-town-to-' + b,)); at(1500, press, ('',)); at(12000, check, ('enter ' + b + ' via icon',)); at(15000, check, ('enter ' + b + ' (after fallback)', 0))
         at(1500, count, (b,))
-        at(500, look, (b + '->town', 'AR1000')); at(4000, press, ('',)); at(1200, shot, ('exit-icon-' + b + '-to-town',)); at(12000, check, ('exit ' + b + ' via icon',)); at(15000, check, ('exit ' + b + ' (after fallback)', 0))
+        at(500, look, (b + '->town', 'AR1000')); at(4000, shot, ('exit-icon-' + b + '-to-town',)); at(1500, press, ('',)); at(12000, check, ('exit ' + b + ' via icon',)); at(15000, check, ('exit ' + b + ' (after fallback)', 0))
     at(1500, count, ('town',))
     at(500, save)

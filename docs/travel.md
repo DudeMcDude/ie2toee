@@ -34,6 +34,11 @@ each interior's `ie_doors_<area>.py` is copied next to the town's.
   destination, one static scenery object of proto 2011 (the standard ToEE exit icon; flags, radius and height copied
   from a vanilla icon) in the area's `.sec`, with `scenery_teleport_to` = a jump point id from 2000 up. The icon stands
   on the region's anchor tile (fallback: the polygon centroid if inside, else the nearest tile inside the polygon).
+  Anchor placement (2026-10-25, to centre icons on doors): among the walkable tiles reachable from the area start
+  (so on the party's side: outside for town doors, inside for interior exits), not on a door's own tiles and within
+  6 tiles of the polygon, the one nearest the centre of the door tiles within 3 tiles of the region; without a door,
+  nearest the polygon's centroid. Icons now stand ~1-2 tiles in front of the door's middle.
+  `IE2TOEE_ANCHOR_DEBUG=1` prints each region's target and anchor.
   `rules/jumppoint.tab` gets one row per icon: destination map + the destination entrance's arrival tile. Being sector
   objects (not mobiles) the icons have no ids and are never duplicated by saves. The sector's objects are kept sorted
   by tile (row by row): the engine writes a sector's save diffs in that order and reads them back in file order, so an
@@ -83,3 +88,5 @@ Real mouse clicks: town -> AR1001 (arrived 481,491, entrance 482,492) -> town (4
 (486,485 vs 485,484) -> town (435,476 vs 436,477), PASS. Icons: 4 near the AR1001 door, 3 near AR1006, 1 in each
 interior; after save and reload the same 3 (then 4), no duplicates, no diff errors. Screenshots `exit-icon-*.png`
 (local only).
+Re-placed icons (in front of the door middle), real clicks again: town -> AR1001 -> town, town -> AR1006 -> town PASS;
+save + reload: 3 icons before and after. Screenshots `exit-icon2-*.png` (taken before the click).

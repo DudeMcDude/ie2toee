@@ -424,14 +424,17 @@ def _poly_dist(px, py, poly):
     return best
 
 
-def region_anchors(kind_open, bbox, regions, start, near=0.8, limit=6.0, avoid=None):
+def region_anchors(kind_open, bbox, regions, start, near=0.8, limit=6.0, avoid=None, doors=None):
     """{region index: [tile u, tile v]} for the travel regions a party cannot get within `near` tiles of.
     ToEE critters have a body radius and the IE search map is coarser than the walls, so the party often cannot
     stand on (or next to) a region's polygon. The anchor is the fully walkable tile, reachable from `start` with
     every door open, nearest to the polygon (at most `limit` tiles away); the runtime also fires when a party
     member is within ~0.9 tile of the anchor (docs/travel.md). ToEE critters stand on 1/3-tile slots, up to ~0.8 tile
     from a tile's centre, so a region a tile centre is 'near' (<= 0.8) may still be out of reach: the convert passes
-    near=-1 and gives every reachable travel region an anchor."""
+    near=-1 and gives every reachable travel region an anchor.
+    The anchor also places the region's exit icon, so among the tiles within `limit` of the polygon it is the one
+    nearest a target point: the centre of the door tiles (`doors` mask) within 3 tiles of the region, else the
+    polygon's centroid. Being reachable from `start` and off the frames puts it on the party's side of the door."""
     from collections import deque
     walk = (kind_open == 0).all((-1, -2))
     su, sv = start[0] - bbox[0], start[1] - bbox[2]
@@ -455,14 +458,35 @@ def region_anchors(kind_open, bbox, regions, start, near=0.8, limit=6.0, avoid=N
                    default=None)
 
     every = reach(walk)
+    door_t = [(a + bbox[0] + 0.5, b + bbox[2] + 0.5) for a, b in zip(*np.nonzero(doors))] if doors is not None else []
+
+    def target(r):
+        near_d = [t for t in door_t if _poly_dist(t[0], t[1], r['poly']) <= 3.0]
+        pts = near_d or [tuple(p) for p in r['poly']]
+        return sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts)
+
+    def nearest_to(tiles, r):
+        tx, ty = target(r); best = None
+        for a, b in tiles:
+            d = _poly_dist(a + bbox[0] + 0.5, b + bbox[2] + 0.5, r['poly'])
+            if d <= limit:
+                k = (math.hypot(a + bbox[0] + 0.5 - tx, b + bbox[2] + 0.5 - ty), d)
+                if best is None or k < best[0]:
+                    best = (k, (d, a + bbox[0], b + bbox[2]))
+        return best and best[1]
     # keep the anchor off the door frames and on the near side of every door (a click on a blocked tile does not
     # move the party, and a tile behind a frame may be unreachable for ToEE pathing); fall back to any reachable tile
     clear = reach(walk & ~avoid) if avoid is not None else []
+    if doors is not None:   # the icon may stand right in front of the frame: only the door's own tiles are excluded
+        clear = reach(walk & ~doors) or clear
     out = {}
     for k, r in enumerate(regions):
         if r['type'] != 'travel':
             continue
-        best = nearest(clear, r) if clear else None
+        best = nearest_to(clear, r) if clear else None
+        if os.environ.get('IE2TOEE_ANCHOR_DEBUG'):
+            print('anchor %s target %.1f,%.1f doors %d -> %s' % (r.get('name'), target(r)[0], target(r)[1],
+                  sum(_poly_dist(t[0], t[1], r['poly']) <= 3.0 for t in door_t), best))
         if not (best and best[0] <= limit):
             best = nearest(every, r)
         if best and near < best[0] <= limit:   # (near < 0: every region)
@@ -577,7 +601,7 @@ def convert(game, area, outdir, map_id, ground_id, guidance, preview=False, clos
     for da in (-1, 0, 1):
         for db in (-1, 0, 1):
             near_door |= np.roll(np.roll(dt, da, 0), db, 1)
-    anchors = region_anchors(kind_open, bbox, regions_t, start, near=-1, avoid=near_door)   # every travel region
+    anchors = region_anchors(kind_open, bbox, regions_t, start, near=-1, avoid=near_door, doors=dt)   # every travel region
     for k, a in anchors.items():
         regions_t[k]['anchor'] = a
     objs = dict(
