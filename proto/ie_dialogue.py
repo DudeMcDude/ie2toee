@@ -60,6 +60,32 @@ _STOP = set('the a an and or of to in on at for with we us our was were is be be
 def _words(t):
     return set(w for w in re.findall(r"[a-z][a-z'-]{2,}", t.lower()) if w not in _STOP)
 
+# IWD has no quest titles (no quest table in the game data; a journal entry is just prose), so the logbook titles
+# are our own, keyed by the opening entry's strref (IWD:EE dialog.tlk). Entries not listed fall back to the
+# entry's first words.
+QUEST_TITLES = {
+    20671: 'Arrival in Easthaven',
+    2331: 'The Missing Caravan',
+    34183: "Gaspar's Shipment",
+    34182: "Gaspar's Trade",
+    16535: "News for Gaspar",
+    3355: "The Wolf in Apsel's Shop",
+    34187: "A Bottle for Old Jed",
+    34189: "Old Jed's Drinking",
+    34188: 'The Captured Villagers',
+    34144: "Damien's Fishing Hole",
+    2080: "Jhonen's Dreams",
+    23507: 'The Woman on the Shore',
+    34497: 'Elisia',
+    11408: "Elisia's Gift",
+    2079: "Jhonen's Departure",
+    34233: "The Tale of Jerrod's Stone",
+    34232: 'The Captive Priest',
+    34220: 'The Glyphs Beneath the Temple',
+    34218: 'The Shard\'s Bargain',
+    352: 'The Expedition to Kuldahar',
+}
+
 def merge_journals(journals, origin, text, jvars=None, jerase=None):
     """IE has one journal entry per step; ToEE one quest per id. A solved ('done') entry joins an opening ('quest')
     entry. First by trace: the opening that the same action list erases (AddJournalEntry(done) +
@@ -311,7 +337,7 @@ def main():
             break
         q = qids.pop(0); body = subst(text(r), False).replace('{', '(').replace('}', ')')
         lines_ = [x.strip() for x in body.replace('\r', '').split('\n') if x.strip()]
-        title = lines_[0] if lines_ else 'Journal'
+        title = QUEST_TITLES.get(r) or (lines_[0] if lines_ else 'Journal')
         if len(title) > 60:
             title = title[:57].rsplit(' ', 1)[0] + '...'
         jmap[r] = (q, journals[r])
