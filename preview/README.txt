@@ -1,4 +1,4 @@
-ICEWIND DALE IN THE TEMPLE OF ELEMENTAL EVIL ENGINE - PLAYER PREVIEW (2026-10-18)
+ICEWIND DALE IN THE TEMPLE OF ELEMENTAL EVIL ENGINE - PLAYER PREVIEW (2026-10-25)
 =================================================================================
 
 IMPORTANT: PYTHON 3.9 OR NEWER MUST BE INSTALLED
@@ -18,6 +18,8 @@ first town, Easthaven (IE area AR1000), from YOUR OWN copy of Icewind Dale and l
   * the 14 building interiors (AR1001-AR1014): walk into a building's door and the whole party enters it, walk
     into the interior's exit and it is back in town. Interiors are bare maps with their doors: no people, no
     furniture objects, no shops, no scripts yet
+  * IE journal entries as ToEE logbook quests, with titles, under an "Easthaven" tab (a solved step is shown as
+    the same quest, completed)
   * dialogue in an IE-style dialogue window (IWD look for classic, IWD:EE look for the Enhanced Edition)
   * IE spells mapped to ToEE/Temple+ spells where an equivalent exists, and IE creature/area scripts
   * everything is baked into the map files, so it survives saving and loading like a normal ToEE map
@@ -36,9 +38,10 @@ REQUIREMENTS
   * Python 3.9 or newer, installed BEFORE you run the converter: https://www.python.org/downloads/
     In the installer, tick "Add python.exe to PATH". The converter then installs its three Python packages
     itself (numpy, pillow, fonttools).
-  * The Temple+ build in the TemplePlus folder of this download. It's Temple+ 1.0.98 plus two preview
-    features: the IE dialogue window and the door/tile hooks. Official Temple+ can't show the converted doors
-    or the IE dialogue window.
+  * The Temple+ build in the TemplePlus folder of this download. It's Temple+ 1.0.98 plus the preview
+    features: the IE dialogue window, the door/tile hooks, and module support (a module can choose where a new
+    game starts). Official Temple+ can't show the converted doors or the IE dialogue window, and doesn't start
+    new games in Easthaven.
 
 INSTALL
 -------
@@ -61,6 +64,9 @@ HOW TO START
 ------------
 The converter installs Icewind Dale as its own Temple+ module, "IWD" (modules\IWD.dat, modules\IWD and
 modules\IWD_core in the ToEE copy). Your normal ToEE module is left alone.
+modules\IWD.dat is not new data: it's your own modules\ToEE.dat, hard-linked (or copied, if a link isn't
+possible) under the module's name, because Temple+ needs a <module>.dat to list a module. The converter makes it;
+if you delete it, copy modules\ToEE.dat to modules\IWD.dat yourself (or run the converter again).
 1. In TemplePlus\TemplePlusConfig.exe, pick the module "IWD" in the module list and save.
 2. Start TemplePlus\TemplePlus.exe and start a NEW game with any party. It begins in Easthaven; no console
    command is needed. (To play normal ToEE again, pick the module "ToEE" in TemplePlusConfig.)
@@ -105,6 +111,6 @@ CREDITS / LICENCES
 Converter: ie2toee (https://github.com/DudeMcDude/ie2toee), see converter\LICENSE.txt.
 Engine: Temple+ (https://github.com/GrognardsFromHell/TemplePlus, MIT licence). The preview changes to Temple+
 are in TemplePlus\ie-preview-changes.diff (against Temple+ master 03d72045). Source:
-https://github.com/DudeMcDude/TemplePlus/tree/feature/ie-dialog-skin
-commit 644ceb9f (https://github.com/DudeMcDude/TemplePlus/commit/644ceb9fbc84c3aae7aa930f966c0b92767fcbed). Icewind Dale is (c) its publishers. You need your own legal copy;
+https://github.com/DudeMcDude/TemplePlus/tree/preview/iwd-module
+commit 15b268bf (https://github.com/DudeMcDude/TemplePlus/commit/15b268bf63ab1dccba92050842d843462f974351). Icewind Dale is (c) its publishers. You need your own legal copy;
 nothing from it is redistributed here. The Temple of Elemental Evil is (c) its publishers.
