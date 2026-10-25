@@ -86,6 +86,15 @@ QUEST_TITLES = {
     352: 'The Expedition to Kuldahar',
 }
 
+# IWD regions by area-resref prefix -> (ToEE area id, name) for the logbook's location label. Default: Easthaven.
+LOGBOOK_AREAS = {'AR1': (1, 'Easthaven'), 'AR2': (3, 'Kuldahar')}
+# The logbook's tabs (temple.dll) are fixed: area 1 -> tab {11} (vanilla "Hommlet"), area 3 -> tab {12} ("Nulb"),
+# everything else -> {13} ("Other"); their labels are mes/logbook_ui_quests_text.mes. Ids 1/3 are reused above.
+LOGBOOK_TABS = {1: 11, 3: 12}
+
+def logbook_area(area):
+    return LOGBOOK_AREAS.get(area[:3], LOGBOOK_AREAS['AR1'])
+
 def merge_journals(journals, origin, text, jvars=None, jerase=None):
     """IE has one journal entry per step; ToEE one quest per id. A solved ('done') entry joins an opening ('quest')
     entry. First by trace: the opening that the same action list erases (AddJournalEntry(done) +
@@ -283,7 +292,7 @@ def main():
     for d in (scr, dlgd):
         os.makedirs(d, exist_ok=True)
     rep = {'tlk': bool(tlk), 'ids_missing': ids.missing, 'actors': [], 'area_scripts': [], 'unknown': {}}
-    allvars = set(); strrefs = set(); journals = {}; origin = {}; jvars = {}; jerase = {}
+    allvars = set(); strrefs = set(); journals = {}; origin = {}; jvars = {}; jerase = {}; jarea = {}
     def w(path, s):
         # ToEE reads Windows-1252 text; EE text outside it becomes '?'
         open(path, 'w', encoding='cp1252', errors='replace', newline='\r\n' if path.endswith('.dlg') else '\n').write(s)
@@ -295,7 +304,7 @@ def main():
         if ident.startswith('area_'):
             m += '_area'
         w(os.path.join(scr, m + '.py'), src)
-        allvars.update(g.vars); rep['unknown'].update(g.unknown); strrefs.update(g.strrefs); journals.update(g.journals); [jvars.setdefault(r_, set()).update(v_) for r_, v_ in g.jvars.items()]; [jerase.setdefault(r_, set()).update(v_) for r_, v_ in g.jerase.items()]; [origin.setdefault(r_, set()).add(ident) for r_ in g.journals]
+        allvars.update(g.vars); rep['unknown'].update(g.unknown); strrefs.update(g.strrefs); journals.update(g.journals); [jvars.setdefault(r_, set()).update(v_) for r_, v_ in g.jvars.items()]; [jerase.setdefault(r_, set()).update(v_) for r_, v_ in g.jerase.items()]; [origin.setdefault(r_, set()).add(ident) for r_ in g.journals]; [jarea.setdefault(r_, (g.area or '').upper()) for r_ in g.journals]
         return m, nb, unk
     for spec in a.actor:
         parts = spec.split(':') + ['', '']
@@ -311,7 +320,7 @@ def main():
         for res in [x for x in bl.split(',') if x]:
             m, nb, unk = bcs(res, ident, area); mods.append(m)
         w(os.path.join(scr, 'py%05die_%s.py' % (sid, ident.lower())), actor_script(sid, ident, area, dlg_parts, mods))
-        allvars.update(g.vars); rep['unknown'].update(g.unknown); strrefs.update(g.strrefs); journals.update(g.journals); [jvars.setdefault(r_, set()).update(v_) for r_, v_ in g.jvars.items()]; [jerase.setdefault(r_, set()).update(v_) for r_, v_ in g.jerase.items()]; [origin.setdefault(r_, set()).add(ident) for r_ in g.journals]
+        allvars.update(g.vars); rep['unknown'].update(g.unknown); strrefs.update(g.strrefs); journals.update(g.journals); [jvars.setdefault(r_, set()).update(v_) for r_, v_ in g.jvars.items()]; [jerase.setdefault(r_, set()).update(v_) for r_, v_ in g.jerase.items()]; [origin.setdefault(r_, set()).add(ident) for r_ in g.journals]; [jarea.setdefault(r_, (g.area or '').upper()) for r_ in g.journals]
         rep['actors'].append({'ident': ident, 'area': area, 'script_id': sid, 'dlg': dlg, 'bcs': mods,
                               'lines': len([l for l in (dlg_parts[0] if dlg_parts else []) if l]),
                               'entry_states': len(dlg_parts[2]) if dlg_parts else 0, 'notes': notes})
@@ -349,7 +358,15 @@ def main():
     w(os.path.join(scr, 'ie_journal.py'), HEADER + 'JOURNAL = %r   # strref -> (ToEE quest id, kind)\n' % jmap)
     with open(os.path.join(a.out, 'journal_snippets.txt'), 'w', encoding='cp1252', errors='replace') as f:
         f.write('# mes/gamequestlog.mes\n' + '\n'.join(l for l in jl if True) + '\n')
-        f.write('# rules/gamequest.mes\n' + '\n'.join('{%d}{1}' % q for q in sorted(set(q for q, _ in jmap.values()))) + '\n')
+        qarea = {}      # quest -> logbook area: the opening entry's IE area (where its dialogue/script lives)
+        for r, (q, k) in jmap.items():
+            if r not in merged:
+                qarea[q] = logbook_area(jarea.get(r, ''))[0]
+        f.write('# rules/gamequest.mes\n' + '\n'.join('{%d}{%d}' % (q, qarea.get(q, 1)) for q in sorted(qarea)) + '\n')
+        # the logbook's location label is the area's name in mes/gamearea.mes (vanilla 1 = Hommlet, 2 = Moathouse...);
+        # the IWD module has no use for ToEE's areas, so their ids are renamed to IWD's regions
+        f.write('# mes/gamearea.mes\n' + '\n'.join('{%d}{0, 0, 0, 0 /%s/%s}' % (i, n, n.upper()) for i, n in sorted(set(LOGBOOK_AREAS.values()))) + '\n')
+        f.write('# mes/logbook_ui_quests_text.mes\n' + '\n'.join('{%d}{%s}' % (LOGBOOK_TABS[i], n) for i, n in sorted(set(LOGBOOK_AREAS.values()))) + '\n')
     rep['journal'] = len(jmap)
     am = {}; pl = {}
     for spec in a.area_map:     # AREA:MAP[:cx,cy]

@@ -205,7 +205,7 @@ def main():
     td = toeedata.ToEEData(toee)
     for rel, lines in sn.items():
         # the quest texts are only read from <module>_core (a copy in the module folder is ignored: verified in game)
-        dst = C if os.path.basename(rel) in ('gamequestlog.mes', 'gamequest.mes') else M
+        dst = C if os.path.basename(rel) in ('gamequestlog.mes', 'gamequest.mes', 'gamearea.mes', 'logbook_ui_quests_text.mes') else M
         mes_with(td, rel, lines, os.path.join(dst, rel))
     # new game -> Easthaven: Temple+ MapList flag (module-support build; docs/modding-start-map.md in the Temple+ fork)
     ml = os.path.join(M, 'rules', 'MapList.mes')
