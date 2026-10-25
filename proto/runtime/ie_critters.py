@@ -139,6 +139,8 @@ def apply(o, s):
             _log('  spells %s%s' % (got, ' + ai strategy' if s.get('ai_strategy') else ''))
         except Exception, e:
             _log('  spells failed: %s' % e)
+    if s.get('portrait'):
+        _set(o, 'obj_f_critter_portrait', int(s['portrait']))
     if s.get('name_id'):
         _set(o, 'obj_f_description', int(s['name_id']))
         _set(o, 'obj_f_critter_description_unknown', int(s['name_id']))   # IE shows names without an introduction

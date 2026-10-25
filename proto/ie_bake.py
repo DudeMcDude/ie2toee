@@ -225,6 +225,8 @@ class Baker(object):
             o.set('critter_gender', 0 if s['gender'] == 'female' else 1)
         if s.get('scale') and int(s['scale']) != 100:
             o.set('model_scale', int(s['scale']))
+        if s.get('portrait'):
+            o.set('critter_portrait', int(s['portrait']))
         if s.get('name_id'):
             o.set('description', int(s['name_id'])); o.set('critter_description_unknown', int(s['name_id']))
         sid = s.get('script_id') or self.a.generic_script
