@@ -7,6 +7,7 @@
 #   optional: KEEP_SAVES=<dir> (copy the probe's saves out before the restore), SAVE_SEED=<dir> (saves to add first),
 #   TOEE_XVFB=<display number> (private Xvfb display, recommended), WINEPREFIX (default ~/.wine-toee-ie), IE_OUT (default ../out), TP_AUTOEXEC (default: import ingame_probe)
 # Probe protocol (one line each in the probe log): SHOT <name> | KEY <xdotool keys> | CLICK <x> <y> | MOVE <x> <y> | DONE
+#   | CLICKICON (click the exit icon find_exit_icon.py spots on screen)
 # Screenshots/logs go to $IE_OUT/ingame/<tag>/ (derived from the player's files: local only).
 set -u
 TAG=${1:-run}; SECS=${2:-240}
@@ -44,6 +45,9 @@ while [ $(( $(date +%s) - T0 )) -lt "$SECS" ]; do
           SHOT\ *) import -display "$DISPLAY" -window root "$OUT/${line#SHOT }.bmp" 2>/dev/null; echo "shot ${line#SHOT }";;
           KEY\ *) [ -z "$XVFB_PID" ] && xdotool search --name ToEEie windowactivate --sync >/dev/null 2>&1; xdotool key ${line#KEY }; echo "key ${line#KEY }";;
           CLICK\ *) set -- ${line#CLICK }; xdotool mousemove "$1" "$2" click 1; echo "click $1 $2";;
+          CLICKICON*) import -display "$DISPLAY" -window root /tmp/ie_icon_$$.png 2>/dev/null
+                     xy=$(python3 "$HERE/find_exit_icon.py" /tmp/ie_icon_$$.png ${line#CLICKICON}); echo "clickicon at '$xy'" >> "$OUT/clicks.txt"
+                     [ -n "$xy" ] && { set -- $xy; xdotool mousemove "$1" "$2"; sleep 0.6; xdotool click 1; }; echo "clickicon $xy";;
           MOVE\ *) set -- ${line#MOVE }; xdotool mousemove "$1" "$2"; echo "move $1 $2";;
         esac
       done

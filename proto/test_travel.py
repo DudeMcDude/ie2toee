@@ -76,43 +76,31 @@ check('inside polygon', T.near_region(2, 2, sq))
 check('within 0.8 of polygon edge', T.near_region(4.7, 2, sq) and not T.near_region(4.9, 2, sq))
 check('2-point region is a segment', T.near_region(52, 50.5, [[50, 50], [54, 50]]) and not T.near_region(52, 52, [[50, 50], [54, 50]]))
 
-# 2. travel, arming, no bounce
+# 2. polling never moves the party (exit icons do the travel now), interiors still get their doors on arrival
 game.party[:] = [Obj('pc%d' % i, 0, 0, 5900) for i in range(3)]
-put_party(5900, 112, 92)                          # standing in the To1001 region when the poll starts
+put_party(5900, 112, 92)
 check('start() starts one poll', T.start() == 1 and len(game.events) == 1)
 check('start() twice does not double-start', T.start() == 0 and len(game.events) == 1)
-run_events(3)
-check('disarmed while the party starts inside a region (no travel)', not game.teleports)
-put_party(5900, 100, 100); run_events(2)
-check('armed after leaving every region', T._armed)
-put_party(5900, 111, 92); run_events(1)
-check('walking into the region moves the party to the entrance', game.teleports == [(5901, 200, 200)])
-check('whole party moved', all(o.map == 5901 for o in game.party))
-check('no bounce on arrival (still disarmed)', (run_events(3), game.teleports)[1] == [(5901, 200, 200)])
-check('doors attached on arrival in the unbaked interior', attached == ['AR1001'])
-clock[0] += 5; run_events(2)
-check('armed again after being outside the regions', T._armed)
+run_events(3); put_party(5900, 100, 100); run_events(2); put_party(5900, 111, 92); run_events(3)
+put_party(5900, 305, 300); run_events(2); put_party(5900, 52, 50); run_events(2)
+check('standing in / next to travel regions never teleports', not game.teleports and not game.leader.floats)
 put_party(5901, 201, 206); run_events(2)
-check('interior exit goes back to the town entrance', game.teleports[-1] == (5900, 100, 100) and len(game.teleports) == 2)
-clock[0] += 5; run_events(3)
-check('baked exterior: ie_travel does not attach doors', attached == ['AR1001'])
-put_party(5900, 100, 100); run_events(2)
-game.party[2].location = location_from_axis(111, 92); run_events(1)
-check('one member in a region is enough', game.teleports[-1] == (5901, 200, 200) and len(game.teleports) == 3)
+check('doors attached on arrival in the unbaked interior', attached == ['AR1001'])
 
-# 2b. anchor: a region the party can't get next to fires near its anchor tile
-clock[0] += 5; put_party(5900, 100, 100); run_events(2)
-put_party(5900, 305, 300); run_events(1)
-check('anchor tile triggers its region', game.teleports[-1] == (5901, 200, 200) and len(game.teleports) == 4)
-put_party(5900, 308, 300); T._armed = True; n = len(game.teleports); run_events(2)
-check('2 tiles from the anchor does not trigger', len(game.teleports) == n)
-
-# 3. unconverted exit: one-time note, party stays
-clock[0] += 5; put_party(5900, 100, 100); run_events(2)
-put_party(5900, 52, 50); run_events(2)
-check('unconverted exit: note once, no teleport', game.leader.floats == ['This exit (AR1200) is not in the preview'] and len(game.teleports) == 4)
-put_party(5900, 100, 100); run_events(2); put_party(5900, 52, 50); run_events(2)
-check('note is one-time', len(game.leader.floats) == 1)
+# 3. exit icons (ie_exiticons): icon tile inside the polygon, jump point = destination arrival tile
+import ie_exiticons as X
+check('icon at the centroid when it is inside', X.icon_tile([[0, 0], [4, 0], [4, 4], [0, 4]]) == (2, 2))
+L = [[0, 0], [6, 0], [6, 1], [1, 1], [1, 6], [0, 6]]          # L shape: centroid outside
+u, v = X.icon_tile(L)
+check('icon falls back to the nearest inside tile', X.inside(u + .5, v + .5, L))
+ar = {'AR1000': dict(map=5900, entrances={'FR1001': [100, 100, 0]}, regions=[dict(name='To1001', poly=[[0, 0], [4, 0], [4, 4], [0, 4]], dest_area='AR1001', dest_entrance='FR1000', dest_map=5901),
+                                                                                dict(name='To9', poly=[[0, 0], [1, 1]], dest_area='AR1200', dest_entrance='X', dest_map=0)]),
+      'AR1001': dict(map=5901, entrances={'FR1000': [200, 200, 0]}, regions=[dict(name='To1000', poly=[[0, 0], [2, 0], [2, 2], [0, 2]], dest_area='AR1000', dest_entrance='FR1001', dest_map=5900)])}
+icons, rows, skipped = X.build(ar)
+check('jump points go to the destination arrival tiles, stable ids', rows == [(2000, 'AR1000-To1001-to-AR1001', 5901, 200, 200), (2001, 'AR1001-To1000-to-AR1000', 5900, 100, 100)])
+ar['AR1001']['regions'][0]['anchor'] = [5, 6]
+check('icon on the anchor tile when the region has one', X.build(ar)[0]['AR1001'] == [(5, 6, 2001)])
+check('unconverted exit gets no icon', icons['AR1000'] == [(2, 2, 2000)] and len(skipped) == 1)
 
 # 4. save/load: restored poll adopts a fresh module state; a stale second poll stops
 game.events[:] = []
@@ -120,7 +108,7 @@ T._last_poll = 0.0; T._gen = 0; T._armed = True; T._map = 5900; T._noted.clear()
 put_party(5900, 112, 92)                          # loaded right in a region
 game.events.append((T.poll, (7,)))                # the event restored from the save (gen 7)
 run_events(3)
-check('restored poll adopted (gen 7), disarmed in the region', T._gen == 7 and not T._armed and len(game.teleports) == 4)
+check('restored poll adopted (gen 7), no travel', T._gen == 7 and not game.teleports)
 n0 = len(game.events)
 T.start()
 check('start() after adopt does not add a second poll', len(game.events) == n0)

@@ -1,15 +1,11 @@
 # Temple+ runtime for the travel regions of maps converted by ie2toee (Python 2.7 inside the game; the syntax is also
 # valid Python 3 so proto/test_travel.py can run it against a mock game). docs/travel.md has the design.
 #
-# IE areas are joined by "travel regions" (ARE regions of type travel): walk into one and the whole party moves to a
-# named entrance of another area. Temple+ has no such trigger, so this module polls the party every POLL_MS:
-#   * any party member inside a region of the current map (or within NEAR tiles of its outline) moves the whole
-#     party, with game.fade_and_teleport, to the destination entrance's arrival tile (ie_travel_data.py, written by
-#     ie_exits.py; ie2toee already moved each arrival tile onto walkable ground);
-#   * the poll stays DISARMED until the party has been outside every region once, so arriving next to a region (or
-#     loading a save made there) does not bounce the party back;
-#   * an exit whose destination was not converted shows a one-time "This exit (ARxxxx) is not in the preview" note
-#     and the party stays;
+# Travel between converted areas uses ToEE's own clickable exit icons (map-change scenery + rules/jumppoint.tab,
+# written by proto/ie_exiticons.py), so nothing here moves the party any more: a polled walk-in trigger could fire
+# right after combat when a PC stood near an exit. travel() stays for scripts/tests. This module still polls the
+# party every POLL_MS for:
+#   * info points (IE Trigger Points): their text floats over the leader when a party member steps in;
 #   * on arrival in a converted area that has no baked data (interiors), its doors are attached (ie_doors.start).
 # start() is idempotent: iwd.go() and the first heartbeat of every baked creature call it. The poll is a game time
 # event, so it is saved with the game; after a load the restored event "adopts" this fresh module (a poll whose
@@ -219,15 +215,7 @@ def tick(gen):
         return 1
     pts = [_pos(p) for p in party]
     info_points(d.AREAS[area], pts)
-    r = hit_region(d.AREAS[area], pts)
-    if r is None:
-        _armed = True
-    elif _armed:
-        if r.get('dest_map'):
-            travel(r)
-        else:
-            _note_unconverted(r)
-            _armed = False            # do not re-note while standing in the region; re-arms once the party steps out
+    # (travel itself is no longer polled: the converter places clickable ToEE exit icons, ie_exiticons.py)
     return 1
 
 

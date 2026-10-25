@@ -155,6 +155,8 @@ def main():
 
     run('travel exits', ['ie_exits.py', w, '--out', os.path.join(w, 'ie_travel_data.py'), '--ie', ie, '--area', '%s:%d' % (AREA, MAP_ID)] +
         sum((['--area', '%s:%d' % kv] for kv in sorted(interiors.items())), []))
+    run('exit icons', ['ie_exiticons.py', '--travel', os.path.join(w, 'ie_travel_data.py'), '--maps', os.path.join(bake, 'modules', 'ToEE', 'maps'),
+                       '--jumppoints', os.path.join(bake, 'rules', 'jumppoint.tab')])
     print('== assemble', flush=True)
     inst = os.path.join(out, 'install'); shutil.rmtree(inst, ignore_errors=True)
     M = os.path.join(inst, 'modules', MODULE); C = os.path.join(inst, 'modules', MODULE + '_core')
@@ -171,6 +173,7 @@ def main():
             copytree(os.path.join(w, 'art', 'ground', g), os.path.join(M, 'art', 'ground', g))
         copytree(os.path.join(w, 'art', 'clip', ar), os.path.join(M, 'art', 'clip', ar))
     copytree(os.path.join(w, 'skin', 'modules', 'ToEE'), M)
+    shutil.copy(os.path.join(bake, 'rules', 'jumppoint.tab'), os.path.join(M, 'rules', 'jumppoint.tab'))   # exit icons
     copytree(os.path.join(cre, 'dialogue', 'modules', 'ToEE', 'dlg'), os.path.join(C, 'dlg'))
     copytree(os.path.join(cre, 'dialogue', 'modules', 'ToEE', 'scr'), os.path.join(C, 'scr'))
     copytree(os.path.join(bake, 'modules', 'ToEE', 'scr'), os.path.join(C, 'scr'))
