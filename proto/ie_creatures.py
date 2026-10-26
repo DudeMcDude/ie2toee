@@ -682,8 +682,11 @@ def convert_area(game, toee_root, out, area, name_base=27000, options=None, scri
         s['name_id'] = nid
         if script_base and s.get('status') == 'ok' and (s.get('dialog') or s.get('scripts')):
             dv = re.sub(r'\W', '', (cre.death_var or '').lower())
-            if dv in ('', 'none'):
-                dv = re.sub(r'\W', '', act['name'].lower())[:16]
+            an = re.sub(r'\W', '', act['name'].lower())[:16]
+            # IWD reuses death variables across creature types (Easthaven goblins carry 'ghast'): only trust one that
+            # looks like this actor's name or CRE resref, otherwise name it after the actor
+            if dv in ('', 'none') or (dv[:3] not in an and dv[:3] not in act['cre'].lower()):
+                dv = an
             s['ident'] = dv if dv and dv not in used else '%s_%d' % (dv or re.sub(r'\W', '', act['name'].lower())[:16] or 'actor', i)
             used.add(s['ident'])
             s['script_id'] = script_base + i
