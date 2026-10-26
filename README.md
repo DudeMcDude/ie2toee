@@ -34,8 +34,11 @@ turned into ToEE objects yet. See [docs/design.md](docs/design.md).
 4. Samples the IE search map at ToEE subtile centres and writes `.sec` files: Block / FlyOver bits and a footstep
    material from a guidance terrain table.
 5. Turns WED wall polygons into ToEE clipping meshes (occlusion).
-6. Writes `map.prp`, `mapinfo.txt`, start location, empty lighting/fog, path nodes, and the `.mes` lines to register
-   the map.
+6. Writes `map.prp`, `mapinfo.txt`, start location, empty lighting/fog and the `.mes` lines to register the map.
+   **Path nodes** (`ie_pathnodes.py`): a walkable grid plus nodes at entrances and NPC anchors, repaired along walking
+   routes so each map is one connected graph; NPC spots in tight pockets are nudged to roomy tiles or dropped, and
+   unreachable islands are removed. Optionally Temple+ itself then relinks the nodes and writes `pathnodedist.pnd` and
+   `clearance.bin` (`pathnode_bake.sh`, `--engine-pathnodes`); `pathnode_stats.py` checks the result offline.
 7. **Doors**: each door is baked in its ARE default state, both in the art (WED door tile cells) and in the blocking
    (ARE closed/open impeded cells). It also writes `<AREA>_doors.json` and `ie_doors_<area>.py`, holding per door
    the portal position, lock, key, script, toggle point and the Block masks of both states. The open and closed tile
@@ -132,7 +135,8 @@ ITEM-ADJ adjudication list, coverage and open items are in [docs/items.md](docs/
 ## Player preview
 
 `proto/ie2toee_preview.py` is a one-command build for players: it runs the map, spell, item, creature, dialogue,
-dialog-skin and bake steps for the town area AR1000 on the player's own IWD or IWD:EE install, and assembles a ToEE
+dialog-skin and bake steps for the town area AR1000 and its 14 interiors (AR1001-AR1014, each with its own
+creatures, containers, doors, exits and exit icons) on the player's own IWD or IWD:EE install, and assembles a ToEE
 module overlay (`modules/ToEE`, `modules/ToEE_core`, `data/`) that it can also copy into a ToEE folder:
 
     python proto/ie2toee_preview.py --iwd "<IWD or IWD:EE>" --toee "<ToEE copy>" --tp "<preview Temple+>" --install
@@ -178,3 +182,6 @@ PATH" in the installer); `convert.bat` installs numpy, pillow and fonttools itse
 | `proto/ie_patrol.py` | IE patrol survey (fixed loop / wander / conditional / reactive) and waypoint routes |
 | `proto/runtime/ie_bakert.py` | Temple+ finalize for baked maps (conditions, spells, item conditions; once per object) |
 | `proto/guidance/*.json` | guidance format example (placeholders only) |
+| `proto/ie_pathnodes.py` | path node placement (grid, entrance/anchor nodes, route repair, NPC-spot nudge, island drop) |
+| `proto/pathnode_bake.sh`, `proto/ingame_pathnode_bake.py` | Temple+ relinks nodes and writes `pathnodedist.pnd` + `clearance.bin` per map |
+| `proto/pathnode_stats.py` | offline check of baked path nodes (links, one-way links, components, files present) |

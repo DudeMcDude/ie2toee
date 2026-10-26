@@ -82,7 +82,8 @@ def main():
     ap.add_argument('--engine-pathnodes', action='store_true',
                     help='after --install: let Temple+ itself recalculate every map\'s path node links and write clearance.bin '
                          '(pathnode_bake.sh; needs a Temple+ build with the TP_AUTOLOAD/TP_AUTOEXEC harness and '
-                         'debug.bake_pathnodes, DudeMcDude/TemplePlus feature/pathnode-bake, given as --tp)')
+                         'debug.recalc_neighbours/flush_nodes/genclearance with the optional args, DudeMcDude/TemplePlus '
+                         'feature/pathnode-bake, given as --tp)')
     a = ap.parse_args()
     ie, toee = os.path.abspath(a.iwd), os.path.abspath(a.toee)
     out = os.path.abspath(a.out)
