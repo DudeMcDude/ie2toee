@@ -424,7 +424,7 @@ def _poly_dist(px, py, poly):
     return best
 
 
-def region_anchors(kind_open, bbox, regions, start, near=0.8, limit=6.0, avoid=None, doors=None):
+def region_anchors(kind_open, bbox, regions, start, near=0.8, limit=6.0, avoid=None, doors=None, keep_off=()):
     """{region index: [tile u, tile v]} for the travel regions a party cannot get within `near` tiles of.
     ToEE critters have a body radius and the IE search map is coarser than the walls, so the party often cannot
     stand on (or next to) a region's polygon. The anchor is the fully walkable tile, reachable from `start` with
@@ -434,7 +434,8 @@ def region_anchors(kind_open, bbox, regions, start, near=0.8, limit=6.0, avoid=N
     near=-1 and gives every reachable travel region an anchor.
     The anchor also places the region's exit icon, so among the tiles within `limit` of the polygon it is the one
     nearest a target point: the centre of the door tiles (`doors` mask) within 3 tiles of the region, else the
-    polygon's centroid. Being reachable from `start` and off the frames puts it on the party's side of the door."""
+    polygon's centroid. Being reachable from `start` and off the frames puts it on the party's side of the door.
+    `keep_off`: entrance arrival tiles; an icon within 2 tiles of one hides under the arriving party."""
     from collections import deque
     walk = (kind_open == 0).all((-1, -2))
     su, sv = start[0] - bbox[0], start[1] - bbox[2]
@@ -468,6 +469,8 @@ def region_anchors(kind_open, bbox, regions, start, near=0.8, limit=6.0, avoid=N
     def nearest_to(tiles, r):
         tx, ty = target(r); best = None
         for a, b in tiles:
+            if any(abs(a + bbox[0] - ku) <= 2 and abs(b + bbox[2] - kv) <= 2 for ku, kv in keep_off):
+                continue
             d = _poly_dist(a + bbox[0] + 0.5, b + bbox[2] + 0.5, r['poly'])
             if d <= limit:
                 k = (math.hypot(a + bbox[0] + 0.5 - tx, b + bbox[2] + 0.5 - ty), d)
@@ -601,7 +604,8 @@ def convert(game, area, outdir, map_id, ground_id, guidance, preview=False, clos
     for da in (-1, 0, 1):
         for db in (-1, 0, 1):
             near_door |= np.roll(np.roll(dt, da, 0), db, 1)
-    anchors = region_anchors(kind_open, bbox, regions_t, start, near=-1, avoid=near_door, doors=dt)   # every travel region
+    anchors = region_anchors(kind_open, bbox, regions_t, start, near=-1, avoid=near_door, doors=dt,
+                             keep_off=[_arrival(e)['arrival'] for e in are.entrances])   # every travel region
     for k, a in anchors.items():
         regions_t[k]['anchor'] = a
     objs = dict(
