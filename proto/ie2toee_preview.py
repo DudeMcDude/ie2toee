@@ -157,6 +157,7 @@ def main():
         sum((['--area', '%s:%d' % kv] for kv in sorted(interiors.items())), []))
     run('exit icons', ['ie_exiticons.py', '--travel', os.path.join(w, 'ie_travel_data.py'), '--maps', os.path.join(bake, 'modules', 'ToEE', 'maps'),
                        '--jumppoints', os.path.join(bake, 'rules', 'jumppoint.tab')])
+    run('path nodes', ['ie_pathnodes.py', '--travel', os.path.join(w, 'ie_travel_data.py'), '--maps', os.path.join(bake, 'modules', 'ToEE', 'maps')])
     print('== assemble', flush=True)
     inst = os.path.join(out, 'install'); shutil.rmtree(inst, ignore_errors=True)
     M = os.path.join(inst, 'modules', MODULE); C = os.path.join(inst, 'modules', MODULE + '_core')
