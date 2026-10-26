@@ -65,7 +65,29 @@ def components(n, nb):
     return comp
 
 
-def build(K, extra, spacing, link):
+def clearance(K, u, v, cap=6):
+    """subtiles from the tile centre to the nearest non-walkable subtile (Chebyshev), capped"""
+    cu, cv = 3 * u + 1, 3 * v + 1
+    for r in range(cap):
+        if (K[max(cu - r, 0):cu + r + 1, max(cv - r, 0):cv + r + 1] != 0).any(): return r
+    return cap
+
+
+def roomy(K, p, need=3, reach=3):
+    """p, or the nearest fully walkable tile within reach tiles with >= need subtiles of clearance (None: drop it).
+    Critters stand behind counters / beside beds: a node in such a pocket gets links out of it, but the engine can't
+    path to it exactly, so the baked graph had one-way links and islands there (AR1002/1004/1008/1013)."""
+    best = None
+    for du in range(-reach, reach + 1):
+        for dv in range(-reach, reach + 1):
+            q = (p[0] + du, p[1] + dv)
+            if 0 < q[0] < 959 and 0 < q[1] < 959 and walk_tile(K, *q) and clearance(K, *q) >= need:
+                d = du * du + dv * dv
+                if best is None or d < best[0]: best = (d, q)
+    return best and best[1]
+
+
+def build(K, extra, spacing, link, loose=()):
     have = np.argwhere((K >= 0).reshape(960, 3, 960, 3).all((1, 3)))
     if not len(have):
         return [], {}
@@ -77,6 +99,9 @@ def build(K, extra, spacing, link):
     for p in extra:
         p = (int(p[0]), int(p[1]))
         if 0 < p[0] < 959 and 0 < p[1] < 959 and K[3 * p[0] + 1, 3 * p[1] + 1] == 0: pts.add(p)
+    for p in set((int(p[0]), int(p[1])) for p in loose):   # critter spots: only where the engine can path in
+        q = roomy(K, p)
+        if q: pts.add(q)
     nodes = sorted(pts); n = len(nodes)
     nb = {i: set() for i in range(n)}
     for i in range(n):
@@ -108,6 +133,17 @@ def build(K, extra, spacing, link):
                 if k >= len(path) - 1: break
             progress = True; break   # components changed: recompute
         if not progress: break
+    # islands no walking route reaches (closed-off pockets, behind counters) with no entrance/exit icon in them: drop
+    keep_pts = set((int(p[0]), int(p[1])) for p in extra)
+    comp = components(len(nodes), nb); main = int(np.argmax(np.bincount(comp))) if len(nodes) else 0
+    drop = set()
+    for c in set(int(x) for x in comp) - {main}:
+        mem = [i for i in range(len(nodes)) if comp[i] == c]
+        if nodes[mem[0]] in islands and not any(nodes[i] in keep_pts for i in mem): drop.update(mem)
+    if drop:
+        idx = {o: k for k, o in enumerate(i for i in range(len(nodes)) if i not in drop)}
+        nodes = [nodes[i] for i in idx]
+        nb = {idx[i]: set(idx[j] for j in nb[i] if j in idx) for i in idx}
     for i in range(len(nodes)):  # Temple+ holds at most 64 neighbours per node: keep the nearest 48
         if len(nb[i]) > 48:
             keep = set(sorted(nb[i], key=lambda j: math.dist(nodes[i], nodes[j]))[:48])
@@ -148,8 +184,7 @@ def main():
         d = areas[area]
         extra = [e[:2] for e in d.get('entrances', {}).values()]
         extra += [r['anchor'] for r in d.get('regions', []) if r.get('anchor')]
-        extra += critter_tiles(mapdir)
-        nodes, nb = build(K, extra, a.spacing, a.link)
+        nodes, nb = build(K, extra, a.spacing, a.link, critter_tiles(mapdir))
         write(os.path.join(mapdir, 'pathnode.pnd'), nodes, nb)
         comp = components(len(nodes), nb)
         print('ie_pathnodes: %s %d nodes, %d components' % (area, len(nodes), len(set(comp))))
