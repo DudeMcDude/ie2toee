@@ -1,10 +1,22 @@
-ICEWIND DALE IN THE TEMPLE OF ELEMENTAL EVIL ENGINE - PLAYER PREVIEW (2026-10-25)
+ICEWIND DALE IN THE TEMPLE OF ELEMENTAL EVIL ENGINE - PLAYER PREVIEW (2026-10-26)
 =================================================================================
 
 IMPORTANT: PYTHON 3.9 OR NEWER MUST BE INSTALLED
   The converter is a Python program. Before you start, install Python 3.9+ from
   https://www.python.org/downloads/ and, in the installer, tick "Add python.exe to PATH".
   Without it convert.bat stops with a message. You also need your own Icewind Dale or Icewind Dale: EE.
+
+NEW IN THIS PREVIEW (2026-10-26)
+--------------------------------
+  * Exit icons: building doors and the town exits show a clickable travel icon. Click it and the party walks
+    there and travels.
+  * Dialogue paging: conversations with more than 5 replies show all of them, paged with More... / Back.
+  * Better pathing: the converter places many more path nodes, so long walks across Easthaven (and clicks on far
+    exit icons) find a route instead of the party standing still.
+  * Known issue: the exit icon of one building (AR1009) may still not react to a click from some spots. If the party
+    doesn't move, walk closer to it and click again.
+  * Old saves: saves made with an earlier preview keep the old maps' state. Start a NEW game after converting and
+    installing this preview (and reconvert: run convert.bat again into your ToEE copy).
 
 WHAT THIS IS
 ------------
