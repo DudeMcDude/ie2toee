@@ -161,7 +161,8 @@ def main():
              '--map-id', str(mid), '--placement', '%d,%d' % (ox, oy), '--generic-script', str(GENERIC_BASE + mid - MAP_ID),
              '--toee', toee, '--ie', ie, '--out', bake])
 
-    run('travel exits', ['ie_exits.py', w, '--out', os.path.join(w, 'ie_travel_data.py'), '--ie', ie, '--area', '%s:%d' % (AREA, MAP_ID)] +
+    run('travel exits', ['ie_exits.py', w, '--out', os.path.join(w, 'ie_travel_data.py'), '--ie', ie, '--area', '%s:%d' % (AREA, MAP_ID),
+                          '--info-regions', os.path.join(bake, 'rules', 'info_regions')] +
         sum((['--area', '%s:%d' % kv] for kv in sorted(interiors.items())), []))
     run('exit icons', ['ie_exiticons.py', '--travel', os.path.join(w, 'ie_travel_data.py'), '--maps', os.path.join(bake, 'modules', 'ToEE', 'maps'),
                        '--jumppoints', os.path.join(bake, 'rules', 'jumppoint.tab')])
@@ -183,6 +184,7 @@ def main():
         copytree(os.path.join(w, 'art', 'clip', ar), os.path.join(M, 'art', 'clip', ar))
     copytree(os.path.join(w, 'skin', 'modules', 'ToEE'), M)
     shutil.copy(os.path.join(bake, 'rules', 'jumppoint.tab'), os.path.join(M, 'rules', 'jumppoint.tab'))   # exit icons
+    copytree(os.path.join(bake, 'rules', 'info_regions'), os.path.join(M, 'rules', 'info_regions'))     # clickable info points
     copytree(os.path.join(cre, 'dialogue', 'modules', 'ToEE', 'dlg'), os.path.join(C, 'dlg'))
     copytree(os.path.join(cre, 'dialogue', 'modules', 'ToEE', 'scr'), os.path.join(C, 'scr'))
     copytree(os.path.join(bake, 'modules', 'ToEE', 'scr'), os.path.join(C, 'scr'))

@@ -59,11 +59,25 @@ def write(data, path):
         f.write('BY_MAP = dict([(a["map"], n) for n, a in AREAS.items()])\n')
 
 
+def write_info_regions(data, outdir):
+    """rules/info_regions/<map id>.json for the Temple+ info region system: clickable regions whose text is shown on a
+    click (IE info points). Coordinates: continuous tile units (tile x + 0.5 + off_x / 28.28...). Text comes from the
+    player's own dialog.tlk: generated module data, never committed."""
+    os.makedirs(outdir, exist_ok=True); n = 0
+    for area, d in sorted(data.items()):
+        regs = [dict(id=k, name=r['name'], poly=r['poly'], text=r['text']) for k, r in enumerate(d.get('infos') or ())]
+        if regs:
+            json.dump({'area': area, 'map': d['map'], 'regions': regs}, open(os.path.join(outdir, '%d.json' % d['map']), 'w'), indent=0)
+            n += len(regs)
+    return n
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('workdir')
     ap.add_argument('--area', action='append', required=True, help='AREA:map_id (repeat)')
     ap.add_argument('--out', required=True)
+    ap.add_argument('--info-regions', help='also write <dir>/<map id>.json (module rules/info_regions) for the Temple+ info region system')
     ap.add_argument('--ie', help='IE install (dialog.tlk for the info point texts)')
     a = ap.parse_args()
     text = None
@@ -74,6 +88,8 @@ def main():
     areas = {x.split(':')[0].upper(): int(x.split(':')[1]) for x in a.area}
     data, problems = collect(a.workdir, areas, text)
     write(data, a.out)
+    if a.info_regions:
+        print('ie_exits: %d info regions -> %s' % (write_info_regions(data, a.info_regions), a.info_regions))
     n = sum(len(d['regions']) for d in data.values())
     print('ie_exits: %d areas, %d travel regions, %d info points -> %s' % (len(data), n, sum(len(d['infos']) for d in data.values()), a.out))
     for p in problems:
