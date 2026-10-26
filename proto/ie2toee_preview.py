@@ -7,6 +7,9 @@ Enhanced Edition) install into a ToEE module overlay for the preview Temple+ bui
 Pipeline (each step is one of the converter scripts in this folder, run in order):
   map (ie2toee.py) -> spells (ie_spells.py) -> items (ie_items.py) -> creatures (ie_creatures.py)
   -> dialogue (ie_dialogue.py) -> dialog window skin (ie_dialog_skin.py) -> bake into map files (ie_bake.py)
+  -> travel exits (ie_exits.py) -> exit icons (ie_exiticons.py) -> path node placement (ie_pathnodes.py)
+  [-> with --install --engine-pathnodes: Temple+ recalculates the node links with its own pathfinder and writes
+      pathnodenew.pnd/pathnodedist.pnd + clearance.bin for every map (pathnode_bake.sh, the standard for new maps)]
 The result is <out>/install: copy its contents into the ToEE folder (or pass --install to do that).
 Nothing of the IE game is shipped with the converter: everything is read from the install you point it at.
 """
@@ -76,6 +79,10 @@ def main():
     ap.add_argument('--tp', help='the preview Temple+ folder (default: the folder with TemplePlus.exe next to this one)')
     ap.add_argument('--out', default='iwd_preview_out')
     ap.add_argument('--install', action='store_true', help='also copy the result into the ToEE folder')
+    ap.add_argument('--engine-pathnodes', action='store_true',
+                    help='after --install: let Temple+ itself recalculate every map\'s path node links and write clearance.bin '
+                         '(pathnode_bake.sh; needs a Temple+ build with the TP_AUTOLOAD/TP_AUTOEXEC harness and '
+                         'debug.bake_pathnodes, DudeMcDude/TemplePlus feature/pathnode-bake, given as --tp)')
     a = ap.parse_args()
     ie, toee = os.path.abspath(a.iwd), os.path.abspath(a.toee)
     out = os.path.abspath(a.out)
@@ -239,6 +246,14 @@ def main():
             except OSError:
                 shutil.copyfile(src, dst)
         print('installed into %s' % toee)
+        if a.engine_pathnodes:   # engine-side path node links + clearance data for every converted map (pathnode_bake.sh)
+            print('== engine path nodes + clearance', flush=True)
+            env = dict(os.environ, TOEE_OVERLAY=toee,   # TOEE_DIR (env): a separate ToEE copy whose saves run_ingame.sh restores
+                       PNBAKE_MODULE=MODULE,
+                       PNBAKE_COPY_TO=os.path.join(M, 'maps'), TP_DIST=os.environ.get('TP_DIST', tp))
+            r = subprocess.run(['bash', os.path.join(HERE, 'pathnode_bake.sh'), os.path.join(scr, 'ie_travel_data.py')], cwd=HERE, env=env)
+            if r.returncode:
+                sys.exit('step "engine path nodes" failed (exit %d)' % r.returncode)
     print('done. Run TemplePlusConfig, pick the module "%s", then start a NEW game: it begins in Easthaven.' % MODULE)
 
 
