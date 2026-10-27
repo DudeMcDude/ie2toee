@@ -54,6 +54,10 @@ DEFAULT_GUIDANCE = {
     "jpeg_quality": 92,
     "pathnode_spacing_tiles": 10,
     "pathnode_link_tiles": 28,
+    # outdoor areas: walkable corridors narrower than 2*cells+1 search-map cells (docks, bridges, shore paths that
+    # IE's small actors walk but a ToEE party leader cannot) grow by `cells` into adjacent flyover (water) cells.
+    # Per-area: "areas": {"AR1000": {"widen_narrow": 0}} disables it; "searchmap_fix" rects still apply after it.
+    "widen_narrow": 2,
     "placement": "centre",   # or [cx, cy] canvas offset of the IE image's top-left pixel
     "cal": [0.0, 0.0],       # extra canvas-pixel correction (CAL_DX, CAL_DY)
     "areas": {}
@@ -497,6 +501,38 @@ def region_anchors(kind_open, bbox, regions, start, near=0.8, limit=6.0, avoid=N
     return out
 
 
+def _win(m, r, op):
+    """min/max of a bool mask over a (2r+1)^2 square window (out of bounds counts as False)."""
+    p = np.pad(m, r, constant_values=False)
+    out = np.ones_like(m) if op == 'min' else np.zeros_like(m)
+    H, W = m.shape
+    for dy in range(2 * r + 1):
+        for dx in range(2 * r + 1):
+            w = p[dy:dy + H, dx:dx + W]
+            out = (out & w) if op == 'min' else (out | w)
+    return out
+
+
+def widen_narrow(sr, guidance, cells):
+    """Grow walkable search-map cells that lie in corridors narrower than 2*cells+1 into neighbouring flyover cells,
+    copying the corridor's own value (so the footstep material follows). Returns (new sr, cells changed)."""
+    kind_of = {int(k): w for k, (w, m) in guidance['searchmap'].items()}
+    walk = np.vectorize(lambda v: kind_of.get(int(v)) == 'walk')(sr)
+    fly = np.vectorize(lambda v: kind_of.get(int(v)) == 'flyover')(sr)
+    narrow = walk & ~_win(_win(walk, cells, 'min'), cells, 'max')
+    out = sr.copy(); src = np.where(narrow, sr.astype(np.int16), -1); n = 0
+    for _ in range(cells):
+        p = np.pad(src, 1, constant_values=-1); H, W = src.shape; nxt = src.copy()
+        for dy in range(3):
+            for dx in range(3):
+                nb = p[dy:dy + H, dx:dx + W]
+                take = (nxt < 0) & (nb >= 0) & fly
+                nxt[take] = nb[take]
+        grow = (src < 0) & (nxt >= 0)
+        out[grow] = nxt[grow]; n += int(grow.sum()); src = nxt
+    return out, n
+
+
 def load_area(game, area, guidance, closed_doors=False):
     g = IEGame(game) if isinstance(game, str) else game
     are = Are(g.read(area, 'are'))
@@ -529,6 +565,10 @@ def load_area(game, area, guidance, closed_doors=False):
             if 0 <= cy < sr.shape[0] and 0 <= cx < sr.shape[1]:
                 sr[cy, cx] = DOOR_BLOCK_VALUE
     are.sr_nodoors = sr_nodoors
+    wn = ag.get('widen_narrow', guidance.get('widen_narrow', 0)) if are.area_type & 1 else 0
+    are.widened = 0
+    if wn:
+        sr, are.widened = widen_narrow(sr, guidance, wn)
     for x, y, w, h, val in ag.get('searchmap_fix', []):
         sr = sr.copy(); sr[y:y + h, x:x + w] = val
     return g, are, wed, img, sr, doors_closed, tis_for
@@ -553,6 +593,7 @@ def convert(game, area, outdir, map_id, ground_id, guidance, preview=False, clos
     report['tile_bbox'] = bbox
     report['sectors'] = write_sectors(U, V, flags, mats, mapdir)
     report['walkable_subtiles'] = int((kind == 0).sum())
+    report['widened_cells'] = are.widened
     nclip, ntri = write_clipping(wed.walls, pl, H, mapdir, os.path.join(outdir, 'art', 'clip', name), name)
     report['clipping'] = dict(meshes=nclip, triangles=ntri, wall_polygons=len(wed.walls))
     report['pathnodes'] = write_pathnodes(U, V, kind, mapdir, guidance['pathnode_spacing_tiles'], guidance['pathnode_link_tiles'])
