@@ -57,12 +57,15 @@ DEFAULT_GUIDANCE = {
     # outdoor areas: walkable corridors narrower than 2*cells+1 search-map cells (docks, bridges, shore paths that
     # IE's small actors walk but a ToEE party leader cannot) grow by `cells` into adjacent flyover (water) cells.
     # Per-area: "areas": {"AR1000": {"widen_narrow": 0}} disables it; "searchmap_fix" rects still apply after it.
-    "widen_narrow": 2,
+    "widen_narrow": 0,   # opt-in (e.g. 2); off by default
     "placement": "centre",   # or [cx, cy] canvas offset of the IE image's top-left pixel
     "cal": [0.0, 0.0],       # extra canvas-pixel correction (CAL_DX, CAL_DY)
     "areas": {
         # walkable apron on the stone threshold in front of the exit door (SR cells x 13-15, y 28-31; the art shows
         # floor there): the exit icon at the door was on a 1-2 tile sliver the party could not path onto
+        # Easthaven dock (Jhonen's route, path nodes 107-118): the IE search map leaves only a 2-3 cell plank strip and
+        # a water gap to the snow bank; the art shows snow (x 113-116, y 95-97) and planks (x 112-115, y 98-103) there
+        "AR1000": {"searchmap_fix": [[113, 95, 4, 3, 11], [112, 98, 4, 6, 2]]},
         "AR1009": {"searchmap_fix": [[13, 28, 3, 4, 9]]},
     }
 }
