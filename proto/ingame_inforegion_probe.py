@@ -39,6 +39,8 @@ if os.environ.get('IE2TOEE_HOVER'):   # hover cursor: off a region, then over it
     OX, OY = [int(v) for v in os.environ.get('IE2TOEE_OFF', '%d,%d' % (CX - 200, CY + 120)).split(',')]
     at(1500, lambda: log('MOVE %d %d' % (OX, OY)) or 0); at(800, lambda: log('CSHOT ir_hover_off') or 0)
     at(1200, lambda: log('MOVE %d %d' % (CX, CY)) or 0); at(800, lambda: log('CSHOT ir_hover_on') or 0)
+    at(300, lambda: log('CLICK %d %d' % (CX, CY)) or 0); at(700, lambda: log('CSHOT ir_hover_bubble') or 0)   # cursor + bubble
+    at(500, lambda: log('MOVE %d %d' % (OX, OY)) or 0); at(600, lambda: log('CSHOT ir_hover_reverted') or 0)
 at(1500, shot, ('ir_before',))
 at(500, click)
 at(400, shot, ('ir_float',))
