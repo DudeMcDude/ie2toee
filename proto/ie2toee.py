@@ -390,15 +390,18 @@ def _walkable(kind, bbox, a, b, strict=True):
 
 def arrival_tile(kind, bbox, u, v, radius=5):
     """(tile u, tile v, moved) where a party arriving at IE entrance (u, v) is put: the entrance's own tile if it is
-    walkable, else the nearest walkable tile within `radius` tiles (fully walkable tiles first, then mostly walkable
+    walkable, else the nearest walkable tile within `radius` tiles (tiles with all 8 neighbours walkable first, then fully walkable, then mostly walkable
     ones); (floor u, floor v, None) if there is none (the entrance stays where it is)."""
     iu, iv = int(math.floor(u)), int(math.floor(v))
-    for strict in (True, False):
+    for strict in ('roomy', True, False):
         best = None
         for du in range(-radius, radius + 1):
             for dv in range(-radius, radius + 1):
                 d = math.hypot(iu + du + 0.5 - u, iv + dv + 0.5 - v)
-                if d <= radius + 0.5 and _walkable(kind, bbox, iu + du - bbox[0], iv + dv - bbox[2], strict):
+                a, b = iu + du - bbox[0], iv + dv - bbox[2]
+                ok = all(_walkable(kind, bbox, a + x, b + y) for x in (-1, 0, 1) for y in (-1, 0, 1)) \
+                    if strict == 'roomy' else _walkable(kind, bbox, a, b, strict)
+                if d <= radius + 0.5 and ok:
                     if best is None or d < best[0]:
                         best = (d, iu + du, iv + dv)
         if best:
@@ -463,6 +466,7 @@ def region_anchors(kind_open, bbox, regions, start, near=0.8, limit=6.0, avoid=N
                    default=None)
 
     every = reach(walk)
+    roomy = _win(walk, 1, 'min')
     door_t = [(a + bbox[0] + 0.5, b + bbox[2] + 0.5) for a, b in zip(*np.nonzero(doors))] if doors is not None else []
 
     def target(r):
@@ -490,7 +494,10 @@ def region_anchors(kind_open, bbox, regions, start, near=0.8, limit=6.0, avoid=N
     for k, r in enumerate(regions):
         if r['type'] != 'travel':
             continue
-        best = nearest_to(clear, r) if clear else None
+        # roomy first: an icon tile whose 8 neighbours are walkable too, so a ToEE body (radius ~0.9 tile) fits there
+        best = nearest_to([t for t in clear if roomy[t]], r) if clear else None
+        if not (best and best[0] <= limit):
+            best = nearest_to(clear, r) if clear else None
         if os.environ.get('IE2TOEE_ANCHOR_DEBUG'):
             print('anchor %s target %.1f,%.1f doors %d -> %s' % (r.get('name'), target(r)[0], target(r)[1],
                   sum(_poly_dist(t[0], t[1], r['poly']) <= 3.0 for t in door_t), best))
