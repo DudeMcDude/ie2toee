@@ -96,9 +96,12 @@ def build(K, extra, spacing, link, loose=()):
     for u in range(int(u0) + spacing // 2, int(u1) + 1, spacing):
         for v in range(int(v0) + spacing // 2, int(v1) + 1, spacing):
             if walk_tile(K, u, v): pts.add((u, v))
-    for p in extra:
-        p = (int(p[0]), int(p[1]))
-        if 0 < p[0] < 959 and 0 < p[1] < 959 and K[3 * p[0] + 1, 3 * p[1] + 1] == 0: pts.add(p)
+    keep_pts = set()
+    for p in extra:          # entrances / region anchors: a roomy tile nearby if there is one (tight doorway spots gave
+        p = (int(p[0]), int(p[1]))   # one-way links in the engine bake, AR1004/AR1013), else the spot itself
+        q = roomy(K, p, reach=2)
+        if not q and 0 < p[0] < 959 and 0 < p[1] < 959 and K[3 * p[0] + 1, 3 * p[1] + 1] == 0: q = p
+        if q: pts.add(q); keep_pts.add(q)
     for p in set((int(p[0]), int(p[1])) for p in loose):   # critter spots: only where the engine can path in
         q = roomy(K, p)
         if q: pts.add(q)
@@ -134,7 +137,6 @@ def build(K, extra, spacing, link, loose=()):
             progress = True; break   # components changed: recompute
         if not progress: break
     # islands no walking route reaches (closed-off pockets, behind counters) with no entrance/exit icon in them: drop
-    keep_pts = set((int(p[0]), int(p[1])) for p in extra)
     comp = components(len(nodes), nb); main = int(np.argmax(np.bincount(comp))) if len(nodes) else 0
     drop = set()
     for c in set(int(x) for x in comp) - {main}:

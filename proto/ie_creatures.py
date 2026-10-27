@@ -655,6 +655,15 @@ def pick_portrait(resref, gender, n):
     return None
 
 
+# Our own names for creature variants the game's own (tlk) name doesn't tell apart: CRE resref -> {tlk name: name}.
+# The tlk name is kept unless it is the generic one listed here (so a translated tlk keeps its own names).
+VARIANT_NAMES = {
+    'goboaxe': {'Goblin': 'Axe Goblin'},
+    'gobobow': {'Goblin': 'Goblin Archer'},
+    'gobehq1': {'Goblin Elite': 'Goblin Elite Archer'},
+}
+
+
 def convert_area(game, toee_root, out, area, name_base=27000, options=None, script_base=None, tp_root=None):
     import toeedata
     tx = ToEEIndex(toeedata.ToEEData(toee_root))
@@ -677,7 +686,8 @@ def convert_area(game, toee_root, out, area, name_base=27000, options=None, scri
                 if por in TOWNSMEN + TOWNSWOMEN:
                     gen[s.get('gender') == 'female'] += 1
         nid = name_base + i
-        nm = cv.text(cre.name_strref) if cre.name_strref >= 0 else act['name']
+        nm = cv.text(cre.name_strref) if cre.name_strref >= 0 else ''
+        nm = VARIANT_NAMES.get(act['cre'].lower(), {}).get(nm.strip(), nm) or act['name']
         names[nid] = nm.replace('{', '(').replace('}', ')')
         s['name_id'] = nid
         if script_base and s.get('status') == 'ok' and (s.get('dialog') or s.get('scripts')):
