@@ -63,9 +63,9 @@ DEFAULT_GUIDANCE = {
     "areas": {
         # walkable apron on the stone threshold in front of the exit door (SR cells x 13-15, y 28-31; the art shows
         # floor there): the exit icon at the door was on a 1-2 tile sliver the party could not path onto
-        # Easthaven dock (Jhonen's route, path nodes 107-118): the IE search map leaves only a 2-3 cell plank strip and
-        # a water gap to the snow bank; the art shows snow (x 113-116, y 95-97) and planks (x 112-115, y 98-103) there
-        "AR1000": {"searchmap_fix": [[113, 95, 4, 3, 11], [112, 98, 4, 6, 2]]},
+        # Easthaven dock (Jhonen's route, path nodes 107-118): the IE search map pinches the plank walkway and its link
+        # to the snow bank to 1-2 cells; 14 cells (snow / planks in the art) at the pinch let the leader-radius bake through
+        "AR1000": {"searchmap_fix": [[115, 95, 2, 3, 11], [114, 97, 1, 1, 11], [114, 98, 1, 5, 2], [115, 102, 1, 2, 2]]},
         "AR1009": {"searchmap_fix": [[13, 28, 3, 4, 9]]},
     }
 }
