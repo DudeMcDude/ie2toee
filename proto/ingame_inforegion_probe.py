@@ -8,7 +8,7 @@ from utilities import location_from_axis, location_to_axis
 import os
 LOG = os.environ.get('IE2TOEE_PROBE_LOG', 'ie2toee_probe.log')
 import ie_travel_data as D
-A = D.AREAS['AR1000']
+A = D.AREAS[os.environ.get('IE2TOEE_AREA', 'AR1000')]
 NAME = os.environ.get('IE2TOEE_INFO', 'Trigger Point 16')
 CX, CY = [int(v) for v in os.environ.get('IE2TOEE_CENTRE', '640,400').split(',')]
 R = [r for r in A['infos'] if r['name'] == NAME][0]
