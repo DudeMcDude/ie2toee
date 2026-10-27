@@ -35,6 +35,10 @@ def at(dt, fn, args=()):
 
 game.fade_and_teleport(0, 0, 0, A['map'], int(cu) + 5, int(cv) + 5)
 at(5000, look)
+if os.environ.get('IE2TOEE_HOVER'):   # hover cursor: off a region, then over it (CSHOT = screenshot with the cursor)
+    OX, OY = [int(v) for v in os.environ.get('IE2TOEE_OFF', '%d,%d' % (CX - 200, CY + 120)).split(',')]
+    at(1500, lambda: log('MOVE %d %d' % (OX, OY)) or 0); at(800, lambda: log('CSHOT ir_hover_off') or 0)
+    at(1200, lambda: log('MOVE %d %d' % (CX, CY)) or 0); at(800, lambda: log('CSHOT ir_hover_on') or 0)
 at(1500, shot, ('ir_before',))
 at(500, click)
 at(400, shot, ('ir_float',))

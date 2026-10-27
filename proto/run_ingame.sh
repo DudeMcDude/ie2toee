@@ -48,6 +48,7 @@ while [ $(( $(date +%s) - T0 )) -lt "$SECS" ]; do
           CLICKICON*) import -display "$DISPLAY" -window root /tmp/ie_icon_$$.png 2>/dev/null
                      xy=$(python3 "$HERE/find_exit_icon.py" /tmp/ie_icon_$$.png ${line#CLICKICON}); echo "clickicon at '$xy'" >> "$OUT/clicks.txt"
                      [ -n "$xy" ] && { set -- $xy; xdotool mousemove "$1" "$2"; sleep 0.6; xdotool click 1; }; echo "clickicon $xy";;
+          CSHOT\ *) ffmpeg -loglevel error -y -f x11grab -draw_mouse 1 -i "$DISPLAY" -frames:v 1 "$OUT/${line#CSHOT }.png"; echo "cshot ${line#CSHOT }";;   # with the X cursor
           MOVE\ *) set -- ${line#MOVE }; xdotool mousemove "$1" "$2"; echo "move $1 $2";;
         esac
       done
