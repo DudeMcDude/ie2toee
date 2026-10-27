@@ -2,7 +2,8 @@
 # Engine-side path node + clearance bake for converted maps (pipeline step after ie_pathnodes.py).
 # Runs a Temple+ build with the TP_AUTOLOAD/TP_AUTOEXEC harness and debug.bake_pathnodes (DudeMcDude/TemplePlus
 # feature/pathnode-bake) via run_ingame.sh: every area of the travel data is loaded in turn and gets
-# pathnodenew.pnd / pathnodedist.pnd (neighbours recalculated with the real pathfinder) and clearance.bin.
+# clearance.bin (generated first, so the neighbour recalc below uses it) and pathnodenew.pnd / pathnodedist.pnd
+# (neighbours recalculated with the real, clearance-based pathfinder).
 # Usage: TP_DIST=.. TOEE_DIR=.. TOEE_OVERLAY=.. ./pathnode_bake.sh <ie_travel_data.py> [areas...]
 #   Bakes into $TOEE_OVERLAY/modules/ToEE/maps/<area>/ (the copy the engine loads); PNBAKE_COPY_TO=<maps dir> also
 #   copies the results there (e.g. the build output). Stale baked files are removed first so the fresh pathnode.pnd is used.

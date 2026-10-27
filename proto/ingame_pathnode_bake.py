@@ -1,6 +1,6 @@
 # In-game path node bake for converted maps (Temple+ Python 2.7), run via pathnode_bake.sh / run_ingame.sh.
 # For each area: teleport there (the engine loads its pathnode.pnd from ie_pathnodes.py), then
-# debug.recalc_neighbours / flush_nodes(dir) / genclearance(dir) recalculate every node's links with the real pathfinder and write
+# debug.genclearance(dir) / recalc_neighbours / flush_nodes(dir) recalculate every node's links with the real pathfinder and write
 # pathnodenew.pnd + pathnodedist.pnd + clearance.bin into <IE2TOEE_PNBAKE_OUT>\<area>.
 #   IE2TOEE_PNBAKE="AR1000:5900:482,424;AR1001:5901:x,y;..."  IE2TOEE_PNBAKE_OUT=Z:\...\maps  [IE2TOEE_PNBAKE_MAXDIST=24]
 from toee import *
@@ -24,9 +24,11 @@ def bake(k):
     else:
         try:
             d = OUT + '\\' + a
+            # clearance first: genclearance also loads it, so recalc_neighbours links nodes with the same clearance-based
+            # pathfinder the game uses (without it the legacy check walks over FlyOver/water and bakes unwalkable links)
+            clr = debug.genclearance(d)
             debug.recalc_neighbours(MAXD)       # existing Temple+ hooks (feature/pathnode-bake adds the optional args)
             ok = debug.flush_nodes(d)
-            clr = debug.genclearance(d)
             log("PNBAKE %s %s flushed %d clrsectors %d" % (a, 'OK' if ok and clr else 'FAIL', ok, clr))
         except Exception, e:
             log("PNBAKE %s FAIL %r" % (a, e))
