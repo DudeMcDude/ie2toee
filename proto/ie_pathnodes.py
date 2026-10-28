@@ -32,9 +32,14 @@ def clear(K, p, q):
     return True
 
 
-def walk_path(K, starts, goals):
-    ctr = lambda K, u, v: K[3 * u + 1, 3 * v + 1] == 0
-    """tile-level BFS over fully walkable tiles (8-neighbour, no corner cutting) -> [tile...] from a start to a goal"""
+LEADER = 2   # subtiles of clearance (tile centre to the nearest blocked subtile) a party leader needs to pass
+ROOMY = 3    # clearance a node needs: the engine bakes node links with the leader's radius, and a node in a tighter
+             # spot gets no links (it showed up as a stray one-node group in AR1000/AR1007/AR1008)
+
+
+def walk_path(K, starts, goals, need=LEADER):
+    ctr = lambda K, u, v: K[3 * u + 1, 3 * v + 1] == 0 and clearance(K, u, v, need) >= need
+    """tile-level BFS over tiles the leader fits through (8-neighbour, no corner cutting) -> [tile...] start to goal"""
     from collections import deque
     prev = {p: None for p in starts}; q = deque(starts)
     while q:
@@ -95,15 +100,15 @@ def build(K, extra, spacing, link, loose=()):
     pts = set()
     for u in range(int(u0) + spacing // 2, int(u1) + 1, spacing):
         for v in range(int(v0) + spacing // 2, int(v1) + 1, spacing):
-            if walk_tile(K, u, v): pts.add((u, v))
+            q = roomy(K, (u, v), need=ROOMY, reach=1)
+            if q: pts.add(q)
     keep_pts = set()
     for p in extra:          # entrances / region anchors: a roomy tile nearby if there is one (tight doorway spots gave
         p = (int(p[0]), int(p[1]))   # one-way links in the engine bake, AR1004/AR1013), else the spot itself
-        q = roomy(K, p, reach=2)
-        if not q and 0 < p[0] < 959 and 0 < p[1] < 959 and K[3 * p[0] + 1, 3 * p[1] + 1] == 0: q = p
+        q = roomy(K, p, need=ROOMY, reach=3) or roomy(K, p, need=LEADER, reach=2)
         if q: pts.add(q); keep_pts.add(q)
     for p in set((int(p[0]), int(p[1])) for p in loose):   # critter spots: only where the engine can path in
-        q = roomy(K, p)
+        q = roomy(K, p, need=ROOMY)
         if q: pts.add(q)
     nodes = sorted(pts); n = len(nodes)
     nb = {i: set() for i in range(n)}
@@ -127,6 +132,7 @@ def build(K, extra, spacing, link, loose=()):
             prev = mine[[nodes[i] for i in mine].index(path[0])]
             for k in range(3, len(path) + 2, 3):   # nodes along the walk, each linked to the one before
                 q = path[min(k, len(path) - 1)]
+                if k < len(path) - 1: q = max(path[k - 1:k + 2], key=lambda t: clearance(K, *t))   # roomiest step
                 if q in nodes: j = nodes.index(q)
                 else:
                     nodes.append(q); j = len(nodes) - 1; nb[j] = set()
@@ -176,12 +182,13 @@ def critter_tiles(mapdir):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--travel', required=True); ap.add_argument('--maps', required=True)
+    ap.add_argument('--areas', nargs='*', help='only these areas (default: all in the travel data)')
     ap.add_argument('--spacing', type=int, default=6); ap.add_argument('--link', type=float, default=24)
     a = ap.parse_args()
     areas = runpy.run_path(a.travel)['AREAS']
     for area in sorted(areas):
         mapdir = os.path.join(a.maps, area)
-        if not os.path.isdir(mapdir): continue
+        if not os.path.isdir(mapdir) or (a.areas and area not in a.areas): continue
         K, _ = load_map_subtiles(mapdir)
         d = areas[area]
         extra = [e[:2] for e in d.get('entrances', {}).values()]
