@@ -46,10 +46,13 @@ def hover(i):
     name, f, t = PAIRS[i]; a = actor()
     x, y = tpgui.world_to_screen(location_from_axis(t[0], t[1]))
     sx, sy = tpgui.world_to_screen(a)
-    nf = 3 | 0x800000   # TO_EXACT|HAS_CRITTER|IGNORE_CRITTERS_ON_DESTINATION
-    log('RC %02d %s actor %s at %s -> %s screen %d,%d actor screen %d,%d combat %d fwd %s rev %s fwd-raw %s rev-raw %s' % (
+    # 'move' = the flags of the combat move/ALT preview (action_sequence.cpp: TO_EXACT|HAS_CRITTER|0x800|ALLOW_ALTERNATIVE_TARGET_TILE,
+    # which nudges a destination whose tile centre is not clear for the mover's radius); 'exact' = strict tile centre
+    nf = 3 | 0x800 | 0x40000 | 0x800000
+    xf = 3 | 0x800000
+    log('RC %02d %s actor %s at %s -> %s screen %d,%d actor screen %d,%d combat %d fwd %s rev %s fwd-exact %s rev-exact %s' % (
         i, name, a, location_to_axis(a.location), tuple(t), x, y, sx, sy, game.combat_is_active(),
-        plen(a, f, t, nf), plen(a, t, f, nf), plen(a, f, t, 3), plen(a, t, f, 3)))
+        plen(a, f, t, nf), plen(a, t, f, nf), plen(a, f, t, xf), plen(a, t, f, xf)))
     log('XDO mousemove %d %d' % (OX + x + 4, OY + y + 3))
     log('XDO keydown alt')
     log('XDO mousemove %d %d' % (OX + x, OY + y))
