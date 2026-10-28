@@ -56,7 +56,8 @@ DEFAULT_GUIDANCE = {
     "pathnode_link_tiles": 28,
     # outdoor areas: walkable corridors narrower than 2*cells+1 search-map cells (docks, bridges, shore paths that
     # IE's small actors walk but a ToEE party leader cannot) grow by `cells` into adjacent flyover (water) cells.
-    # Per-area: "areas": {"AR1000": {"widen_narrow": 0}} disables it; "searchmap_fix" rects still apply after it.
+    # Per-area: "areas": {"AR1000": {"widen_narrow": 0}} disables it; "searchmap_fix" rects still apply after it;
+    # "anchor_fix": {"To1201": [u, v]} overrides a travel region's anchor (its exit icon / trigger point).
     "widen_narrow": 0,   # opt-in (e.g. 2); off by default
     "placement": "centre",   # or [cx, cy] canvas offset of the IE image's top-left pixel
     "cal": [0.0, 0.0],       # extra canvas-pixel correction (CAL_DX, CAL_DY)
@@ -71,7 +72,10 @@ DEFAULT_GUIDANCE = {
         # fit; 4 cells make tiles (480,461) and (482,460-462) walkable so the corridor is 3 tiles wide, and 5 more (the
         # rows above/beside the icon tile, the cave mouth's tip) give the icon tile itself room for the PC radius
         "AR1200": {"searchmap_fix": [[15, 17, 1, 1, 11], [11, 19, 1, 1, 11], [12, 20, 1, 1, 11], [13, 21, 1, 1, 11],
-                                     [10, 14, 3, 1, 11], [9, 15, 1, 1, 11], [13, 15, 1, 1, 11]]},
+                                     [10, 14, 3, 1, 11], [9, 15, 1, 1, 11], [13, 15, 1, 1, 11]],
+                   # the leader still stopped at (481,463), 3 tiles short of the auto anchor (481,460): icon + anchor
+                   # moved there, just outside the cave mouth (approved by Shai, 2026-10-28)
+                   "anchor_fix": {"To1201": [481, 463]}},
     }
 }
 
@@ -675,6 +679,9 @@ def convert(game, area, outdir, map_id, ground_id, guidance, preview=False, clos
                              keep_off=[_arrival(e)['arrival'] for e in are.entrances])   # every travel region
     for k, a in anchors.items():
         regions_t[k]['anchor'] = a
+    for r in regions_t:   # per-area "anchor_fix": {region name: [u, v]} pins a region's travel anchor + exit icon by hand
+        if r.get('name') in ag.get('anchor_fix', {}):
+            r['anchor'] = list(ag['anchor_fix'][r['name']])
     objs = dict(
         placement=dict(canvas_offset=[pl.cx, pl.cy], scale=pl.scale, cal=[pl.calx - CAL_X0, pl.caly - CAL_Y0]),
         entrances=[dict(e, toee=tl(e['x'], e['y']), **_arrival(e)) for e in are.entrances],
