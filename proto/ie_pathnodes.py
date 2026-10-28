@@ -78,6 +78,44 @@ def clearance(K, u, v, cap=6):
     return cap
 
 
+SUBTILE_IN = 9.4280901   # inches per subtile (a tile is 3x3)
+FIT_RADIUS = 25.0         # nominal PC radius (protos.tab obj_f_radius of the medium PC protos), same as the bake
+
+
+def edge_dist(S, su, sv, cap=6):
+    """inches from the centre of subtile (su, sv) to the nearest non-walkable (blocked, flyover or off-map) subtile.
+    Mirrors Temple+ PathDestIsClear: a raycast circle of the mover's radius at the destination that stops at the
+    first sector blocker or flyover subtile; a destination is clear when that circle touches none of them."""
+    best = cap * SUBTILE_IN
+    for i in range(su - cap, su + cap + 1):
+        for j in range(sv - cap, sv + cap + 1):
+            if 0 <= i < S.shape[0] and 0 <= j < S.shape[1] and S[i, j] == 0: continue
+            dx = max(0, abs(i - su) - 0.5); dy = max(0, abs(j - sv) - 0.5)
+            best = min(best, math.hypot(dx, dy) * SUBTILE_IN)
+    return best
+
+
+def fits(S, u, v, r=FIT_RADIUS):
+    """the engine's exact-point fit check for a mover of radius r at the centre of tile (u, v)"""
+    return edge_dist(S, 3 * u + 1, 3 * v + 1) >= r
+
+
+def nudge(K, p, reach=2, nearest=False):
+    """p if a radius-25 mover fits at its centre, else the walkable tile within `reach` tiles where it fits with the
+    most room (nearest=True: the nearest such tile, for points that must stay put, like arrivals by a door); p if none"""
+    if fits(K, *p): return p
+    best = None
+    for du in range(-reach, reach + 1):
+        for dv in range(-reach, reach + 1):
+            q = (p[0] + du, p[1] + dv)
+            if not (0 < q[0] < 959 and 0 < q[1] < 959 and walk_tile(K, *q)): continue
+            room = edge_dist(K, 3 * q[0] + 1, 3 * q[1] + 1)
+            if room < FIT_RADIUS: continue
+            key = (du * du + dv * dv, -room) if nearest else (-room, du * du + dv * dv)
+            if best is None or key < best[0]: best = (key, q)
+    return best[1] if best else p
+
+
 def roomy(K, p, need=3, reach=3):
     """p, or the nearest fully walkable tile within reach tiles with >= need subtiles of clearance (None: drop it).
     Critters stand behind counters / beside beds: a node in such a pocket gets links out of it, but the engine can't
@@ -110,6 +148,10 @@ def build(K, extra, spacing, link, loose=()):
     for p in set((int(p[0]), int(p[1])) for p in loose):   # critter spots: only where the engine can path in
         q = roomy(K, p, need=ROOMY)
         if q: pts.add(q)
+    moved = {p: nudge(K, p) for p in pts}   # borderline spots: move where the engine's exact-point check passes
+    keep_pts = set(moved[p] for p in keep_pts)
+    build.moved = sum(1 for p, q in moved.items() if p != q)
+    pts = set(moved.values())
     nodes = sorted(pts); n = len(nodes)
     nb = {i: set() for i in range(n)}
     for i in range(n):
@@ -147,7 +189,7 @@ def build(K, extra, spacing, link, loose=()):
     drop = set()
     for c in set(int(x) for x in comp) - {main}:
         mem = [i for i in range(len(nodes)) if comp[i] == c]
-        if nodes[mem[0]] in islands and not any(nodes[i] in keep_pts for i in mem): drop.update(mem)
+        if nodes[mem[0]] in islands and (len(mem) == 1 or not any(nodes[i] in keep_pts for i in mem)): drop.update(mem)   # a lone anchor node off the walkable net only splits the graph
     if drop:
         idx = {o: k for k, o in enumerate(i for i in range(len(nodes)) if i not in drop)}
         nodes = [nodes[i] for i in idx]
@@ -196,7 +238,7 @@ def main():
         nodes, nb = build(K, extra, a.spacing, a.link, critter_tiles(mapdir))
         write(os.path.join(mapdir, 'pathnode.pnd'), nodes, nb)
         comp = components(len(nodes), nb)
-        print('ie_pathnodes: %s %d nodes, %d components' % (area, len(nodes), len(set(comp))))
+        print('ie_pathnodes: %s %d nodes, %d components, %d nudged' % (area, len(nodes), len(set(comp)), build.moved))
 
 
 if __name__ == '__main__':

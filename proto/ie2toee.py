@@ -409,8 +409,22 @@ def arrival_tile(kind, bbox, u, v, radius=5):
                     if best is None or d < best[0]:
                         best = (d, iu + du, iv + dv)
         if best:
-            return best[1], best[2], (best[1], best[2]) != (iu, iv)
+            bu, bv = _fit_nearby(kind, bbox, u, v, best[1], best[2]) if strict else (best[1], best[2])
+            return bu, bv, (bu, bv) != (iu, iv)
     return iu, iv, None
+
+
+def _fit_nearby(kind, bbox, u, v, bu, bv, reach=2):
+    """(bu, bv), or if a radius-25 mover does not fit at its centre (Temple+'s exact-point check, which fails strict
+    paths to the arrival), the nearest fully walkable tile to the IE point within `reach` tiles of it where one does"""
+    from ie_pathnodes import edge_dist, FIT_RADIUS
+    S = kind.transpose(0, 2, 1, 3).reshape(kind.shape[0] * 3, kind.shape[1] * 3)
+    room = lambda tu, tv: edge_dist(S, 3 * (tu - bbox[0]) + 1, 3 * (tv - bbox[2]) + 1)
+    if room(bu, bv) >= FIT_RADIUS: return bu, bv
+    c = [(math.hypot(bu + du + 0.5 - u, bv + dv + 0.5 - v), bu + du, bv + dv) for du in range(-reach, reach + 1)
+         for dv in range(-reach, reach + 1) if _walkable(kind, bbox, bu + du - bbox[0], bv + dv - bbox[2])]
+    c = [t for t in sorted(c) if room(t[1], t[2]) >= FIT_RADIUS]
+    return (c[0][1], c[0][2]) if c else (bu, bv)
 
 
 def _poly_dist(px, py, poly):
