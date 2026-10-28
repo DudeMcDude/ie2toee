@@ -554,6 +554,36 @@ class Converter(object):
                 items.append({'slot': 'armor', 'proto': garb[h % len(garb)], 'ie_type': 'garb (default)', 'enchantment': 0})
             if self.gd.cb.get('default_boots'):
                 items.append({'slot': 'boots', 'proto': self.gd.cb['default_boots'], 'ie_type': 'boots (default)', 'enchantment': 0})
+        # monsters on a bare PC body (orc = half-orc PC mesh, barbarians, animated plate, ...): IE draws their armour as
+        # part of the animation, the CRE carries none, and ToEE renders the body unclothed -> the family's default gear
+        # (guidance "gear": [{slot, protos, unless}]), else the class track's garb + boots; never over a worn item
+        mid = self.toee.col(pid, 34).strip() if pid else ''
+        mesh = str(self.toee.meshes.get(int(mid), '')) if mid.isdigit() else ''
+        if track == 'monster' and mesh.lower().startswith('pcs\\'):
+            # the IE AC already holds the animation's armour (natural_ac above is derived from it): worn default gear
+            # spends that budget (guidance "gear_ac" = 3e armour/shield bonus per proto) instead of adding to it, so
+            # the heaviest piece that fits is picked and only the rest stays natural armour; never on top of real armour
+            have = {i['slot'] for i in items}
+            types = {i['ie_type'] for i in items}
+            gac = {int(k): v for k, v in (fam.get('gear_ac') or {}).items()}
+            budget = spec.get('natural_ac') or 0
+            gear_d = fam.get('gear') or [{'slot': 'armor', 'protos': self.gd.cb.get('default_garb') or []},
+                                         {'slot': 'boots', 'protos': [self.gd.cb['default_boots']] if self.gd.cb.get('default_boots') else []}]
+            for gd_ in gear_d:
+                sl = gd_['slot']
+                if sl in have or not gd_.get('protos') or types & set(gd_.get('unless', ())):
+                    continue
+                if sl == 'armor' and types & {'armor', 'robe'}:
+                    continue
+                fit = sorted((p_ for p_ in gd_['protos'] if gac.get(p_, 0) <= budget), key=lambda p_: -gac.get(p_, 0))
+                if not fit:
+                    continue
+                pid3 = fit[0]; budget -= gac.get(pid3, 0)
+                items.append({'slot': sl, 'proto': pid3, 'ie_type': '%s (default)' % sl, 'enchantment': 0})
+                have.add(sl)
+            if budget != (spec.get('natural_ac') or 0):
+                notes.append('default gear AC %d taken from natural armour (%d -> %d)' % (spec['natural_ac'] - budget, spec['natural_ac'], budget))
+                spec['natural_ac'] = budget
         spec['items'] = items
         # ---- spells: IE memorised / known spells -> Temple+ spell lists (ie_spells.SpellMapper, docs/spells.md)
         sp, miss, strat = self.npc_spells(cre, spec)

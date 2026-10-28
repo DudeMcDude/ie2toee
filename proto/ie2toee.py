@@ -67,6 +67,11 @@ DEFAULT_GUIDANCE = {
         # to the snow bank to 1-2 cells; 14 cells (snow / planks in the art) at the pinch let the leader-radius bake through
         "AR1000": {"searchmap_fix": [[115,95,2,3,11],[114,97,1,1,11],[114,98,1,5,2],[115,102,1,2,2],[56,201,1,1,2],[57,202,1,1,2],[50,198,1,1,2],[49,197,1,1,2]]},
         "AR1009": {"searchmap_fix": [[13, 28, 3, 4, 9]]},
+        # AR1200 To1201 cave mouth: the icon (481,459) ended a 1-tile corridor (u=481, v=459-462) a radius-25 PC could not
+        # fit; 4 cells make tiles (480,461) and (482,460-462) walkable so the corridor is 3 tiles wide, and 5 more (the
+        # rows above/beside the icon tile, the cave mouth's tip) give the icon tile itself room for the PC radius
+        "AR1200": {"searchmap_fix": [[15, 17, 1, 1, 11], [11, 19, 1, 1, 11], [12, 20, 1, 1, 11], [13, 21, 1, 1, 11],
+                                     [10, 14, 3, 1, 11], [9, 15, 1, 1, 11], [13, 15, 1, 1, 11]]},
     }
 }
 

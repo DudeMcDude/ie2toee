@@ -180,7 +180,52 @@
    "model": 104,
    "proto": 14069,
    "status": "stand-in",
-   "notes": "half-orc body + orc gear; candidate for a free-model orc"
+   "notes": "half-orc body + orc gear; candidate for a free-model orc",
+   "gear": [
+    {
+     "slot": "armor",
+     "protos": [
+      6013,
+      6056
+     ]
+    },
+    {
+     "slot": "helmet",
+     "protos": [
+      6034,
+      6010
+     ]
+    },
+    {
+     "slot": "boots",
+     "protos": [
+      6011
+     ]
+    },
+    {
+     "slot": "shield",
+     "protos": [
+      6067,
+      6066
+     ],
+     "unless": [
+      "bow",
+      "crossbow",
+      "quarterstaff",
+      "large_sword",
+      "halberd",
+      "spear",
+      "sling"
+     ]
+    }
+   ],
+   "_gear_about": "IWD orcs wear their armour in the animation (the CREs carry none); ToEE orcs use the half-orc PC body, so they get leather / studded leather, a leather cap or helm, boots and (one-handed fighters) an orcish shield; gear_ac: 3e bonuses, spent from the IE-derived natural armour so AC is not counted twice",
+   "gear_ac": {
+    "6013": 2,
+    "6056": 3,
+    "6066": 2,
+    "6067": 2
+   }
   },
   {
    "id": "orog",
@@ -846,7 +891,36 @@
    "model": 100,
    "proto": 14000,
    "status": "stand-in",
-   "notes": "human body hidden under full plate + great helm"
+   "notes": "human body hidden under full plate + great helm",
+   "gear": [
+    {
+     "slot": "armor",
+     "protos": [
+      6039
+     ]
+    },
+    {
+     "slot": "helmet",
+     "protos": [
+      6033
+     ]
+    },
+    {
+     "slot": "boots",
+     "protos": [
+      6020
+     ]
+    },
+    {
+     "slot": "gloves",
+     "protos": [
+      6021
+     ]
+    }
+   ],
+   "gear_ac": {
+    "6039": 8
+   }
   },
   {
    "id": "golem",

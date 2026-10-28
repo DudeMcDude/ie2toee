@@ -1,6 +1,6 @@
 # In-game test of the exit icons (Temple+ Python 2.7), run via run_ingame.sh (docs/travel.md, "Exit icons"):
 #   TP_AUTOEXEC="import sys; sys.path[:0]=[<proto>, <proto>/runtime, <out>]; import ingame_exiticon_probe"
-# Env: IE2TOEE_BUILDINGS=AR1001,AR1006 (interiors to visit; AR1015:AR1006 = a side room and its parent area, default AR1000), IE2TOEE_SAVE=<slot name> (save at the end), IE2TOEE_COUNT_ONLY=1 (after an autoload: only count icons).
+# Env: IE2TOEE_CLEAR=1 (hide non-party critters), IE2TOEE_BUILDINGS=AR1001,AR1006 (interiors to visit; AR1015:AR1006 = a side room and its parent area, default AR1000), IE2TOEE_SAVE=<slot name> (save at the end), IE2TOEE_COUNT_ONLY=1 (after an autoload: only count icons).
 # For each building: start on the town tile in front of it, centre the view on the town's exit icon into it, click it
 # (real mouse click; a scripted use is the fallback), check the party arrived in the interior at the entrance, then
 # the same with the interior's exit icon back to town. Lines "RESULT ..." + "SHOT <name>" go to the log.
@@ -11,6 +11,16 @@ LOG = os.environ.get('IE2TOEE_PROBE_LOG', 'ie2toee_probe.log')
 import ie_travel_data as D
 BLD = os.environ.get('IE2TOEE_BUILDINGS', 'AR1001,AR1006').split(',')
 COUNT_ONLY = os.environ.get('IE2TOEE_COUNT_ONLY')
+CLEAR = os.environ.get('IE2TOEE_CLEAR') == '1'   # hide the area's non-party critters (hostile maps would start combat)
+
+def clear():
+    n = 0
+    for x in range(300, 700, 20):
+        for y in range(300, 700, 20):
+            for o in game.obj_list_vicinity(location_from_axis(x, y), OLC_CRITTERS):
+                if o not in game.party and not (o.object_flags_get() & OF_OFF):
+                    o.object_flag_set(OF_OFF); n += 1
+    log('cleared %d critters on map %d' % (n, game.leader.map)); return 0
 
 def log(s):
     f = open(LOG, 'a'); f.write(s + '\n'); f.close()
@@ -101,8 +111,10 @@ else:
         r = region(b, P)                         # the interior's way out lands on this entrance of its parent area
         u, v = D.AREAS[P]['entrances'][r['dest_entrance']][:2]
         at(1000, lambda u=u, v=v, m=D.AREAS[P]['map']: (game.fade_and_teleport(0, 0, 0, m, u, v), 0)[1])
-        at(6000, look, ('town->' + b, b)); at(4000, shot, ('exit-icon-town-to-' + b,)); at(1500, press, ('',)); at(12000, check, ('enter ' + b + ' via icon',)); at(15000, check, ('enter ' + b + ' (after fallback)', 0))
+        if CLEAR: at(1500, clear)
+        at(4500 if CLEAR else 6000, look, ('town->' + b, b)); at(4000, shot, ('exit-icon-town-to-' + b,)); at(1500, press, ('',)); at(12000, check, ('enter ' + b + ' via icon',)); at(15000, check, ('enter ' + b + ' (after fallback)', 0))
         at(1500, count, (b,))
+        if CLEAR: at(500, clear)
         at(500, look, (b + '->town', P)); at(4000, shot, ('exit-icon-' + b + '-to-town',)); at(1500, press, ('',)); at(12000, check, ('exit ' + b + ' via icon',)); at(15000, check, ('exit ' + b + ' (after fallback)', 0))
     at(1500, count, ('town',))
     at(500, save)
