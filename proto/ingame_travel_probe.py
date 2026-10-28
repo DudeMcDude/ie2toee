@@ -1,6 +1,6 @@
 # In-game travel test (Temple+ Python 2.7), run via run_ingame.sh:
 #   TP_AUTOEXEC="import sys; sys.path[:0]=[<proto>, <proto>/runtime, <out>]; import ingame_travel_probe"
-# Env: IE2TOEE_BUILDING (default AR1001). iwd.go() starts ie_travel and teleports to the town; the party is put on the
+# Env: IE2TOEE_BUILDING (default AR1001), IE2TOEE_TOWN (its parent area, default AR1000; e.g. AR1006 for AR1015). iwd.go() starts ie_travel and teleports to the town; the party is put on the
 # town entrance of the building, runs into the building's door region (-> must arrive in the interior), then runs into the
 # interior's exit region (-> must be back in the town). Lines "RESULT <step> PASS|FAIL ..." + "SHOT <name>" go to the log.
 from toee import *
@@ -8,10 +8,11 @@ from utilities import location_from_axis, location_to_axis
 import os
 LOG = os.environ.get('IE2TOEE_PROBE_LOG', 'ie2toee_probe.log')
 B = os.environ.get('IE2TOEE_BUILDING', 'AR1001')
+TOWN = os.environ.get('IE2TOEE_TOWN', 'AR1000')
 import ie_travel_data as D
-EXT, INT = D.AREAS['AR1000'], D.AREAS[B]
+EXT, INT = D.AREAS[TOWN], D.AREAS[B]
 exit_r = [r for r in EXT['regions'] if r['dest_area'] == B][0]
-back_r = [r for r in INT['regions'] if r['dest_area'] == 'AR1000'][0]
+back_r = [r for r in INT['regions'] if r['dest_area'] == TOWN][0]
 ent = EXT['entrances']['FR' + B[2:]]          # town entrance of this building
 def centre(r):
     a = r.get('anchor')    # a walkable tile at the region (a blocked click target does not move the party)
@@ -40,6 +41,8 @@ def look(tag):
     where(tag); game.scroll_to(game.leader); log("SHOT " + tag); return 0
 
 def place(mp, x, y, tag):
+    if game.leader.map != mp:     # a parent area other than the town: travel there first, then place
+        game.fade_and_teleport(0, 0, 0, mp, x, y); game.timeevent_add(place, (mp, x, y, tag), 4000, 1); return 0
     for i, o in enumerate(game.party):
         o.move(location_from_axis(x + (i % 2), y + (i // 2)), 0, 0)
     game.scroll_to(game.leader); where(tag); return 0
@@ -84,7 +87,8 @@ def go():
     iwd.go(); return 0
 at(2000, go)      # (not at import time: that sometimes hung the game on its legal screen)
 at(9000, look, ('town_start',))
-at(500, place, (5900, ent[0], ent[1], 'at_town_entrance'))
+at(500, place, (EXT['map'], ent[0], ent[1], 'at_town_entrance'))
+at(0 if TOWN == 'AR1000' else 5000, where, ('placed',))
 at(2500, open_door, ('d',))
 at(2000, look, ('town_before_door',))
 at(300, run_to, (centre(exit_r)[0], centre(exit_r)[1], 'door'))
@@ -93,6 +97,6 @@ at(5000, look, ('interior_arrival',))
 at(4000, expect, ('no_bounce_in_interior', INT['map']))
 at(300, run_to, (centre(back_r)[0], centre(back_r)[1], 'out'))
 at(7000, where, ('mid_out',))
-at(7000, expect, ('back_in_town', 5900))
+at(7000, expect, ('back_in_town', EXT['map']))
 at(4000, look, ('town_after_exit',))
 at(500, done)

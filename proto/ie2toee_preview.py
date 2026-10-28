@@ -23,10 +23,16 @@ AREA, MAP_ID, GROUND_ID, START = 'AR1000', 5900, 900, (482, 424)
 MODULE = 'IWD'          # Temple+ module: modules\IWD.dat (link to your ToEE.dat) + modules\IWD (maps, art, rules, mes) +
                         # modules\IWD_core (dlg, scr, quest texts); chosen in TemplePlusConfig (defaultModule=IWD)
 QUEST_BASE = 1          # IE journal entries -> ToEE quests 1.. (vanilla quests are not kept in the IWD module)
-SCRIPT_BASE = 1100      # town actors 1100.., interior n: 1120+10n.. (<= 1269)
+SCRIPT_BASE = 1100      # town actors 1100.., interior n: 1120+10n.. (n <= 14: <= 1269); side rooms n >= 15: 1300+10(n-15)..
 GENERIC_BASE = 1280    # interior n's baked-object script (the town's is 1099)
-# Easthaven's 14 building interiors: map ids 5901.., ground ids 901.. (map, doors, baked actors + containers)
-INTERIORS = ['AR10%02d' % i for i in range(1, 15)]
+# Easthaven's 14 building interiors + 2 side rooms (AR1015 off AR1006, AR1016 off AR1007): map ids 5901..5916,
+# ground ids 901..916 (map, doors, baked actors + containers)
+INTERIORS = ['AR10%02d' % i for i in range(1, 17)]
+
+
+def script_base(i):
+    """interior n's actor script ids (clear of the baked-object scripts GENERIC_BASE + n = 1281..)"""
+    return SCRIPT_BASE + 20 + 10 * i if i <= 14 else 1300 + 10 * (i - 15)
 RUNTIME = ['ie_runtime', 'ie_critters', 'ie_spellrt', 'ie_combat', 'ie_doors', 'ie_bakert', 'ie_itemrt', 'ie_travel']
 
 
@@ -115,7 +121,7 @@ def main():
     for ar, mid in sorted(interiors.items()):
         i = mid - MAP_ID; d = os.path.join(w, 'cre_' + ar.lower())
         if run_soft('creatures %s' % ar, ['ie_creatures.py', 'convert', ie, toee, d, '--area', ar,
-                                         '--script-base', str(SCRIPT_BASE + 20 + 10 * i),
+                                         '--script-base', str(script_base(i)),
                                          '--name-base', str(27000 + 20 * i + 80)] + tpa):
             icre[ar] = d
             actors += open(os.path.join(d, 'dialogue_actors.txt')).read().split()

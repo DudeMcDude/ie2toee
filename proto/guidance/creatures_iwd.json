@@ -609,9 +609,9 @@
     "0xe230"
    ],
    "model": null,
-   "proto": null,
-   "status": "missing",
-   "notes": "free-model candidate (vermin)"
+   "proto": 14089,
+   "status": "stand-in",
+   "notes": "giant tick body (Easthaven AR1015 beetles); free-model candidate (vermin)"
   },
   {
    "id": "spider",

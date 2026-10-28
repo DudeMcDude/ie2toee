@@ -9,7 +9,8 @@ and jumps to a `jumppoint.tab` row), so the preview turns every travel region in
 |---|---|---|---|
 | AR1000 | Easthaven town (baked: NPCs, items, doors) | 5900 | 900 |
 | AR1001-AR1014 | the 14 building interiors (map + doors only) | 5901-5914 | 901-914 |
-| AR1200 (road), AR1015, AR1016 (interior side doors) | not converted | - | - |
+| AR1015 (off AR1006), AR1016 (off AR1007) | side rooms (map, exits, actors, containers) | 5915-5916 | 915-916 |
+| AR1200 (road) | not converted | - | - |
 
 `ie2toee_preview.py` converts the interiors after the town, with `ie2toee.py` per interior (map id = 5900 + n, ground
 id = 900 + n; the night ground id is +1000 as for the town). An interior that fails is skipped with a message and its
