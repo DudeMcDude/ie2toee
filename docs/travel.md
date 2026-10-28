@@ -10,7 +10,8 @@ and jumps to a `jumppoint.tab` row), so the preview turns every travel region in
 | AR1000 | Easthaven town (baked: NPCs, items, doors) | 5900 | 900 |
 | AR1001-AR1014 | the 14 building interiors (map + doors only) | 5901-5914 | 901-914 |
 | AR1015 (off AR1006), AR1016 (off AR1007) | side rooms (map, exits, actors, containers) | 5915-5916 | 915-916 |
-| AR1200 (road) | not converted | - | - |
+| AR1200 (hill road off the town's map edge; exits To1000, To1201) | road (map, exits, actors) | 5917 | 917 |
+| AR1201 (Orc Cave, dead end) | cave (map, exit, actors, 3 containers) | 5918 | 918 |
 
 `ie2toee_preview.py` converts the interiors after the town, with `ie2toee.py` per interior (map id = 5900 + n, ground
 id = 900 + n; the night ground id is +1000 as for the town). An interior that fails is skipped with a message and its
@@ -26,6 +27,7 @@ each interior's `ie_doors_<area>.py` is copied next to the town's.
   entrances (arrival tile + orientation) and the travel regions (polygon in ToEE tile coordinates, destination area
   and entrance). Exits whose destination area or entrance is not converted are listed and get `dest_map: 0`.
   Easthaven: 15 areas, 31 travel regions, 3 unusable (AR1000 -> AR1200, AR1006 -> AR1015, AR1007 -> AR1016).
+  With AR1015/AR1016/AR1200/AR1201 converted: 19 areas, 36 travel regions, none unusable.
 * **Anchors.** The party often cannot stand on or next to a region's outline: IE regions lie on door frames and the
   IE search map is coarser than ToEE pathing (a ToEE critter also stands on 1/3-tile slots, up to ~0.8 tile off a
   tile centre). `ie2toee.region_anchors` therefore gives every travel region an `anchor` tile: the fully walkable tile,
@@ -72,7 +74,11 @@ each interior's `ie_doors_<area>.py` is copied next to the town's.
 
 ## Not done / judgment calls
 * Interiors: actors, containers and stores are baked (ie2toee_preview.py, verified with proto/ingame_interior_probe.py: talk / container / shop). Still missing: area scripts, journal, info regions, ambient sound.
-* The road exit (AR1200) and AR1015/AR1016 have no icon. Converting AR1200 would make a first outdoor area.
+* AR1200/AR1201 (converted; AR1000 To1200 anchor (457,552), arrival FR1200 (462,548)). Known chokepoint, not widened:
+  AR1200 To1201 icon (481,459) sits at the end of a 1-tile corridor (u=481, v=459-462, clearance 21-28) that a
+  strict (PC-radius) path does not fit; the reachable end is (481,463). Fix options: move the anchor to (481,463) or
+  widen those 4 tiles by hand. AR1201 Chest1 (489,435) and Chest2 (506,500) have no strictly reachable tile within 6
+  tiles from FR1200 (Crate1 is reachable). AR1201 orcs are hostile and start combat on arrival.
 * IE entrances have no facing in ToEE: the party arrives at the tile with default facing (`orient` is kept in the data).
 * The icon is the stock ToEE map-change icon (same look for doors and map edges).
 

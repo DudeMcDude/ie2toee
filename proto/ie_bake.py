@@ -253,7 +253,7 @@ class Baker(object):
             if box is not None:
                 o.set('npc_substitute_inventory', box.id)
         self.mobs.append(o)
-        keep = ('ident', 'resref', 'hp', 'conditions', 'spells', 'ai_strategy', 'to_hit_bonus')
+        keep = ('ident', 'resref', 'hp', 'conditions', 'spells', 'ai_strategy', 'to_hit_bonus', 'difficulty')
         self.runtime[T.guid_name(o.id)] = {'k': 'npc', 'spec': {k: s[k] for k in keep if s.get(k) not in (None, [], '')}}
         self.report['npcs'] += 1
         return o

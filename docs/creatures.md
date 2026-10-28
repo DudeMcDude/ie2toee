@@ -230,3 +230,25 @@ or are class-based; only about 10–13 % need new art. The report itself stays l
 Not handled yet. V2.2 is a different header: 3e-style stats, per-class levels, skills and feats bitfields, and
 spell tables per class and level. It is in some ways *easier*, since it is already 3e. `iecre.Cre` raises
 `NotImplementedError` for it. Add a separate `Cre22` reader when IWD2 support starts.
+
+## Difficulty gating (IWD:EE)
+The ARE actor difficulty byte (0x2F) is unused in IWDEE (it is 0 everywhere; it is IWD2 only). IWDEE gates actors with
+tiny scripts in the actor's script slots that destroy the actor below/at a level (DIFFLEV.IDS: 1 easiest, 2 easy,
+3 normal, 4 hard, 5 hardest):
+
+| script | trigger (+ DestroySelf) | actor exists at |
+|---|---|---|
+| EFDELEAS | Difficulty(1) | 2-5 |
+| EFDELNOR | DifficultyLT(3) | 3-5 |
+| EFDELHRD | DifficultyLT(4) | 4-5 |
+| EFDELINS | DifficultyLT(5) | 5 |
+| EFDELDEF | DifficultyLT(4) + a SPRITE_IS_DEADGEM check | 4-5 |
+
+`Converter.difficulty_gate()` (ie_creatures.py) reads every BCS block of the ARE actor scripts and the CRE scripts
+that ends in DestroySelf and has Difficulty/DifficultyLT/DifficultyGT triggers (negation handled) and stores
+`spec['difficulty'] = {'levels': [allowed levels], 'script': <resref>, 'cond': <trigger text>}` (absent = all levels).
+It is kept in `ie_creatures_<area>.py`, `<AREA>_creatures.json` and the runtime `OBJS[guid]['spec']['difficulty']`
+(ie_bake_<area>.py). The runtime does not yet filter: those triggers are unsupported and evaluate False, so every
+actor spawns (= hardest). Heart of Fury is a game mode (stat boost), not an actor gate.
+AR1201 (Orc Cave): 8 of 45 actors gated (classic IWD has the other 37): EFDELHRD (4-5): Ogre 2, an Orc Elite
+(ORCEWBOW), Orc Archer 10; EFDELINS (5): Ogre 3, Ogre 4, 3 Orc Elites (ORCEWBOW). AR1200: none.

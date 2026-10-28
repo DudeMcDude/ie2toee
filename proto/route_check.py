@@ -26,9 +26,20 @@ def plen(crit, f, t, fl):
         return '%d/%.1fft' % (r, ln)
     except Exception, e:
         return 'ERR %r' % (e,)
+CLEAR = os.environ.get('ROUTECHECK_CLEAR') == '1'   # hide every non-party critter (hostile maps: the orcs would take the turn)
+def clear(_):
+    n = 0
+    for x in range(300, 700, 20):
+        for y in range(300, 700, 20):
+            for o in game.obj_list_vicinity(location_from_axis(x, y), OLC_CRITTERS):
+                if o not in game.party and not (o.object_flags_get() & OF_OFF):
+                    o.object_flag_set(OF_OFF); n += 1
+    log('RC cleared %d critters' % n)
 def start(_):
     f = PAIRS[0][1]
     game.fade_and_teleport(0, 0, 0, MAP, f[0], f[1])
+    if CLEAR:
+        game.timeevent_add(clear, (0,), 4000, 1)
     game.timeevent_add(combat, (0,), 6000, 1)
 def combat(_):
     log('KEY c')

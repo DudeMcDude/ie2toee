@@ -28,11 +28,19 @@ GENERIC_BASE = 1280    # interior n's baked-object script (the town's is 1099)
 # Easthaven's 14 building interiors + 2 side rooms (AR1015 off AR1006, AR1016 off AR1007): map ids 5901..5916,
 # ground ids 901..916 (map, doors, baked actors + containers)
 INTERIORS = ['AR10%02d' % i for i in range(1, 17)]
+# the Orc Cave chain off AR1000's south-east road exit (To1200): AR1200 hill road, AR1201 Orc Cave (map ids 5917/5918,
+# ground ids 917/918); converted like the interiors (map, exits, actors, containers)
+INTERIORS += ['AR1200', 'AR1201']
 
 
 def script_base(i):
     """interior n's actor script ids (clear of the baked-object scripts GENERIC_BASE + n = 1281..)"""
-    return SCRIPT_BASE + 20 + 10 * i if i <= 14 else 1300 + 10 * (i - 15)
+    return SCRIPT_BASE + 20 + 10 * i if i <= 14 else 1300 + 10 * (i - 15) if i <= 17 else 1330 + 50 * (i - 18)
+
+
+def name_base(i):
+    """interior n's creature name ids (description .mes): 20 per area, 60 for the cave (AR1201, 45 actors)"""
+    return 27000 + 20 * i + 80 if i <= 18 else 27000 + 20 * 18 + 80 + 60 * (i - 18)
 RUNTIME = ['ie_runtime', 'ie_critters', 'ie_spellrt', 'ie_combat', 'ie_doors', 'ie_bakert', 'ie_itemrt', 'ie_travel']
 
 
@@ -122,7 +130,7 @@ def main():
         i = mid - MAP_ID; d = os.path.join(w, 'cre_' + ar.lower())
         if run_soft('creatures %s' % ar, ['ie_creatures.py', 'convert', ie, toee, d, '--area', ar,
                                          '--script-base', str(script_base(i)),
-                                         '--name-base', str(27000 + 20 * i + 80)] + tpa):
+                                         '--name-base', str(name_base(i))] + tpa):
             icre[ar] = d
             actors += open(os.path.join(d, 'dialogue_actors.txt')).read().split()
     run('dialogue', ['ie_dialogue.py', ie, os.path.join(cre, 'dialogue'), '--quest-base', str(QUEST_BASE)] + actors +
