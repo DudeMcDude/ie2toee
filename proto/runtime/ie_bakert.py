@@ -71,6 +71,7 @@ def finalize_critter(o, d, F):
             o.d20_status_init()
         except Exception:
             pass
+        ie_critters.apply_3e(o, s)
         ie_critters.fix_hp(o, s)
         o.obj_set_int(mark, STAMP)
     return first

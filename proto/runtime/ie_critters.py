@@ -7,6 +7,11 @@ import toee
 from utilities import location_from_axis
 import math
 
+def _const(n):   # feat_* / skill_* constant: toee module, else Temple+'s constants module
+    if n in globals(): return globals()[n]
+    from templeplus import constants
+    return getattr(constants, n)
+
 LOG = [None]
 
 def _log(s):
@@ -91,6 +96,8 @@ def apply(o, s):
         _set(o, 'obj_f_critter_gender', 0 if s['gender'] == 'female' else 1)
     if s.get('scale') and int(s['scale']) != 100:
         _set(o, 'obj_f_model_scale', int(s['scale']))
+    if s.get('mesh'):   # a mesh other than the proto's (e.g. IWD2 kegs: barrel mesh on a critter)
+        o.obj_set_int(37, int(s['mesh'])); o.obj_set_int(38, int(s['mesh']))   # obj_f_base_mesh, obj_f_base_anim
     if s.get('hostility') == 'hostile':
         o.npc_flag_set(ONF_KOS)
     else:
@@ -130,6 +137,7 @@ def apply(o, s):
         o.d20_status_init()
     except Exception:
         pass
+    apply_3e(o, s)
     fix_hp(o, s)
     if s.get('spells'):
         try:
@@ -167,6 +175,20 @@ def fix_hp(o, s):
                 break
             o.obj_set_int(f, max(1, o.obj_get_int(f) + d))
         _set(o, 'obj_f_hp_damage', 0)
+
+def apply_3e(o, s):
+    """IWD2 (iwd2_rules): feats and skill ranks as Temple+ constants."""
+    for f in s.get('feats') or ():
+        try:
+            o.feat_add(_const(f))
+        except Exception, e:
+            _log('  feat %s failed: %s' % (f, e))
+    for k, n in (s.get('skills') or {}).items():
+        try:
+            o.skill_ranks_set(_const(k), n)
+        except Exception, e:
+            _log('  skill %s failed: %s' % (k, e))
+
 
 def spawn(s, loc, script_id=None, rotation=None):
     o = game.obj_create(int(s['proto']), loc)

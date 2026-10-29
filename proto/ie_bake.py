@@ -225,6 +225,8 @@ class Baker(object):
             o.set('critter_gender', 0 if s['gender'] == 'female' else 1)
         if s.get('scale') and int(s['scale']) != 100:
             o.set('model_scale', int(s['scale']))
+        if s.get('mesh'):     # stand-in mesh (e.g. a barrel keg) instead of the proto's model
+            o.set('base_mesh', int(s['mesh'])).set('base_anim', int(s['mesh']))
         if s.get('portrait'):
             o.set('critter_portrait', int(s['portrait']))
         if s.get('name_id'):
@@ -253,7 +255,7 @@ class Baker(object):
             if box is not None:
                 o.set('npc_substitute_inventory', box.id)
         self.mobs.append(o)
-        keep = ('ident', 'resref', 'hp', 'conditions', 'spells', 'ai_strategy', 'to_hit_bonus', 'difficulty')
+        keep = ('ident', 'resref', 'hp', 'conditions', 'spells', 'ai_strategy', 'to_hit_bonus', 'difficulty', 'feats', 'skills')
         self.runtime[T.guid_name(o.id)] = {'k': 'npc', 'spec': {k: s[k] for k in keep if s.get(k) not in (None, [], '')}}
         self.report['npcs'] += 1
         return o
