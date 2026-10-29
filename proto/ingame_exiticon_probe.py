@@ -15,6 +15,15 @@ CLEAR = os.environ.get('IE2TOEE_CLEAR') == '1'
 TOL = int(os.environ.get('IE2TOEE_TOL', '3'))   # arrival tolerance (tiles); ie_exiticons may move a cramped jump point
 PARENT = os.environ.get('IE2TOEE_PARENT', 'AR1000')   # default parent area (e.g. I2AR1000 with a map name prefix)   # hide the area's non-party critters (hostile maps would start combat)
 
+JUMPS = {}   # IE2TOEE_JUMPS=<jumppoint.tab>: start/arrival tiles from the jump points (ie_exiticons may move them)
+if os.environ.get('IE2TOEE_JUMPS'):
+    for ln in open(os.environ['IE2TOEE_JUMPS']):
+        f = ln.strip().split('\t')
+        if len(f) == 5 and f[0] != '0': JUMPS[f[1]] = (int(f[3]), int(f[4]))
+
+def jump_tile(area, r, default):
+    return JUMPS.get('%s-%s-to-%s' % (area, r['name'], r['dest_area']), default)
+
 def clear():
     n = 0
     for x in range(300, 700, 20):
@@ -49,7 +58,7 @@ def look(tag, dest_area):
         log('%s: map %d leader %s, %d exit icons near: %s' % (tag, game.leader.map, location_to_axis(game.leader.location), len(ic),
             [(location_to_axis(o.location), o.obj_get_int(obj_f_scenery_teleport_to)) for o in ic]))
         r = region(D.BY_MAP[game.leader.map], dest_area)
-        u, v = D.AREAS[dest_area]['entrances'][r['dest_entrance']][:2]
+        u, v = jump_tile(D.BY_MAP[game.leader.map], r, D.AREAS[dest_area]['entrances'][r['dest_entrance']][:2])
         st['want'] = (D.AREAS[dest_area]['map'], (u, v))
         # the icon of this region sits on its anchor tile (else near the polygon centre)
         px = sum(p[0] for p in r['poly']) / len(r['poly']); py = sum(p[1] for p in r['poly']) / len(r['poly'])
@@ -117,7 +126,7 @@ else:
     for b in BLD:
         b, P = (b.split(':') + [PARENT])[:2]
         r = region(b, P)                         # the interior's way out lands on this entrance of its parent area
-        u, v = D.AREAS[P]['entrances'][r['dest_entrance']][:2]
+        u, v = jump_tile(b, r, D.AREAS[P]['entrances'][r['dest_entrance']][:2])
         at(1000, lambda u=u, v=v, m=D.AREAS[P]['map']: (game.fade_and_teleport(0, 0, 0, m, u, v), 0)[1])
         if CLEAR: at(1500, clear); at(2000, clear)
         at(4500 if CLEAR else 6000, look, ('town->' + b, b)); at(4000, shot, ('exit-icon-town-to-' + b,)); at(1500, press, ('',)); at(12000, check, ('enter ' + b + ' via icon',)); at(15000, check, ('enter ' + b + ' (after fallback)', 0))
