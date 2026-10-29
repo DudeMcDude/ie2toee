@@ -107,7 +107,7 @@ class Itm(object):
         fb_off, eq_idx, eq_n = u('<IHH', 0x6a)
         self.abilities = []
         for i in range(eh_n):
-            o = eh_off + i * (0x38 + (0x10 if s else 0))
+            o = eh_off + i * 0x38   # V2.0 abilities are V1-sized (only the header grew)
             if o + 0x38 > len(data):
                 break
             self.abilities.append(Ability(data, o, fb_off))
