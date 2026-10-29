@@ -14,7 +14,7 @@ FEATS = {
     'EXTRA_RAGE': None, 'EXTRA_SHAPESHIFTING': None, 'EXTRA_SMITING': None, 'EXTRA_TURNING': 'feat_extra_turning',
     'FIENDSLAYER': None, 'FORESTER': None, 'GREAT_FORTITUDE': 'feat_great_fortitude', 'HAMSTRING': None,
     'HERETICS_BANE': None, 'HEROIC_INSPIRATION': None,
-    'IMPROVED_CRITICAL': None,   # ToEE's is per weapon: needs the creature's weapon (TODO: pick from the wielded item)
+    'IMPROVED_CRITICAL': 'IMPROVED_CRITICAL_WIELDED',   # per weapon in ToEE: resolved in game from the wielded weapon (ie_critters.apply_3e)
     'IMPROVED_EVASION': 'feat_improved_evasion', 'IMPROVED_INITIATIVE': 'feat_improved_initiative',
     'IMPROVED_TURNING': 'feat_improved_turning', 'IRON_WILL': 'feat_iron_will', 'LIGHTNING_REFLEXES': 'feat_lightning_reflexes',
     'LINGERING_SONG': None, 'LUCK_OF_HEROES': None,
@@ -29,7 +29,7 @@ FEATS = {
     'SPELL_FOCUS_NECROMANCY': 'feat_spell_focus_necromancy', 'SPELL_FOCUS_TRANSMUTE': 'feat_spell_focus_transmutation',
     'SPELL_PENETRATION': 'feat_spell_penetration', 'SPIRIT_OF_FLAME': None, 'STRONG_BACK': None,
     'STUNNING_FIST': 'feat_stunning_fist', 'SUBVOCAL_CASTING': None, 'TOUGHNESS': 'feat_toughness',
-    'TWO_WEAPON_FIGHTING': 'feat_two_weapon_fighting', 'WEAPON_FINESSE': None,   # per weapon in ToEE (TODO as Improved Critical)
+    'TWO_WEAPON_FIGHTING': 'feat_two_weapon_fighting', 'WEAPON_FINESSE': 'feat_weapon_finesse_dagger',   # Temple+'s single (non weapon-specific) Weapon Finesse is stored as this id
     'WILDSHAPE_BOAR': None, 'WILDSHAPE_PANTHER': None, 'WILDSHAPE_SHAMBLER': None,
 }
 # SKILLS.IDS order = CRE V2.2 rank bytes 0x218..0x227

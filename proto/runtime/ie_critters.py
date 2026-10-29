@@ -180,6 +180,12 @@ def apply_3e(o, s):
     """IWD2 (iwd2_rules): feats and skill ranks as Temple+ constants."""
     for f in s.get('feats') or ():
         try:
+            if f == 'IMPROVED_CRITICAL_WIELDED':   # ToEE's Improved Critical is per weapon type: use the wielded one
+                w = o.item_worn_at(3)
+                if w == OBJ_HANDLE_NULL:
+                    _log('  improved critical: no weapon wielded'); continue
+                o.feat_add(_const('feat_improved_critical_gauntlet') + w.obj_get_int(_c('obj_f_weapon_type')))
+                continue
             o.feat_add(_const(f))
         except Exception, e:
             _log('  feat %s failed: %s' % (f, e))
