@@ -12,6 +12,7 @@ import ie_travel_data as D
 BLD = os.environ.get('IE2TOEE_BUILDINGS', 'AR1001,AR1006').split(',')
 COUNT_ONLY = os.environ.get('IE2TOEE_COUNT_ONLY')
 CLEAR = os.environ.get('IE2TOEE_CLEAR') == '1'
+TOL = int(os.environ.get('IE2TOEE_TOL', '3'))   # arrival tolerance (tiles); ie_exiticons may move a cramped jump point
 PARENT = os.environ.get('IE2TOEE_PARENT', 'AR1000')   # default parent area (e.g. I2AR1000 with a map name prefix)   # hide the area's non-party critters (hostile maps would start combat)
 
 def clear():
@@ -19,8 +20,13 @@ def clear():
     for x in range(300, 700, 20):
         for y in range(300, 700, 20):
             for o in game.obj_list_vicinity(location_from_axis(x, y), OLC_CRITTERS):
-                if o not in game.party and not (o.object_flags_get() & OF_OFF):
+                if o in game.party: continue
+                if not (o.object_flags_get() & OF_OFF):
                     o.object_flag_set(OF_OFF); n += 1
+                # hidden critters stay in an already started fight, and in combat the engine ignores exit icons
+                # (the mouse handler returns at once, a use goal never runs): remove them
+                if game.combat_is_active(): o.destroy()
+    if game.combat_is_active(): log('KEY space')   # end the party's turn: combat ends once no enemy is left
     log('cleared %d critters on map %d' % (n, game.leader.map)); return 0
 
 def log(s):
@@ -68,7 +74,8 @@ def check(tag, fallback=1):
     try:
         m, (u, v) = st['want']
         l = game.leader
-        ok = l.map == m and dist(location_to_axis(l.location), (u, v)) <= 3
+        ok = l.map == m and dist(location_to_axis(l.location), (u, v)) <= TOL
+        if not ok: log('%s: combat active %s' % (tag, game.combat_is_active()))
         if not ok and fallback and st.get('icon'):
             log('%s: click did not travel (map %d), scripted use of the icon' % (tag, l.map))
             l.anim_goal_use_object(st['icon']); st['used'] = st.get('used', 0) + 1
@@ -112,10 +119,10 @@ else:
         r = region(b, P)                         # the interior's way out lands on this entrance of its parent area
         u, v = D.AREAS[P]['entrances'][r['dest_entrance']][:2]
         at(1000, lambda u=u, v=v, m=D.AREAS[P]['map']: (game.fade_and_teleport(0, 0, 0, m, u, v), 0)[1])
-        if CLEAR: at(1500, clear)
+        if CLEAR: at(1500, clear); at(2000, clear)
         at(4500 if CLEAR else 6000, look, ('town->' + b, b)); at(4000, shot, ('exit-icon-town-to-' + b,)); at(1500, press, ('',)); at(12000, check, ('enter ' + b + ' via icon',)); at(15000, check, ('enter ' + b + ' (after fallback)', 0))
         at(1500, count, (b,))
-        if CLEAR: at(500, clear)
+        if CLEAR: at(500, clear); at(2000, clear)
         at(500, look, (b + '->town', P)); at(4000, shot, ('exit-icon-' + b + '-to-town',)); at(1500, press, ('',)); at(12000, check, ('exit ' + b + ' via icon',)); at(15000, check, ('exit ' + b + ' (after fallback)', 0))
     at(1500, count, ('town',))
     at(500, save)

@@ -15,15 +15,51 @@ these rows (the IWD module needs none of vanilla's).
 
   ie_exiticons.py --travel <w>/ie_travel_data.py --maps <bake>/modules/ToEE/maps --jumppoints <M>/rules/jumppoint.tab
 """
-import argparse, os, runpy, sys
+import argparse, glob, os, runpy, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import toeemob as T
+import ie_pathnodes as P
+from toee_sectors import load_map_subtiles
 
 JP_BASE = 2000
 ICON_PROTO = 2011
 # from a vanilla exit icon (Hommlet exterior): flags, radius, render height; the engine also sets them for a fresh one
 ICON_FLAGS = -1874852816
 ICON_RADIUS, ICON_HEIGHT = 34.32571029663086, 56.51353454589844
+USE_REACH = 2   # tiles: the use goal walks the party to within ~2 tiles of the icon (GoalSetRadiusTo2); a party
+                # member (radius 25) must fit on some tile that close, else Temple+ finds no path and a click on the
+                # icon does nothing (I2AR1000 -> AR1004: the icon sat in a niche between a wall and the door frame)
+
+
+def use_room(K, u, v, reach=USE_REACH):
+    """tiles within `reach` of (u, v) where a radius-25 mover fits (the engine's exact-point check)"""
+    return [(u + du, v + dv) for du in range(-reach, reach + 1) for dv in range(-reach, reach + 1)
+            if P.walk_tile(K, u + du, v + dv) and P.fits(K, u + du, v + dv)]
+
+
+def roomy_icon(K, u, v, reach=5):
+    """(u, v) if the party can stand within use range of it, else the nearest tile, walking along walkable tiles from
+    (u, v) for at most `reach` steps, that has such room: IE doorways can be narrower than a ToEE party member
+    (I2AR1000 To1004: a one-tile diagonal ramp), so the icon moves back along it to where the party can stand,
+    staying on the door's approach; (u, v) if there is none (needs a hand fix: anchor_fix or widening)"""
+    return (u, v) if use_room(K, u, v) else walk_to_room(K, u, v, lambda q: use_room(K, *q), reach)
+
+
+def walk_to_room(K, u, v, good, reach=5):
+    """the tile nearest (u, v) among the first walkable tiles reached from it (<= reach steps) that are `good`"""
+    seen = {(u, v)}; ring = [(u, v)]
+    for _ in range(reach):
+        nxt = []
+        for a, b in ring:
+            for du in (-1, 0, 1):
+                for dv in (-1, 0, 1):
+                    q = (a + du, b + dv)
+                    if q not in seen and P.walk_tile(K, *q):
+                        seen.add(q); nxt.append(q)
+        ok = [q for q in nxt if good(q)]
+        if ok: return min(ok, key=lambda q: (q[0] - u) ** 2 + (q[1] - v) ** 2)
+        ring = nxt
+    return u, v
 
 
 def inside(x, y, poly):
@@ -82,8 +118,21 @@ def main():
     areas = runpy.run_path(a.travel)['AREAS']
     icons, rows, skipped = build(areas)
     placed = 0
+    for area in sorted(icons):   # re-runnable: drop the icons an earlier run put into this area's sectors
+        for p in glob.glob(os.path.join(a.maps, area, '*.sec')):
+            sec = T.Sector.read(open(p, 'rb').read()); n0 = len(sec.objects)
+            sec.objects = [ob for ob in sec.objects if not (ob.proto_num == ICON_PROTO and ob.get('scenery_teleport_to'))]
+            if len(sec.objects) != n0: open(p, 'wb').write(sec.write())
     for area, lst in sorted(icons.items()):
+        K = load_map_subtiles(os.path.join(a.maps, area))[0] if os.path.isdir(os.path.join(a.maps, area)) else None
         for u, v, jp in lst:
+            if K is not None:
+                nu, nv = roomy_icon(K, u, v)
+                if (nu, nv) != (u, v):
+                    print('  icon %d (%s): no room to use it at %d,%d -> moved to %d,%d' % (jp, area, u, v, nu, nv))
+                    u, v = nu, nv
+                elif not use_room(K, u, v):
+                    print('  icon %d (%s) at %d,%d: no room to use it within 2 tiles (fix by hand)' % (jp, area, u, v))
             p = os.path.join(a.maps, area, '%d.sec' % T.sector_of(u, v))
             if not os.path.exists(p):
                 skipped.append('%s icon at %d,%d: sector file missing' % (area, u, v)); continue
@@ -99,6 +148,18 @@ def main():
             b = sec.write(); assert T.Sector.read(b).write() == b
             open(p, 'wb').write(b)
             placed += 1
+    # arrivals: a party member must fit on the jump point, else the engine drops the party on some free tile nearby,
+    # possibly across a wall (I2AR1004 -> town landed on the far side of the ramp to the door): walk back to room
+    by_map = {areas[x]['map']: x for x in areas}
+    for k, (jp, name, m, u, v) in enumerate(rows):
+        d = os.path.join(a.maps, by_map.get(m, ''))
+        if by_map.get(m) and os.path.isdir(d):
+            K = load_map_subtiles(d)[0]
+            if not P.fits(K, u, v):
+                nu, nv = walk_to_room(K, u, v, lambda q: P.fits(K, *q))
+                if (nu, nv) != (u, v):
+                    print('  jump point %d: no room at %d,%d -> %d,%d' % (jp, u, v, nu, nv))
+                    rows[k] = (jp, name, m, nu, nv)
     os.makedirs(os.path.dirname(a.jumppoints), exist_ok=True)
     with open(a.jumppoints, 'w', newline='\r\n') as f:
         f.write('0\tDO NOT USE\t0\t0\t0\n')
