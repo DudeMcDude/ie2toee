@@ -11,7 +11,8 @@ LOG = os.environ.get('IE2TOEE_PROBE_LOG', 'ie2toee_probe.log')
 import ie_travel_data as D
 BLD = os.environ.get('IE2TOEE_BUILDINGS', 'AR1001,AR1006').split(',')
 COUNT_ONLY = os.environ.get('IE2TOEE_COUNT_ONLY')
-CLEAR = os.environ.get('IE2TOEE_CLEAR') == '1'   # hide the area's non-party critters (hostile maps would start combat)
+CLEAR = os.environ.get('IE2TOEE_CLEAR') == '1'
+PARENT = os.environ.get('IE2TOEE_PARENT', 'AR1000')   # default parent area (e.g. I2AR1000 with a map name prefix)   # hide the area's non-party critters (hostile maps would start combat)
 
 def clear():
     n = 0
@@ -101,13 +102,13 @@ except Exception, e:
     log('travel start: %s' % e)
 if COUNT_ONLY:
     at(5000, count, ('after load',))
-    b = BLD[0]; r = region(b, 'AR1000'); u, v = D.AREAS['AR1000']['entrances'][r['dest_entrance']][:2]
-    at(500, lambda: (game.fade_and_teleport(0, 0, 0, 5900, u, v), 0)[1])
+    b = BLD[0]; r = region(b, PARENT); u, v = D.AREAS[PARENT]['entrances'][r['dest_entrance']][:2]
+    at(500, lambda: (game.fade_and_teleport(0, 0, 0, D.AREAS[PARENT]['map'], u, v), 0)[1])
     at(5000, count, ('town again',))
     at(500, done)
 else:
     for b in BLD:
-        b, P = (b.split(':') + ['AR1000'])[:2]
+        b, P = (b.split(':') + [PARENT])[:2]
         r = region(b, P)                         # the interior's way out lands on this entrance of its parent area
         u, v = D.AREAS[P]['entrances'][r['dest_entrance']][:2]
         at(1000, lambda u=u, v=v, m=D.AREAS[P]['map']: (game.fade_and_teleport(0, 0, 0, m, u, v), 0)[1])

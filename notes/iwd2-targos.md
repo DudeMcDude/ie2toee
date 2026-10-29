@@ -19,3 +19,9 @@
 - In game (separate overlay ~/games/ToEE-iwd2 + prefix ~/.wine-toee-iwd2, dist-inforeg, save slot0101): pathnode
   bake OK (25 clearance sectors), creatures baked, party walks; goblin attack starts combat at the docks.
 - Exit icons: none placed yet: every AR1000 exit leads to an unconverted area (AR1001-1006, AR1100).
+
+## Session 3 (2026-10-29): Targos interiors + AR1100
+Maps 5951-5956 = I2AR1001-1006, 5957 = I2AR1100 (outdoor). Bake outputs named by map_dir; exiticon probe takes IE2TOEE_PARENT.
+In-game (dist-iedlg/inforeg, slot0101): real-click round trip PASS for AR1006 and AR1100; AR1005 enter PASS (click), exit FAIL;
+AR1001/1003 travel only via scripted icon use (AR1003 both ways PASS, AR1001 back FAIL: combat on arrival); AR1002 exit FAIL; AR1004 enter FAIL.
+Open: click misses on some icons, combat-on-arrival blocks exit, kegs/Guthewulf no model, 00ax1h05 unmapped, item icons skipped, door-patch light square not looked at.
