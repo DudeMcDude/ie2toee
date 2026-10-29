@@ -40,3 +40,10 @@ Probe: destroys critters + ends the turn (space) when a fight is running; IE2TOE
 IWD AR1200 To1201 (2034): offline the icon (481,463) has room (6 tiles) and its arrival fits, so not this cause;
 in-game test still to do.
 The in-game re-test after the fix could not run: wine is no longer installed on the box (wine: command not found).
+
+## Oct 29: probe uses the "kos" cheat instead of destroying critters
+`cheats.kos = 0` (vanilla console cheat, Python `cheats` object in __main__) sets the AI "NPCs may fight" global
+0x102BD4E0 to 0 -> ai.cpp forces every NPC fight status to none. Run: all I2AR1001-1006 + I2AR1100 both ways PASS by real
+click except I2AR1004 (critters left visible: a Targos NPC stands between the party's start tile and the cramped
+AR1004 door icon 2003, so neither the click nor scripted use reaches it). With IE2TOEE_HIDE=1 (hide, no destroy)
+AR1004 passes both ways by real click. Worth a look: a townsfolk NPC can block that cramped door in normal play.

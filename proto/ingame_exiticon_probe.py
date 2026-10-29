@@ -1,6 +1,6 @@
 # In-game test of the exit icons (Temple+ Python 2.7), run via run_ingame.sh (docs/travel.md, "Exit icons"):
 #   TP_AUTOEXEC="import sys; sys.path[:0]=[<proto>, <proto>/runtime, <out>]; import ingame_exiticon_probe"
-# Env: IE2TOEE_CLEAR=1 (hide non-party critters), IE2TOEE_BUILDINGS=AR1001,AR1006 (interiors to visit; AR1015:AR1006 = a side room and its parent area, default AR1000), IE2TOEE_SAVE=<slot name> (save at the end), IE2TOEE_COUNT_ONLY=1 (after an autoload: only count icons).
+# Env: IE2TOEE_CLEAR=1 (no fights: cheats.kos = 0; IE2TOEE_HIDE=1 also hides non-party critters), IE2TOEE_BUILDINGS=AR1001,AR1006 (interiors to visit; AR1015:AR1006 = a side room and its parent area, default AR1000), IE2TOEE_SAVE=<slot name> (save at the end), IE2TOEE_COUNT_ONLY=1 (after an autoload: only count icons).
 # For each building: start on the town tile in front of it, centre the view on the town's exit icon into it, click it
 # (real mouse click; a scripted use is the fallback), check the party arrived in the interior at the entrance, then
 # the same with the interior's exit icon back to town. Lines "RESULT ..." + "SHOT <name>" go to the log.
@@ -11,7 +11,8 @@ LOG = os.environ.get('IE2TOEE_PROBE_LOG', 'ie2toee_probe.log')
 import ie_travel_data as D
 BLD = os.environ.get('IE2TOEE_BUILDINGS', 'AR1001,AR1006').split(',')
 COUNT_ONLY = os.environ.get('IE2TOEE_COUNT_ONLY')
-CLEAR = os.environ.get('IE2TOEE_CLEAR') == '1'
+CLEAR = os.environ.get('IE2TOEE_CLEAR') == '1'   # switch fights off (cheats.kos = 0) at each arrival
+HIDE = os.environ.get('IE2TOEE_HIDE') == '1'
 TOL = int(os.environ.get('IE2TOEE_TOL', '3'))   # arrival tolerance (tiles); ie_exiticons may move a cramped jump point
 PARENT = os.environ.get('IE2TOEE_PARENT', 'AR1000')   # default parent area (e.g. I2AR1000 with a map name prefix)   # hide the area's non-party critters (hostile maps would start combat)
 
@@ -24,19 +25,23 @@ if os.environ.get('IE2TOEE_JUMPS'):
 def jump_tile(area, r, default):
     return JUMPS.get('%s-%s-to-%s' % (area, r['name'], r['dest_area']), default)
 
+def no_fights():
+    # vanilla console cheat "kos" (cheats table 0x102B02E8): its setter stores the value in the AI "NPCs may fight"
+    # global 0x102BD4E0; with 0 every NPC's fight status is forced to none (ai.cpp), so nobody attacks or keeps a fight going
+    import __main__; __main__.cheats.kos = 0
+
 def clear():
+    no_fights()
     n = 0
-    for x in range(300, 700, 20):
-        for y in range(300, 700, 20):
-            for o in game.obj_list_vicinity(location_from_axis(x, y), OLC_CRITTERS):
-                if o in game.party: continue
-                if not (o.object_flags_get() & OF_OFF):
+    if HIDE:   # optional: also hide the area's non-party critters (they stay visible by default)
+        for x in range(300, 700, 20):
+            for y in range(300, 700, 20):
+                for o in game.obj_list_vicinity(location_from_axis(x, y), OLC_CRITTERS):
+                    if o in game.party or o.object_flags_get() & OF_OFF: continue
                     o.object_flag_set(OF_OFF); n += 1
-                # hidden critters stay in an already started fight, and in combat the engine ignores exit icons
-                # (the mouse handler returns at once, a use goal never runs): remove them
-                if game.combat_is_active(): o.destroy()
-    if game.combat_is_active(): log('KEY space')   # end the party's turn: combat ends once no enemy is left
-    log('cleared %d critters on map %d' % (n, game.leader.map)); return 0
+    # a fight already running ends once the AI no longer fights: end the party's turn (in combat the engine ignores exit icons)
+    if game.combat_is_active(): log('KEY space')
+    log('kos cheat off, hid %d critters, combat %s on map %d' % (n, game.combat_is_active(), game.leader.map)); return 0
 
 def log(s):
     f = open(LOG, 'a'); f.write(s + '\n'); f.close()
@@ -111,6 +116,7 @@ t = [0]
 def at(dt, fn, args=()):
     t[0] += dt; game.timeevent_add(fn, args, t[0], 1)
 
+if CLEAR: no_fights()
 log('SHOT town_start')
 try:
     import ie_travel; ie_travel.start()
