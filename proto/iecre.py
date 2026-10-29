@@ -185,6 +185,16 @@ class Cre(object):
                             feats=list(u('<3I', 0x1c0)), skills=list(data[0x218:0x228]), xp_category=data[0x25a],
                             enchantment=data[0x1bc])
         self.known_spells, self.memorized, self.spell_slots = [], [], []
+        # spell lists: 7 classes x 9 levels (bard cleric druid paladin ranger sorcerer wizard), then 9 domain levels and
+        # innates; entries are (2DA row index, max, remaining, ?), resolved through listspll/listdomn/listinnt by the caller
+        self.spells_v22 = []
+        lists = [('class', c, lv, 0x3ba + 4 * (c * 9 + lv), 0x4b6 + 4 * (c * 9 + lv)) for c in range(7) for lv in range(9)]
+        lists += [('domain', 1, lv, 0x5b2 + 4 * lv, 0x5d6 + 4 * lv) for lv in range(9)] + [('innate', 0, 0, 0x5fa, 0x5fe)]
+        for kind, c, lv, oo, no in lists:
+            off, cnt = u('<I', oo)[0], u('<I', no)[0]
+            for k in range(cnt if off and off + 16 * cnt <= len(data) else 0):
+                idx, mx, rem, _ = u('<4I', off + 16 * k)
+                self.spells_v22.append((kind, c, lv + 1, idx, mx))
         slot_off, it_off, it_n, ef_off, ef_n = u('<5I', 0x612)
         self.items = [dict(resref=cstr(data[o:o + 8]).lower(), charges=list(u('<3H', o + 0x0a)),
                            flags=u('<I', o + 0x10)[0]) for o in (it_off + i * 20 for i in range(it_n))]

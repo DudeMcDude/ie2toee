@@ -106,6 +106,12 @@ def apply(o, res, qty=None):
         _set(o, 'obj_f_item_inv_aid', e['i'])
     if e.get('w'):
         _set(o, 'obj_f_item_worth', e['w'])
+    if e.get('t'):   # built throwing weapon (e.g. IWD2 throwing axe on the handaxe proto)
+        try:
+            _set(o, 'obj_f_weapon_flags', o.obj_get_int(_field('obj_f_weapon_flags')) | OWF_THROWABLE)
+            _set(o, 'obj_f_weapon_range', e['t'])
+        except Exception, ex:
+            _log('IE_ITEM thrown %s: %s' % (res, ex))
     q = qty or e.get('q')
     if q:
         if o.type == obj_t_ammo:

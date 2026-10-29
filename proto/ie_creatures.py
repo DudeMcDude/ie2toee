@@ -399,6 +399,8 @@ class Converter(object):
                     'class': cls_name, 'race': race_name, 'str': '%d/%02d' % (cre.str, cre.str_bonus) if cre.str_bonus else cre.str,
                     'saves': cre.saves if r3 is None else [r3['fort'], r3['ref'], r3['will']], 'bab': None if r3 is None else r3['bab'], 'xp': cre.xp_value, 'morale': cre.morale, 'morale_break': cre.morale_break,
                     'resist': res, 'mr': mr}}
+        if r3 is not None and getattr(cre, 'spells_v22', None):   # IWD2: 2DA-index spell lists -> resrefs
+            self.v22_spells(cre)
         if r3 is not None:   # IWD2: feats + skill ranks -> Temple+ (iwd2_rules), unmapped ones listed in the notes
             import iwd2_rules
             if not hasattr(self, '_feat_names'):
@@ -614,6 +616,8 @@ class Converter(object):
         # ---- spells: IE memorised / known spells -> Temple+ spell lists (ie_spells.SpellMapper, docs/spells.md)
         sp, miss, strat = self.npc_spells(cre, spec)
         spec['spells'] = sp; spec['spells_unmatched'] = miss
+        if miss:
+            notes.append('spells with no ToEE equivalent (left out): %s' % ', '.join(str(m[0]) for m in miss))
         if strat:
             spec['ai_strategy'] = strat
         ok = lambda r: r and r.strip() and r.strip().lower() != 'none'
@@ -650,6 +654,30 @@ class Converter(object):
             self._spells = ie_spells.SpellMapper(self.game, tp, {k: v for k, v in self.opt.items()
                                                                  if k in ie_spells.SPELL_OPTIONS})
         return self._spells
+
+    V22_LISTS = {'class': 'listspll', 'domain': 'listdomn', 'innate': 'listinnt'}
+
+    def v22_spells(self, cre):
+        """CRE V2.2 spell entries -> cre.memorized ({resref, level, type, memorized}) for npc_spells."""
+        if not hasattr(self, '_v22_tabs'):
+            self._v22_tabs = {}
+            for k, n in self.V22_LISTS.items():
+                rows = {}
+                try:
+                    for l in self.game.read(n, '2da').decode('latin-1').splitlines()[3:]:
+                        f = l.split()
+                        if len(f) >= 2 and f[0].isdigit():
+                            rows[int(f[0])] = f[-1].lower()
+                except Exception:
+                    pass
+                self._v22_tabs[k] = rows
+        for kind, c, lvl, idx, n in cre.spells_v22:
+            ref = self._v22_tabs[kind].get(idx)
+            if not ref:
+                continue
+            typ = 'innate' if kind == 'innate' else 'wizard' if c in (0, 5, 6) and kind == 'class' else 'priest'
+            for _ in range(max(1, n)):
+                cre.memorized.append(dict(resref=ref, level=lvl, type=typ, memorized=n > 0))
 
     def npc_spells(self, cre, spec):
         """IE spell lists -> [{res, toee, cls (Temple+ class key or 'domain_special'), lvl, n, mem}] plus unmatched
@@ -740,6 +768,8 @@ PORTRAITS = {
     'churin': 6610, 'barkeep': 7620,
 }
 PORTRAIT_TODO = ('damien', 'eboy1', 'eboy2', 'egirl1', 'egirl2', 'squirel')
+ORC_PORTRAITS = (6470, 6480)   # ToEE's half-orc NPCs Pintark (14207) and Tuelk (14206)
+ORC_FAMILIES = ('orc', 'orog')
 TOWNSMEN = (7830, 6620, 6700, 7660)
 TOWNSWOMEN = (7840, 7670, 7910, 7920, 7690)
 
@@ -784,6 +814,8 @@ def convert_area(game, toee_root, out, area, name_base=27000, options=None, scri
             s['x'], s['y'] = fx
         if s.get('status') == 'ok':
             por = pick_portrait(act['cre'], s.get('gender'), gen[s.get('gender') == 'female'])
+            if por is None and (s.get('family') in ORC_FAMILIES or s.get('model') == 104):   # orc / half-orc body
+                por = ORC_PORTRAITS[i % 2]
             if por is not None:
                 s['portrait'] = por
                 if por in TOWNSMEN + TOWNSWOMEN:

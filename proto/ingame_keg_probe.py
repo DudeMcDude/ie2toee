@@ -13,13 +13,13 @@ def crit():
 def poll():
     try:
         m = game.leader.map
-        if m == 5951 and 'keg' not in st['done']:
+        if m not in st['done']:
+            st['done'].add(m); game.timeevent_add(survey, (m,), 3000, 1)
+        if m == 5952 and 'keg' not in st['done']:
             st['done'].add('keg'); game.timeevent_add(kegs, (), 2500, 1)
-        if m == 5953 and 'guth' not in st['done']:
-            st['done'].add('guth'); game.timeevent_add(guth, (), 800, 1)
     except Exception, e:
         log('KEG poll error %s' % e)
-    if len(st['done']) < 2: game.timeevent_add(poll, (), 1000, 1)
+    if 'keg' not in st['done'] or 'k' in st and 'clicked' not in st['done'] or 5950 not in st['done']: game.timeevent_add(poll, (), 1000, 1)
     return 0
 def kegs():
     try:
@@ -27,10 +27,29 @@ def kegs():
         log('KEG found %d kegs: %s' % (len(k), [(o.obj_get_int(37), o.obj_get_int(38), o.stat_level_get(stat_hp_current), o.object_flags_get() & (OF_CLICK_THROUGH | OF_DONTDRAW | OF_OFF)) for o in k]))
         if k:
             o = k[0]; st['k'] = o; game.scroll_to(o); log('SHOT keg_before')
-            game.timeevent_add(kill, (), 1500, 1)
+            st['hp0'] = o.stat_level_get(stat_hp_current); game.timeevent_add(click, (), 1500, 1)
     except Exception, e:
         import traceback; log('KEG error %s' % traceback.format_exc())
     return 0
+def click():
+    log('CLICK 640 408'); game.timeevent_add(clicked, (), 4000, 1); return 0
+def clicked():
+    o = st['k']; st['done'].add('clicked')
+    log('KEG click: hp %d -> %d, leader target ok %s' % (st['hp0'], o.stat_level_get(stat_hp_current), True)); log('SHOT keg_clicked')
+    game.timeevent_add(kill, (), 1000, 1); return 0
+def survey(m):
+    try:
+        c = crit(); ic = [o for o in c if o.has_feat(feat_improved_critical_gauntlet)]
+        log('SURVEY map %d critters %d improved_critical %d %s' % (m, len(c), len(ic), [str(o) for o in ic][:5]))
+        if m == 5950:
+            ps = [o for o in game.obj_list_vicinity(game.leader.location, OLC_PORTAL)][:3]
+            for i, o in enumerate(ps):
+                game.timeevent_add(doorshot, (o, i), 1500 * (i + 1), 1)
+    except Exception, e:
+        import traceback; log('SURVEY error %s' % traceback.format_exc())
+    return 0
+def doorshot(o, i):
+    game.scroll_to(o); log('SHOT door_%d' % i); return 0
 def kill():
     try:
         o = st['k']

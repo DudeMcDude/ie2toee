@@ -405,6 +405,10 @@ class ItemMapper(object):
             e['status'] = 'direct'
         elif e['status'] == 'base' and e['conds']:
             e['status'] = 'built'
+        if k == 'weapon' and it.type_name == 'axe' and e['proto'] is not None and \
+                any(a.attack_type == 'ranged' for a in it.abilities):   # throwing axe: handaxe base made throwable
+            e['proto'] = self.g.get('throwing_axe_base', 4067); e['label'] = self.label(e['proto'])
+            e['thrown'] = 10; e['status'] = 'built'; e['notes'].append('thrown (OWF_THROWABLE, 10 ft increment)')
         if e['status'] in ('built', 'base') and e.get('dropped'):
             e['status'] = 'new' if it.magical else e['status']
         e['ident'] = not (it.magical and it.lore > 0) or self.opt['identify'] == 'all_identified'
@@ -829,9 +833,9 @@ def convert(game, out, toee, tp=None, options=None, areas=(), stores=(), objects
         sto[s.lower()] = dict(type=S_.type, sell=S_.sell_markup, buy=S_.buy_markup, allow=S_.allow,
                               items=[[i['resref'], (5 if i['infinite'] else max(1, i['stock']))] for i in S_.items],
                               cures=len(S_.cures), container=m.g['store_container'][0])
-    keep = ('proto', 'conds', 'worth', 'name', 'icon_id', 'ident', 'qty', 'charges', 'magic', 'kind', 'status', 'weight')
+    keep = ('proto', 'conds', 'worth', 'name', 'icon_id', 'ident', 'qty', 'charges', 'magic', 'kind', 'status', 'weight', 'thrown')
     short = {'proto': 'p', 'conds': 'c', 'worth': 'w', 'name': 'n', 'icon_id': 'i', 'ident': 'id', 'qty': 'q',
-             'charges': 'ch', 'magic': 'm', 'kind': 'k', 'status': 's', 'weight': 'wt'}
+             'charges': 'ch', 'magic': 'm', 'kind': 'k', 'status': 's', 'weight': 'wt', 'thrown': 't'}
     items = {r: {short[k]: e[k] for k in keep if e.get(k) not in (None, [], 0, '') or k == 'ident'}
              for r, e in entries.items() if e.get('proto')}
     with open(os.path.join(out, 'ie_itemmap.py'), 'w') as f:
