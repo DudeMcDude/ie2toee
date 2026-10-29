@@ -762,6 +762,9 @@ def convert_area(game, toee_root, out, area, name_base=27000, options=None, scri
             specs.append({'actor': act['name'], 'resref': act['cre'], 'status': 'error', 'error': str(e)}); continue
         s = cv.convert(cre, act)
         s.update(actor=act['name'], x=act['x'], y=act['y'], orient=act['orient'], schedule=act['schedule'])
+        fx = cv.gd.g.get('spawn_fix', {}).get('%s/%s/%s' % (area.upper(), act['name'], act['cre'].lower()))
+        if fx:   # guidance "spawn_fix": {"AREA/actor/cre": [x, y]} (IE pixels) moves a spawn by hand
+            s['x'], s['y'] = fx
         if s.get('status') == 'ok':
             por = pick_portrait(act['cre'], s.get('gender'), gen[s.get('gender') == 'female'])
             if por is not None:

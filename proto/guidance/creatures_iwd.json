@@ -1,4 +1,6 @@
 {
+  "spawn_fix": {"_doc": "IWD2 Targos: 1000_Goblin_10 spawned on the one-tile ramp to the AR1004 door, the only tile the party can use that exit icon from; moved 3 tiles toward the street (tile 532,488)",
+                "AR1000/1000_Goblin_10/10gob": [700, 1978]},
  "_about": [
   "ie2toee creature guidance for Icewind Dale (classic) and Icewind Dale: Enhanced Edition.",
   "Authored mapping rules only: IE animation ids (engine constants, see IESDP ANIMATE.IDS) -> ToEE model ids (art/meshes/meshes.mes) and",
