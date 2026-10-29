@@ -368,8 +368,13 @@ class Converter(object):
         if st != cre.str:
             notes.append('STR %d/%02d -> %d (%s table)' % (cre.str, cre.str_bonus % 100, st, o['strength_table']))
         # ---- levels / classes
-        classes = R.split_class(cls_name)
-        levels = R.class_levels(classes, cre.levels, o['multiclass']) if track == 'class' else []
+        r3 = cre.rules3e   # native 3e creature (CRE V2.2): per-class levels, BAB and saves are taken as they are
+        if r3 is not None:
+            levels = sorted(r3['class_levels'].items(), key=lambda kv: -kv[1]) if track == 'class' else []
+            classes = [c for c, _ in levels]
+        else:
+            classes = R.split_class(cls_name)
+            levels = R.class_levels(classes, cre.levels, o['multiclass']) if track == 'class' else []
         commoner = False
         if track == 'class' and (not classes or (o['commoners'] == 'monster_hd' and classes == ['fighter'] and
                                                  cre.levels[0] <= 1 and cre.max_hp <= 8 and
@@ -378,7 +383,7 @@ class Converter(object):
             notes.append('commoner: %s L%d -> 1 HD humanoid, no PC class (ADJ-12)' % (cls_name or '?', cre.levels[0]))
         if len(classes) > 1 and levels:
             notes.append('multiclass %s %s -> %s (CM p.3)' % (cls_name, cre.levels[:len(classes)], levels))
-        if levels and o['level_ability_bumps']:
+        if levels and o['level_ability_bumps'] and r3 is None:   # 3e scores already include level bumps
             tot = sum(n for _, n in levels)
             k = R.KEY_ABILITY.get(levels[0][0], 0)
             if tot // 4:
@@ -390,7 +395,7 @@ class Converter(object):
                 'hostility': R.hostility(cre.ea), 'ie': {
                     'hp': cre.max_hp, 'ac': ie_ac, 'thac0': cre.thac0, 'apr': R.apr_ie(cre.attacks), 'levels': cre.levels,
                     'class': cls_name, 'race': race_name, 'str': '%d/%02d' % (cre.str, cre.str_bonus) if cre.str_bonus else cre.str,
-                    'saves': cre.saves, 'xp': cre.xp_value, 'morale': cre.morale, 'morale_break': cre.morale_break,
+                    'saves': cre.saves if r3 is None else [r3['fort'], r3['ref'], r3['will']], 'bab': None if r3 is None else r3['bab'], 'xp': cre.xp_value, 'morale': cre.morale, 'morale_break': cre.morale_break,
                     'resist': res, 'mr': mr}}
         # ---- template proto + model
         if track == 'class':
@@ -473,13 +478,17 @@ class Converter(object):
             spec['natural_ac'] = 0 if gear and any(g[2].type in (2, 60, 61, 62, 63, 64, 65, 66, 68) for g in gear) else nat
         spec['ac_3e_target'] = R.ac_3e(ie_ac)
         # ---- attack (CM p.11) and saves (CM p.12)
-        ie_ab = R.attack_from_thac0(cre.thac0)
+        ie_ab = R.attack_from_thac0(cre.thac0) if r3 is None else r3["bab"]
         spec['bab'] = bab
         if o['attack_from_ie'] == 'bonus_if_better' and ie_ab - bab >= 3:
             spec['to_hit_bonus'] = ie_ab - bab
             notes.append('THAC0 %d ~ +%d vs 3e BAB +%d: +%d to-hit (ADJ-6)' % (cre.thac0, ie_ab, bab, ie_ab - bab))
         sv = cre.saves
-        ie_saves = [R.save_from_2e(sv['death']), R.save_from_2e(sv['spells']), R.save_from_2e(sv['spells'])]
+        if r3 is not None:   # 3e base saves (ability modifiers are added by the engine, as for `base`)
+            ie_saves = [r3['fort'] + conm, r3['ref'] + dexm, r3['will'] + R.mod(abil[4])]
+            sv = {'death': r3['fort'], 'spells': r3['will']}
+        else:
+            ie_saves = [R.save_from_2e(sv['death']), R.save_from_2e(sv['spells']), R.save_from_2e(sv['spells'])]
         base = [saves[0] + conm, saves[1] + dexm, saves[2] + R.mod(abil[4])]
         bonus = [0, 0, 0]
         if o['saves_from_ie'] == 'bonus_if_better':

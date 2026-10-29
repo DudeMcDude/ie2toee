@@ -31,7 +31,7 @@ def collect(workdir, areas, text=None):
                 continue
             if r['type'] != 'travel' or not r.get('dest_area'):
                 continue
-            dest = r['dest_area'].upper()
+            dest = o.get('name_prefix', '') + r['dest_area'].upper()
             r_ent = (r.get('dest_entrance') or '').upper()
             extra = dict((k, r[k]) for k in ('anchor',) if r.get(k))
             regs.append(dict(extra, name=r['name'], poly=[[round(float(x), 2), round(float(y), 2)] for x, y in r['poly']],

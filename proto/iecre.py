@@ -3,7 +3,9 @@
   CRE V1.0  BG/BG2/EE (IWD:EE stores every creature as V1.0)
   CRE V9.0  classic IWD / HoW / TotL: same header as V1.0 up to 0x270, then 0x68 bytes of extra IWD fields
             (visibility, death variables, saved location), so the IDS bytes and section offsets move by +0x68
-  CRE V2.2  IWD2: different header (3e stats, feats, skills, per-class levels) -- detected, not parsed yet
+  CRE V2.2  IWD2: different header (3e stats, feats, skills, per-class levels). Parsed into the same attribute names
+            (2e-equivalent compat values: thac0 = 20 - BAB, descending AC = 20 - AC) plus a `rules3e` dict holding
+            the native 3e numbers (BAB, Fort/Ref/Will, per-class levels, feats, skills) for 3e-aware converters
   ITM V1    the fields the creature converter needs (type, proficiency, enchantment, damage of each ability)
 
 Everything read here comes from the player's own install at conversion time; nothing is stored in this repo.
@@ -57,8 +59,10 @@ class Cre(object):
         if sig != b'CRE ':
             raise ValueError('%s: not a CRE (%r)' % (resref, sig))
         self.version = ver.decode('latin-1').strip()
+        self.rules3e = None
         if self.version == 'V2.2':
-            raise NotImplementedError('%s: CRE V2.2 (IWD2) not supported yet' % resref)
+            self._parse_v22(data)
+            return
         if self.version not in ('V1.0', 'V9.0'):
             raise NotImplementedError('%s: CRE %s' % (resref, self.version))
         u = lambda f, o: struct.unpack_from(f, data, o)
@@ -128,11 +132,82 @@ class Cre(object):
         sz, rd = (EFF_V2_SIZE, Effect.v2) if self.eff_version == 1 else (EFF_V1_SIZE, Effect.v1)
         self.effects = [rd(data, ef_off + i * sz) for i in range(ef_n)]
 
+    CLASSES_3E = ('barbarian', 'bard', 'cleric', 'druid', 'fighter', 'monk', 'paladin', 'ranger', 'rogue', 'sorcerer',
+                  'wizard')
+    SLOT_NAMES_V22 = (['helmet', 'armor', 'shield', 'gloves', 'lring', 'rring', 'amulet', 'belt', 'boots',
+                       'weapon1', 'shield1', 'weapon2', 'shield2', 'weapon3', 'shield3', 'weapon4', 'shield4',
+                       'quiver1', 'quiver2', 'quiver3', 'quiver4', 'cloak', 'quick1', 'quick2', 'quick3'] +
+                      ['inv%d' % i for i in range(1, 25)] + ['magic_weapon'])
+
+    def _parse_v22(self, data):
+        """CRE V2.2 (IESDP cre_v2.2). Spells are 2DA-index based in V2.2 and are not resolved here yet."""
+        u = lambda f, o: struct.unpack_from(f, data, o)
+        self.name_strref, self.tooltip_strref, self.flags = u('<iiI', 0x08)
+        self.xp_value, self.power_level, self.gold, self.state = u('<IIII', 0x14)
+        self.hp, self.max_hp = u('<HH', 0x24)
+        self.animation = u('<I', 0x28)[0]
+        self.colors = dict(zip(('metal', 'minor', 'major', 'skin', 'leather', 'armor', 'hair'), data[0x2c:0x33]))
+        self.eff_version = data[0x33]
+        self.portrait_small, self.portrait_large = cstr(data[0x34:0x3c]), cstr(data[0x3c:0x44])
+        self.reputation, self.hide_in_shadows = u('<bB', 0x44)
+        ac3, cr, mi, pi, sl = u('<5h', 0x46)
+        bab, self.attacks, fort, ref, will = data[0x50:0x55]
+        self.ac_natural = self.ac_effective = 20 - ac3          # compat: descending 2e-style AC
+        self.ac_crushing, self.ac_missile, self.ac_piercing, self.ac_slashing = -cr, -mi, -pi, -sl
+        self.thac0 = max(0, 20 - bab)                            # compat
+        self.resist = dict(zip(('fire', 'cold', 'electricity', 'acid', 'magic', 'magic_fire', 'magic_cold',
+                                'slashing', 'crushing', 'piercing', 'missile'), data[0x55:0x60]))
+        self.fatigue, self.intoxication = data[0x65], data[0x66]
+        self.luck = u('<b', 0x67)[0]
+        self.turn_undead, self.tracking = data[0x68], 0
+        self.proficiencies = []
+        cl = dict(zip(self.CLASSES_3E, data[0x8b:0x96]))
+        top = sorted((n for n in cl.values() if n), reverse=True) or [max(1, data[0x8a])]
+        self.levels = (top + [0, 0])[:3]                         # compat: highest class levels first
+        self.saves = None                                        # 2e save table does not exist; see rules3e
+        self.str, self.int, self.wis, self.dex, self.con, self.cha = data[0x266:0x26c]
+        self.str_bonus = 0
+        self.morale, self.morale_break, self.racial_enemy, self.morale_recovery = 10, 1, data[0x25b], 0
+        self.kit = u('<I', 0x270)[0]
+        self.scripts = {'override': cstr(data[0x274:0x27c]), 'special3': cstr(data[0x27c:0x284]),
+                        'special2': cstr(data[0x284:0x28c]), 'combat': cstr(data[0x28c:0x294]),
+                        'movement': cstr(data[0x294:0x29c]), 'team': cstr(data[0x1ac:0x1b4]),
+                        'special1': cstr(data[0x1b4:0x1bc])}
+        self.visible = data[0x29c]
+        self.death_var_secondary = cstr(data[0x2aa:0x2ca]); self.death_var_tertiary = cstr(data[0x2ca:0x2ea])
+        self.saved_xy = u('<HH', 0x2ec)
+        (self.ea, self.general, self.race, self.cls, self.specific, self.gender) = data[0x384:0x38a]
+        self.object_ids = list(data[0x38a:0x38f]); self.alignment = data[0x38f]
+        self.death_var = cstr(data[0x394:0x3b4])
+        self.dialog = cstr(data[0x626:0x62e])
+        self.rules3e = dict(bab=bab, fort=fort, ref=ref, will=will, ac=ac3, total_level=data[0x8a],
+                            class_levels={k: v for k, v in cl.items() if v}, subrace=data[0x263],
+                            feats=list(u('<3I', 0x1c0)), skills=list(data[0x218:0x228]), xp_category=data[0x25a],
+                            enchantment=data[0x1bc])
+        self.known_spells, self.memorized, self.spell_slots = [], [], []
+        slot_off, it_off, it_n, ef_off, ef_n = u('<5I', 0x612)
+        self.items = [dict(resref=cstr(data[o:o + 8]).lower(), charges=list(u('<3H', o + 0x0a)),
+                           flags=u('<I', o + 0x10)[0]) for o in (it_off + i * 20 for i in range(it_n))]
+        n = len(self.SLOT_NAMES_V22)
+        words = list(u('<%dH' % n, slot_off)) if slot_off and slot_off + 2 * n <= len(data) else []
+        self.slots = {k: self.items[w]['resref'] for k, w in zip(self.SLOT_NAMES_V22, words)
+                      if w != 0xFFFF and w < len(self.items)}
+        self.selected_weapon = u('<H', slot_off + 2 * n)[0] if words else 1000
+        sz, rd = (EFF_V2_SIZE, Effect.v2) if self.eff_version == 1 else (EFF_V1_SIZE, Effect.v1)
+        self.effects = [rd(data, ef_off + i * sz) for i in range(ef_n)]
+
     @property
     def equipped(self):
         """Slots that matter for appearance and combat (worn items + the weapon in the selected slot)."""
         out = {k: v for k, v in self.slots.items() if not k.startswith(('inv', 'quick', 'quiver'))}
         sel = self.selected_weapon
+        if self.rules3e is not None:   # V2.2: weapon/shield pairs; only the selected set is in hand
+            out = {k: v for k, v in out.items() if not k.startswith(('weapon', 'shield')) or k == 'shield'}
+            if sel != 1000 and 0 <= sel < 4:
+                for k in ('weapon', 'shield'):
+                    if self.slots.get('%s%d' % (k, sel + 1)):
+                        out['selected_weapon' if k == 'weapon' else 'shield'] = self.slots['%s%d' % (k, sel + 1)]
+            return out
         if sel != 1000 and 0 <= sel < 4:
             w = self.slots.get('weapon%d' % (sel + 1))
             if w:

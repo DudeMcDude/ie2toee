@@ -609,7 +609,7 @@ def convert(game, area, outdir, map_id, ground_id, guidance, preview=False, clos
     W, H = wed.size_px
     ag = guidance.get('areas', {}).get(area.upper(), {})
     pl = Placement(W, H, guidance.get('scale', 1.0), ag.get('placement', guidance.get('placement')), ag.get('cal', guidance.get('cal', (0, 0))))
-    name = area.upper()
+    name = guidance.get("map_name_prefix", "") + area.upper()   # prefix keeps folders of different IE games apart (IWD AR1000 vs IWD2 AR1000)
     mapdir = os.path.join(outdir, 'maps', name)
     os.makedirs(mapdir, exist_ok=True)
     report = dict(area=name, are_version=are.version, size_px=[W, H], canvas_offset=[pl.cx, pl.cy])
@@ -691,6 +691,7 @@ def convert(game, area, outdir, map_id, ground_id, guidance, preview=False, clos
         doors=[dict(d, wed=next((dict(cells=len(w['cells']), closed_polys=len(w['closed_polys'])) for w in wed.doors
                                  if w['name'].lower() == d['wed_id'].lower()), None)) for d in are.doors],
         animations=[dict(a, toee=tl(a['x'], a['y'])) for a in are.animations])
+    objs["name_prefix"] = guidance.get("map_name_prefix", "")   # ie_exits.py prefixes destination areas the same way
     json.dump(objs, open(os.path.join(outdir, f'{name}_objects.json'), 'w'), indent=1)
     if preview:
         Y, X = np.mgrid[0:H, 0:W]

@@ -1,0 +1,89 @@
+{
+  "_comment": "IWD2 guidance (GOG 2.01): facts and choices only, never IE pixels, text or names.",
+  "game": "iwd2",
+  "expect_files": {
+    "chitin.key": {
+      "size": 365212,
+      "sha1": "0c5acb29e635bf25aa6ffde945d6973976235b11"
+    }
+  },
+  "scale": 1.0,
+  "jpeg_quality": 92,
+  "pathnode_spacing_tiles": 10,
+  "pathnode_link_tiles": 28,
+  "searchmap": {
+    "0": [
+      "block",
+      "ReservedBlocked"
+    ],
+    "1": [
+      "walk",
+      "Dirt"
+    ],
+    "2": [
+      "walk",
+      "Wood"
+    ],
+    "3": [
+      "walk",
+      "Wood"
+    ],
+    "4": [
+      "walk",
+      "Stone"
+    ],
+    "5": [
+      "walk",
+      "Grass"
+    ],
+    "6": [
+      "walk",
+      "Water"
+    ],
+    "7": [
+      "walk",
+      "Stone"
+    ],
+    "8": [
+      "flyover",
+      "ReservedFlyOver"
+    ],
+    "9": [
+      "walk",
+      "Wood"
+    ],
+    "10": [
+      "block",
+      "ReservedBlocked"
+    ],
+    "11": [
+      "walk",
+      "Ice"
+    ],
+    "12": [
+      "flyover",
+      "DeepWater"
+    ],
+    "13": [
+      "block",
+      "ReservedBlocked"
+    ],
+    "14": [
+      "walk",
+      "Dirt"
+    ],
+    "15": [
+      "walk",
+      "Grass"
+    ]
+  },
+  "areas": {
+    "AR1000": {
+      "map": 5950,
+      "ground": 950
+    }
+  },
+  "map_name_prefix": "I2",
+  "map_id_base": 5950,
+  "ground_id_base": 950
+}
