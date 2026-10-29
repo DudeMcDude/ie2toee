@@ -66,7 +66,7 @@ DEFAULT_GUIDANCE = {
         # floor there): the exit icon at the door was on a 1-2 tile sliver the party could not path onto
         # Easthaven dock (Jhonen's route, path nodes 107-118): the IE search map pinches the plank walkway and its link
         # to the snow bank to 1-2 cells; 14 cells (snow / planks in the art) at the pinch let the leader-radius bake through
-        "AR1000": {"searchmap_fix": [[115,95,2,3,11],[114,97,1,1,11],[114,98,1,5,2],[115,102,1,2,2],[56,201,1,1,2],[57,202,1,1,2],[50,198,1,1,2],[49,197,1,1,2]]},
+        "AR1000": {"searchmap_fix": [[115,95,2,3,11],[114,97,1,1,11],[114,98,1,5,2],[115,102,1,2,2],[115,103,1,1,2],[116,104,1,2,2],[117,106,1,1,2],[118,107,1,1,2],[119,108,1,1,2],[120,109,1,1,2],[56,201,1,1,2],[57,202,1,1,2],[50,198,1,1,2],[49,197,1,1,2]]},
         "AR1009": {"searchmap_fix": [[13, 28, 3, 4, 9]]},
         # AR1200 To1201 cave mouth: the icon (481,459) ended a 1-tile corridor (u=481, v=459-462) a radius-25 PC could not
         # fit; 4 cells make tiles (480,461) and (482,460-462) walkable so the corridor is 3 tiles wide, and 5 more (the
