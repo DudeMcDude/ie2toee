@@ -387,13 +387,21 @@ class Bcs(object):
         if self.toks[self.i].startswith('['):
             r = [int(x) for x in self._t()[1:-1].split('.')]
             rect = tuple(r) if any(v != -1 for v in r) else None
-        name = self._str(); self._expect('OB')
+        name = self._str()
+        iwd2 = self.layout == 'iwd2' or (self.layout is None and len(ints) == 13)
+        if iwd2:   # IWD2: 2 more ints after the name
+            while re.match(r'-?\d+$', self.toks[self.i]): self._int()
+        self._expect('OB')
         # IWD / BG2 / EE layout (12 ints): EA GENERAL RACE CLASS SPECIFIC GENDER ALIGN ID1..ID5; EE engines may
         # append extra fields after the identifiers (kept out of the filter). PST (14) inserts FACTION TEAM after EA.
-        # IWD2 (16) adds SUBRACE/class mask fields -- TODO verify against an IWD2 install.
+        # IWD2 (13 + 2 after the name) inserts SUBRACE after ALIGN (kept in the filter as SUBRACE).
+        sub = 0
+        if iwd2:
+            sub = ints[7]; ints = ints[:7] + ints[8:]
         if self.layout == 'pst' or (self.layout is None and len(ints) == 14):
             ints = [ints[0]] + ints[3:]
         filt = dict((k, v) for k, v in zip(OBJ_FILTER_FIELDS, ints[:7]) if v)
+        if sub: filt['SUBRACE'] = sub
         # stored innermost first (Myself, NearestEnemyOf) -> keep outermost first like the text form
         chain = [self.ids['object'].name(v, 'Object%d' % v) for v in reversed(ints[7:12]) if v]
         return Obj(name=name, chain=chain, filt=filt, rect=rect)
