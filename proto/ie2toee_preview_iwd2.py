@@ -18,7 +18,28 @@ from ie2toee_preview import run, run_soft, copytree, mes_with, RUNTIME
 
 GUIDE = os.path.join(HERE, 'guidance', 'iwd2.json')
 AREAS = ['AR1000', 'AR1001', 'AR1002', 'AR1003', 'AR1004', 'AR1005', 'AR1006', 'AR1100']
-START = (489, 425)   # I2AR1000 (Targos docks) new-game tile
+START = (450, 490)   # fallback: I2AR1000 tile of IWD2's own new-game spot (STARTARE.2DA 2390,860, the docks)
+
+
+def start_tile(ie, w):
+    """IWD2's new-game position (STARTARE.2DA) as a ToEE tile, by an affine fit of the I2AR1000 entrances' IE -> tile."""
+    try:
+        import iefs
+        t = iefs.IEGame(ie).read('startare', '2da').decode('latin-1')
+        x, y = (int(re.search(r'START_%sPOS\s+(\d+)' % k, t).group(1)) for k in 'XY')
+        P = [(e['x'], e['y'], e['toee'][0], e['toee'][1]) for e in
+             json.load(open(os.path.join(w, 'I2AR1000_objects.json')))['entrances'] if e.get('toee')][:3]
+        def solve(c):   # 3x3 Cramer
+            m = [[p[0], p[1], 1] for p in P]; v = [p[c] for p in P]
+            det = lambda a: (a[0][0] * (a[1][1] * a[2][2] - a[1][2] * a[2][1]) - a[0][1] * (a[1][0] * a[2][2] - a[1][2] * a[2][0])
+                             + a[0][2] * (a[1][0] * a[2][1] - a[1][1] * a[2][0]))
+            d = det(m)
+            return [det([[v[r] if j == i else m[r][j] for j in range(3)] for r in range(3)]) / d for i in range(3)]
+        A, B = solve(2), solve(3)
+        return int(round(A[0] * x + A[1] * y + A[2])), int(round(B[0] * x + B[1] * y + B[2]))
+    except Exception as e:
+        print('warning: IWD2 start position not read (%s); using %s' % (e, START))
+        return START
 
 
 def main():
@@ -52,7 +73,7 @@ def main():
         if ar in ok:
             d = os.path.join(w, 'cre_' + ar.lower())
             if run_soft('creatures %s' % ar, ['ie_creatures.py', 'convert', ie, toee, d, '--area', ar,
-                                              '--name-base', str(27000 + 300 * i)] + tpa):
+                                              '--name-base', str(28000 + 300 * i)] + tpa):
                 cre[ar] = d
     run('items', ['ie_items.py', 'convert', ie, os.path.join(w, 'items'), '--toee', toee] +
         sum((['--area', ar, '--objects', '%s=%s' % (ar, os.path.join(w, 'I2' + ar + '_objects.json'))] for ar in ok), []) + tpa)
@@ -108,6 +129,7 @@ def main():
     td = toeedata.ToEEData(toee)
     for rel, lines in sn.items():
         mes_with(td, rel, lines, os.path.join(M, rel))
+    st = start_tile(ie, w); print('new game start: I2AR1000 tile %s' % (st,))
     ml = os.path.join(M, 'rules', 'MapList.mes')
     if os.path.isfile(ml):   # new game -> Targos docks (Temple+ MapList flag, module-support build)
         t = open(ml, encoding='latin-1').read().split('\n')
@@ -116,7 +138,7 @@ def main():
                 t[i] = l = re.sub(r',\s*Flag:\s*NEW_GAME_START(,\s*NewGame[XY]:\s*\d+)*', '', l)
             if l.startswith('{%d}' % G['AR1000']['map']):
                 l = re.sub(r',\s*Flag:\s*NEW_GAME_START.*?(?=,\s*\w+:|}\s*$)', '', l.rstrip('\r'))
-                t[i] = l[:l.rindex('}')] + ', Flag: NEW_GAME_START, NewGameX: %d, NewGameY: %d}' % START
+                t[i] = l[:l.rindex('}')] + ', Flag: NEW_GAME_START, NewGameX: %d, NewGameY: %d}' % st
         open(ml, 'w', encoding='latin-1', newline='').write('\n'.join(t))
     print('overlay: %s  (%d areas: %s)' % (inst, len(ok), ' '.join('I2' + x for x in ok)))
     if a.install:

@@ -74,6 +74,11 @@ def finalize_critter(o, d, F):
         ie_critters.apply_3e(o, s)
         ie_critters.fix_hp(o, s)
         o.obj_set_int(mark, STAMP)
+        if s.get('dead'):   # IE STATE_DEAD corpse
+            try:
+                o.critter_kill_by_effect()
+            except Exception, e:
+                _log('IE_BAKE kill corpse %s: %s' % (s.get('ident') or s.get('resref'), e))
     return first
 
 

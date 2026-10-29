@@ -396,6 +396,15 @@ class ItemMapper(object):
             e['notes'].append('IE unusable by: %s' % ','.join(it.unusable_by))
         if e['kind'] == 'scroll' and e['spell'] and e['spell'].get('label'):
             e['label'] = 'scroll: ' + e['spell']['label']
+        if it.name_id in (-1, 0) and it.type_name == 'misc' and e['kind'] == 'misc':   # nameless creature weapon (IWD2 001d4s ...)
+            ab = next((a for a in it.abilities if a.attack_type == 'melee' and a.dice_sides), None)
+            if ab:
+                big = ab.dice_n * ab.dice_sides
+                dt = str(ab.damage_type)
+                tab = {'piercing': (4060, 4049, 4116), 'crushing': (4071, 4071, 4092), 'missile': (4060, 4049, 4116)}.get(dt, (4060, 4067, 4036))
+                e['proto'] = tab[0 if big <= 4 else 1 if big <= 6 else 2]; e['label'] = self.label(e['proto'])
+                e['kind'] = 'weapon'; e['status'] = 'base'
+                e['notes'].append('creature weapon %dd%d %s -> stand-in %s' % (ab.dice_n, ab.dice_sides, dt, e['label']))
         if e['proto'] is None:
             e['status'] = 'unmapped'
         elif e['kind'] in ('misc', 'container') and e['status'] == 'base' and not e['conds']:
