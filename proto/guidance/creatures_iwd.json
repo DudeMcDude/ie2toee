@@ -132,6 +132,16 @@
  },
  "families": [
   {
+   "id": "keg",
+   "label": "Keg (IWD2 Targos inn props, 10keg*; ToEE has no breakable scenery: an NPC critter with the barrel mesh)",
+   "classic": ["0xef50", "0xef60", "0xef70"],
+   "ee": [],
+   "mesh": 11013,
+   "proto": 14000,
+   "status": "stand-in",
+   "track": "monster"
+  },
+  {
    "id": "goblin",
    "label": "Goblin",
    "classic": [
@@ -1060,7 +1070,7 @@
   {
    "id": "barbarian",
    "label": "Northern barbarian",
-   "classic": [],
+   "classic": ["0xf77a"],
    "ee": [
     "0xe244",
     "0xe245",
