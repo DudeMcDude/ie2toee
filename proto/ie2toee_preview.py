@@ -44,6 +44,32 @@ def name_base(i):
 RUNTIME = ['ie_runtime', 'ie_critters', 'ie_spellrt', 'ie_combat', 'ie_doors', 'ie_bakert', 'ie_itemrt', 'ie_travel']
 
 
+IWD_START = ('AR1006', 440, 464)   # STARTARE.2DA of IWD:EE; classic IWD's copy is encrypted, so it is used for both
+
+
+def ie_start(ie, w, interiors):
+    """The game's own new-game area and spot -> (ToEE map id, tile). IE pixels -> tiles with the converter's iso
+    step (scale 1.0: 1/40 tile per px across, 1/28 down), anchored on an entrance of that area."""
+    import json
+    ar, x, y = IWD_START
+    try:
+        import iefs
+        t = iefs.IEGame(ie).read('startare', '2da').decode('latin-1')
+        if t.startswith('2DA'):
+            ar = re.search(r'^\s*START_AREA\s+(\w+)', t, re.M).group(1).upper()
+            x, y = (int(re.search(r'^\s*START_%sPOS\s+(\d+)' % k, t, re.M).group(1)) for k in 'XY')
+    except Exception:
+        pass
+    try:
+        mid = MAP_ID if ar == AREA else interiors[ar]
+        e = next(e for e in json.load(open(os.path.join(w, ar + '_objects.json')))['entrances'] if e.get('toee'))
+        dx, dy = x - e['x'], y - e['y']
+        return mid, (int(round(e['toee'][0] - dx / 40.0 + dy / 28.0)), int(round(e['toee'][1] + dx / 40.0 + dy / 28.0)))
+    except Exception as ex:
+        print('warning: start %s not converted (%s); new game starts in the town' % (ar, ex))
+        return MAP_ID, START
+
+
 def flavour(ie):
     """EE installs have a lang/ folder (and a .key next to it); classic ones keep dialog.tlk at the top."""
     if os.path.isdir(os.path.join(ie, 'lang')):
@@ -236,15 +262,20 @@ def main():
         dst = C if os.path.basename(rel) in ('gamequestlog.mes', 'gamequest.mes', 'gamearea.mes', 'logbook_ui_quests_text.mes') else M
         mes_with(td, rel, lines, os.path.join(dst, rel))
     # new game -> Easthaven: Temple+ MapList flag (module-support build; docs/modding-start-map.md in the Temple+ fork)
+    smap, stile = ie_start(ie, w, interiors)   # the game's own new-game spot (IWD:EE STARTARE.2DA: AR1006 at 440,464)
+    print('new game start: map %d tile %s' % (smap, stile), flush=True)
     ml = os.path.join(M, 'rules', 'MapList.mes')
     t = open(ml, encoding='latin-1').read().split('\n')
+    found = False
     for i, l in enumerate(t):
-        if l.startswith('{%d}' % MAP_ID):
-            l = re.sub(r',\s*Flag:\s*NEW_GAME_START.*?(?=,\s*\w+:|}\s*$)', '', l.rstrip('\r'))
-            t[i] = l[:l.rindex('}')] + ', Flag: NEW_GAME_START, NewGameX: %d, NewGameY: %d}' % START
-            break
-    else:
-        raise SystemExit('MapList.mes: no entry for map %d' % MAP_ID)
+        if 'NEW_GAME_START' in l:   # one start map only
+            t[i] = l = re.sub(r',\s*Flag:\s*NEW_GAME_START(,\s*NewGame[XY]:\s*\d+)*', '', l)
+        if l.startswith('{%d}' % smap):
+            l = l.rstrip('\r')
+            t[i] = l[:l.rindex('}')] + ', Flag: NEW_GAME_START, NewGameX: %d, NewGameY: %d}' % stile
+            found = True
+    if not found:
+        raise SystemExit('MapList.mes: no entry for map %d' % smap)
     open(ml, 'w', encoding='latin-1', newline='').write('\n'.join(t))
     print('module overlay: %s  (%d areas: %s + %d interiors)' % (inst, 1 + len(interiors), AREA, len(interiors)))
     if a.install:
