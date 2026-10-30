@@ -4,7 +4,7 @@
   python ie2toee_preview_iwd2.py --iwd2 "C:\\GOG Games\\Icewind Dale 2" --toee "C:\\GOG Games\\ToEE-IWD2" [--out iwd2_out] [--install]
 
 Same converter steps as ie2toee_preview.py (map, spells, creatures, items, bake, travel exits, exit icons, path nodes),
-without dialogue. Maps are named I2AR1000.. (map ids 5950-5957, guidance/iwd2.json) so they never clash with IWD's.
+plus dialogue for the Targos NPCs (ie_dialogue.py; journal/quests not yet). Maps are named I2AR1000.. (map ids 5950-5957, guidance/iwd2.json) so they never clash with IWD's.
 Install target (use a COPY of ToEE): maps, ground art, rules -> modules\\ToEE; scripts and description .mes ->
 modules\\ToEE_core (Temple+ discovers scripts before modules\\ToEE is mounted); item icons -> data\\.
 Nothing of IWD2 is shipped: everything is read from the install you point it at.
@@ -18,6 +18,7 @@ from ie2toee_preview import run, run_soft, copytree, mes_with, RUNTIME
 
 GUIDE = os.path.join(HERE, 'guidance', 'iwd2.json')
 AREAS = ['AR1000', 'AR1001', 'AR1002', 'AR1003', 'AR1004', 'AR1005', 'AR1006', 'AR1100']
+SCRIPT_BASE = 1500  # area i's actor scripts 1500+100i.. (vanilla ToEE: <= 1374); dialogue for the actors with a DLG
 START = (450, 490)   # fallback: I2AR1000 tile of IWD2's own new-game spot (STARTARE.2DA 2390,860, the docks)
 
 
@@ -73,8 +74,19 @@ def main():
         if ar in ok:
             d = os.path.join(w, 'cre_' + ar.lower())
             if run_soft('creatures %s' % ar, ['ie_creatures.py', 'convert', ie, toee, d, '--area', ar,
-                                              '--name-base', str(28000 + 300 * i)] + tpa):
+                                              '--name-base', str(28000 + 300 * i), '--script-base', str(SCRIPT_BASE + 100 * i)] + tpa):
                 cre[ar] = d
+    # dialogue: the actors that have a DLG (IE scripts of dialogue-less actors such as the goblins stay unconverted)
+    actors = []
+    for d in cre.values():
+        for l in open(os.path.join(d, 'dialogue_actors.txt')).read().split('\n'):
+            p_ = l.split()[-1].split(':') if l.strip() else []
+            if len(p_) > 3 and p_[3]:
+                actors += ['--actor', l.split()[-1]]
+    dlg = os.path.join(w, 'dialogue')
+    amap = sum((['--area-map', '%s:%d:%d,%d' % ((ar, G[ar]['map']) + tuple(json.load(open(os.path.join(w, 'I2' + ar + '_objects.json')))
+                ['placement']['canvas_offset']))] for ar in ok), [])
+    run_soft('dialogue', ['ie_dialogue.py', ie, dlg, '--strip-directions', '--quest-base', '150', '--quest-max', '199'] + actors + amap)
     run('items', ['ie_items.py', 'convert', ie, os.path.join(w, 'items'), '--toee', toee] +
         sum((['--area', ar, '--objects', '%s=%s' % (ar, os.path.join(w, 'I2' + ar + '_objects.json'))] for ar in ok), []) + tpa)
     bake = os.path.join(w, 'bake')
@@ -115,6 +127,9 @@ def main():
             if re.match(r'ie_creatures_ar\d+\.py$', f): shutil.copy(os.path.join(d, f), scr)
     copytree(os.path.join(w, 'items', 'modules', 'ToEE', 'mes', 'description'), os.path.join(C, 'mes', 'description'))
     copytree(os.path.join(w, 'items', 'data'), os.path.join(inst, 'data'))
+    if os.path.isdir(os.path.join(dlg, 'modules', 'ToEE', 'dlg')):
+        copytree(os.path.join(dlg, 'modules', 'ToEE', 'dlg'), os.path.join(C, 'dlg'))
+        copytree(os.path.join(dlg, 'modules', 'ToEE', 'scr'), scr)
     for f in [os.path.join(HERE, 'runtime', m + '.py') for m in RUNTIME] + [
             os.path.join(w, 'spells', 'ie_spellmap.py'), os.path.join(w, 'items', 'ie_itemmap.py'), tr]:
         shutil.copy(f, scr)

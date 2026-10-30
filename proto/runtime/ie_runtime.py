@@ -14,7 +14,7 @@
 # Variables: IE GLOBAL / LOCALS / <area> / MYAREA variables are kept in game.global_vars slots that the converter
 # allocated (module ie_varslots: SLOTS = {'global:name': index, ...}); unallocated ones fall back to an in-memory
 # dict (logged, not saved). Timers (SetGlobalTimer) store the expiry time in game seconds.
-import random
+import random, re
 try:
     _NUM = (int, long, float)
 except NameError:      # python 3 (offline tests)
@@ -289,6 +289,17 @@ class _Triggers(object):
     def Detect(self, c, obj): return self.See(c, obj)
     def IsGabber(self, c, obj): return obj is not None and obj == c.other
     def InParty(self, c, obj): return IN_GAME and obj is not None and obj in game.party
+    # IWD2 dialogue triggers: the area as a number (AR1000 -> 1000), 3e skill checks, subraces (ToEE has none: False)
+    def CurrentAreaIs(self, c, obj, n):
+        m = AREA_MAPS.get('AR%04d' % n)
+        o = obj if obj is not None else c.me
+        if not IN_GAME or o is None or m is None:
+            return False
+        return o.map == (m[0] if isinstance(m, (tuple, list)) else m)
+    def CheckSkill(self, c, obj, v, sk): return _ie_skill(obj, sk) == v
+    def CheckSkillGT(self, c, obj, v, sk): return _ie_skill(obj, sk) > v
+    def CheckSkillLT(self, c, obj, v, sk): return _ie_skill(obj, sk) < v
+    def SubRace(self, c, obj, sr): return False
     def NumInPartyGT(self, c, n): return len(_party()) > n
     def NumInPartyLT(self, c, n): return len(_party()) < n
     def NumInParty(self, c, n): return len(_party()) == n
@@ -466,6 +477,17 @@ def _align_match(ieval, toee):
     if lo:
         return lo == ge
     return True
+
+def _ie_skill(obj, sk):
+    """IWD2 SKILLS.IDS name -> the ToEE skill rank (unknown skills: 0, logged)"""
+    if obj is None or not IN_GAME:
+        return 0
+    n = 'skill_' + re.sub(r'[^a-z]+', '_', str(sk).lower()).strip('_')
+    n = {'skill_alchemy': 'skill_craft', 'skill_wilderness_lore': 'skill_wilderness_lore', 'skill_animal_empathy': 'skill_handle_animal'}.get(n, n)
+    if n not in globals():
+        log_once('skill:%s' % sk, 'IE_UNSUPPORTED skill %s' % sk)
+        return 0
+    return obj.skill_level_get(globals()[n])
 
 def _ie_stat(obj, stat):
     n = MAPS['stat'].get(stat)

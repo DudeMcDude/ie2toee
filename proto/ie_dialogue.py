@@ -212,7 +212,7 @@ class DlgConv(object):
                                      % (fn, self.g.action_list(acts or []), repr(jour) if jour else 'None'))
                         effect = '%s(npc, pc)' % fn
                     ans = 0 if t['end'] else self.line(t['next_dlg'] or r, t['next_state'])
-                    if any(getattr(a_, 'name', '').lower() == 'startstore' for a_ in acts):
+                    if any(getattr(a_, 'name', '').lower() == 'startstore' for a_ in (acts or [])):
                         pt = 'B:' + pt      # ToEE opens the barter screen on "B:" responses (vanilla merchants)
                     out_lines.append('{%d}{%s}{}{1}{%s}{%d}{%s}' % (tl, pt, test, ans, effect))
                 out_lines.append('')
@@ -273,6 +273,7 @@ def main():
     ap.add_argument('game'); ap.add_argument('out')
     ap.add_argument('--actor', action='append', default=[], help='IDENT:AREA:SCRIPT_ID[:DLG][:BCS,BCS]')
     ap.add_argument('--area-script', action='append', default=[], help='AREA:BCS')
+    ap.add_argument('--strip-directions', action='store_true', help='drop [bracketed] voice notes (IWD2)')
     ap.add_argument('--tlk'); ap.add_argument('--lang', help='EE locale, e.g. en_US'); ap.add_argument('--fallback'); ap.add_argument('--slot-base', type=int, default=1000)
     ap.add_argument('--area-map', action='append', default=[], help='AREA:TOEE_MAP[:canvas_x,canvas_y]')
     ap.add_argument('--slot-max', type=int, default=1999)
@@ -288,6 +289,9 @@ def main():
         p = S.find_tlk(a.game, a.lang)
         tlk = S.Tlk.load(p) if p else None
     text = S.StrrefText(tlk)
+    if a.strip_directions:      # IWD2 dialog.tlk: voice-actor notes in [brackets] (pronunciations, stage directions)
+        _t = text
+        text = lambda r, _t=_t: re.sub(r'\s{2,}', ' ', re.sub(r'\[[^\]]*\]', '', _t(r) or '')).strip()
     mod = os.path.join(a.out, 'modules', 'ToEE'); scr = os.path.join(mod, 'scr'); dlgd = os.path.join(mod, 'dlg')
     for d in (scr, dlgd):
         os.makedirs(d, exist_ok=True)
