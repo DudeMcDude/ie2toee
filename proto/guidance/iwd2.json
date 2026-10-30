@@ -80,7 +80,9 @@
   "areas": {
     "AR1000": {
       "map": 5950,
-      "ground": 950
+      "ground": 950,
+      "_gangway": "start ship gangway (SR x 134-135, y 73-82) pinches to 1 cell at y 78: widened to 5 cells (x 132-136, y 74-82), and its 1-cell link to the deck (y 74-76); FR1002 path pinch at SR (131-133,39-41) and FR1004 south lane (x 41-43, y 172-182) widened by 1 cell",
+      "searchmap_fix": [[132, 74, 5, 9, 9], [136, 73, 1, 1, 9], [137, 76, 1, 1, 9], [141, 74, 2, 1, 9], [132, 39, 2, 3, 9], [44, 172, 1, 10, 9], [40, 176, 1, 6, 9]]
     },
     "AR1001": {
       "map": 5951,
