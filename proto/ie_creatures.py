@@ -714,6 +714,8 @@ PORTRAITS = {
     'churin': 6610, 'barkeep': 7620,
 }
 PORTRAIT_TODO = ('damien', 'eboy1', 'eboy2', 'egirl1', 'egirl2', 'squirel')
+ORC_PORTRAITS = (6470, 6480)   # ToEE's half-orc NPCs Pintark (14207) and Tuelk (14206)
+ORC_FAMILIES = ('orc', 'orog')
 TOWNSMEN = (7830, 6620, 6700, 7660)
 TOWNSWOMEN = (7840, 7670, 7910, 7920, 7690)
 
@@ -755,6 +757,8 @@ def convert_area(game, toee_root, out, area, name_base=27000, options=None, scri
         s.update(actor=act['name'], x=act['x'], y=act['y'], orient=act['orient'], schedule=act['schedule'])
         if s.get('status') == 'ok':
             por = pick_portrait(act['cre'], s.get('gender'), gen[s.get('gender') == 'female'])
+            if por is None and (s.get('family') in ORC_FAMILIES or s.get('model') == 104):   # orc / half-orc body
+                por = ORC_PORTRAITS[i % 2]
             if por is not None:
                 s['portrait'] = por
                 if por in TOWNSMEN + TOWNSWOMEN:

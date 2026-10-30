@@ -79,6 +79,12 @@ each interior's `ie_doors_<area>.py` is copied next to the town's.
   strict (PC-radius) path does not fit; the reachable end is (481,463). Fix options: move the anchor to (481,463) or
   widen those 4 tiles by hand. AR1201 Chest1 (489,435) and Chest2 (506,500) have no strictly reachable tile within 6
   tiles from FR1200 (Crate1 is reachable). AR1201 orcs are hostile and start combat on arrival.
+  Re-checked 2026-10-30 (Temple+ debug.pathlen with every critter hidden): all three containers are reachable. Chest2 is
+  reached from the east part of the cave (FR1200 -> (508,500) 347 ft); Chest1's north passage is walkable hop by hop
+  ((474,448) -> (489,437) 44 ft), but one click from the entrance does not find the whole winding route (the engine's
+  long-path search gives up; a click closer in works). The earlier 'unreachable' result used target tiles under
+  walls/containers. AR1200 <-> AR1201 icons travel both ways on real clicks (with kos set); without it the AR1200 orcs
+  near the cave mouth start combat and Temple+ ignores exit icons in combat, which was the 'icon does not travel' case.
 * IE entrances have no facing in ToEE: the party arrives at the tile with default facing (`orient` is kept in the data).
 * The icon is the stock ToEE map-change icon (same look for doors and map edges).
 
