@@ -71,11 +71,13 @@ DEFAULT_GUIDANCE = {
         # AR1200 To1201 cave mouth: the icon (481,459) ended a 1-tile corridor (u=481, v=459-462) a radius-25 PC could not
         # fit; 4 cells make tiles (480,461) and (482,460-462) walkable so the corridor is 3 tiles wide, and 5 more (the
         # rows above/beside the icon tile, the cave mouth's tip) give the icon tile itself room for the PC radius
-        "AR1200": {"searchmap_fix": [[15, 17, 1, 1, 11], [11, 19, 1, 1, 11], [12, 20, 1, 1, 11], [13, 21, 1, 1, 11],
-                                     [10, 14, 3, 1, 11], [9, 15, 1, 1, 11], [13, 15, 1, 1, 11]],
-                   # the leader still stopped at (481,463), 3 tiles short of the auto anchor (481,460): icon + anchor
-                   # moved there, just outside the cave mouth (approved by Shai, 2026-10-28)
-                   "anchor_fix": {"To1201": [481, 463]}},
+        # AR1200 To1201 cave mouth: the icon sat at the end of a 1-tile corridor; a 9-cell shave there (2026-10-28) did not
+        # give the PC radius a connected route (offline fit check 2026-10-30), so it was removed: the icon + anchor sit at
+        # (481,463), just outside the cave mouth, where the leader stops (approved by Shai, 2026-10-28)
+        "AR1200": {"anchor_fix": {"To1201": [481, 463]}},
+        # AR1201: the IE container point is the chest's launch point, ~1.5 tiles from the chest drawn in the art; the ToEE
+        # chest objects go to the tile of their IE polygon's centre instead
+        "AR1201": {"container_fix": {"Chest 1": [489, 433], "Chest 2": [504, 500]}},
     }
 }
 
@@ -686,7 +688,8 @@ def convert(game, area, outdir, map_id, ground_id, guidance, preview=False, clos
         placement=dict(canvas_offset=[pl.cx, pl.cy], scale=pl.scale, cal=[pl.calx - CAL_X0, pl.caly - CAL_Y0]),
         entrances=[dict(e, toee=tl(e['x'], e['y']), **_arrival(e)) for e in are.entrances],
         actors=[dict(a, toee=tl(a['x'], a['y'])) for a in are.actors],
-        containers=[dict(c, toee=tl(c['x'], c['y']), poly=[tl(*p) for p in c['poly']]) for c in are.containers],
+        containers=[dict(c, toee=list(ag.get('container_fix', {}).get(c['name'], tl(c['x'], c['y']))), poly=[tl(*p) for p in c['poly']])
+                    for c in are.containers],   # per-area "container_fix": {name: [u, v]} places a container by hand
         regions=regions_t,
         doors=[dict(d, wed=next((dict(cells=len(w['cells']), closed_polys=len(w['closed_polys'])) for w in wed.doors
                                  if w['name'].lower() == d['wed_id'].lower()), None)) for d in are.doors],
