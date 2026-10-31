@@ -65,8 +65,12 @@ def to_bink1(src, dst, tmp):
     outs = []
     for k in range(n):
         avi = os.path.join(tmp, 'in.avi'); out = os.path.join(tmp, 'out.bik')
-        subprocess.check_call(['ffmpeg', '-v', 'error', '-y', '-ss', str(k * CHUNK_S), '-t', str(CHUNK_S), '-i', src,
-                               ] + (['-r', '15'] if src.lower().endswith('.mve') else []) + ['-c:v', 'rawvideo', '-pix_fmt', 'bgr24', '-c:a', 'pcm_s16le', '-ar', '22050', avi])
+        cut = ['-ss', str(k * CHUNK_S), '-t', str(CHUNK_S)]
+        mve = src.lower().endswith('.mve')      # Interplay MVE cannot input-seek: cut on the output side
+        subprocess.check_call(['ffmpeg', '-v', 'error', '-y'] + ([] if mve else cut) + ['-i', src,
+                               ] + (cut + ['-r', '15'] if mve else []) + ['-c:v', 'rawvideo', '-pix_fmt', 'bgr24', '-c:a', 'pcm_s16le', '-ar', '22050', avi])
+        if k and os.path.getsize(avi) < 65536:   # duration overestimated: nothing left to encode
+            break
         wp = (lambda p: p) if os.name == 'nt' else (lambda p: 'Z:' + p.replace('/', '\\'))   # '/x' would be a switch
         cmd = [rv, 'binkc', wp(avi), wp(out), '/v1', '/o', '/#']
         if os.name != 'nt':
@@ -102,7 +106,9 @@ def convert(game, toee, out, ee=None, only=None, flavour=None):
         src = find_loose(game, res, ('mve', 'bik'))
         try:
             parts = [dst]
-            if src and open(src, 'rb').read(4) == b'BIKi':
+            if os.path.exists(dst) and os.environ.get('IE_MOVIES_REUSE'):
+                parts = [dst] + sorted(glob.glob(dst[:-4] + '-[0-9].bik'))
+            elif src and open(src, 'rb').read(4) == b'BIKi':
                 shutil.copy(src, dst)
             else:
                 if not src:
@@ -115,7 +121,7 @@ def convert(game, toee, out, ee=None, only=None, flavour=None):
                 parts = to_bink1(src, dst, tmp)
             for k, pth in enumerate(parts):
                 done[MOVIE_BASE + 5 * i + k] = (key, os.path.basename(pth))
-            print('movie %s -> %s' % (os.path.basename(src), name), flush=True)
+            print('movie %s -> %s' % (res, name), flush=True)
         except Exception as e:
             print('movie %s failed: %s' % (res, e), flush=True)
     shutil.rmtree(tmp, ignore_errors=True)
