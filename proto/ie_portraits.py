@@ -1,6 +1,6 @@
 """Commissioned (AI-generated, owner's own) NPC portraits -> ToEE portrait TGAs + portraits.mes entries.
 
-Ids are 9900+ in steps of 10 (Co8 uses 9000-9754). Per id: +0 _b 130x150, +1 _m 42x37, +2 _s 53x47, +3 _s_grey, +4 _m_grey,
+Ids are 9900+ in steps of 10 (batch 2 runs past 9999: 10000-10054) (Co8 uses 9000-9754). Per id: +0 _b 130x150, +1 _m 42x37, +2 _s 53x47, +3 _s_grey, +4 _m_grey,
 the vanilla NPC layout (vanilla leaves +0 empty for NPCs; we put the big portrait there like the PC entries do).
 Sources: art/portraits/<key>/ie_<key>_{big,m,s}.png (see /workspace/portrait-commission specs).
 """
@@ -15,6 +15,9 @@ ART_IDS = {
     'hrothgar': (9900, 'Hrothgar'), 'everard': (9910, 'Everard'), 'arundel': (9920, 'Arundel'),
     'poquelin': (9930, 'Poquelin'), 'belhifet': (9940, 'Belhifet'), 'yxunomei': (9950, 'Yxunomei'),
     'kresselack': (9960, 'Kresselack'), 'conlan': (9970, 'Conlan'),
+    # batch 2: IWD2
+    'ulbrec': (9980, 'Ulbrec'), 'shawford': (9990, 'Shawford'), 'hedron': (10000, 'Hedron'), 'oswald': (10010, 'Oswald'),
+    'nathaniel': (10020, 'Nathaniel'), 'isair': (10030, 'Isair'), 'madae': (10040, 'Madae'), 'ennelia': (10050, 'Ennelia'),
 }
 # Face boxes on the 1200x1384 master, set by eye: (centre x, top of head/hair/crown, bottom of chin/beard).
 # _m/_s are recropped from these (whole head + margin under the chin, like vanilla NPC_6001_m_Terjon);
@@ -22,6 +25,8 @@ ART_IDS = {
 FACE = {
     'hrothgar': (590, 120, 800), 'everard': (630, 120, 820), 'arundel': (530, 90, 770), 'poquelin': (620, 80, 790),
     'belhifet': (420, 170, 860), 'yxunomei': (580, 110, 840), 'kresselack': (620, 50, 880), 'conlan': (650, 170, 850),
+    'ulbrec': (520, 150, 730), 'shawford': (560, 180, 830), 'hedron': (580, 130, 810), 'oswald': (620, 120, 800),
+    'nathaniel': (500, 200, 880), 'isair': (560, 150, 850), 'madae': (600, 120, 870), 'ennelia': (600, 220, 880),
 }
 TOP_PAD, CHIN_PAD = 0.06, 0.14   # fraction of head height above the top / below the chin
 SIZES = {'b': (130, 150), 'm': (42, 37), 's': (53, 47)}
