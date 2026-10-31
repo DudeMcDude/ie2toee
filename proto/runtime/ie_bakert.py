@@ -155,6 +155,11 @@ def first_heartbeat(o, area):
         return
     _members[a] = {g: 1}
     _last[a] = now
+    try:      # the area's own IE script (ARE header) and the new-game IE globals
+        import ie_cutscene
+        ie_cutscene.area_start(area)      # (not in area_pass: IWD2 areas have no ie_bake_<area> module)
+    except ImportError:
+        pass
     try:
         area_pass(area)
     except Exception, e:

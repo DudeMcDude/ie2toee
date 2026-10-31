@@ -41,7 +41,7 @@ def script_base(i):
 def name_base(i):
     """interior n's creature name ids (description .mes): 20 per area, 60 for the cave (AR1201, 45 actors)"""
     return 27000 + 20 * i + 80 if i <= 18 else 27000 + 20 * 18 + 80 + 60 * (i - 18)
-RUNTIME = ['ie_runtime', 'ie_critters', 'ie_spellrt', 'ie_combat', 'ie_doors', 'ie_bakert', 'ie_itemrt', 'ie_travel', 'ie_movies_rt']
+RUNTIME = ['ie_runtime', 'ie_critters', 'ie_spellrt', 'ie_combat', 'ie_doors', 'ie_bakert', 'ie_itemrt', 'ie_travel', 'ie_movies_rt', 'ie_cutscene']
 
 
 IWD_START = ('AR1006', 440, 464)   # STARTARE.2DA of IWD:EE; classic IWD's copy is encrypted, so it is used for both
