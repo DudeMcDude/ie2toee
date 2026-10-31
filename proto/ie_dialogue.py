@@ -277,6 +277,7 @@ def main():
     ap.add_argument('--tlk'); ap.add_argument('--lang', help='EE locale, e.g. en_US'); ap.add_argument('--fallback'); ap.add_argument('--slot-base', type=int, default=1000)
     ap.add_argument('--area-map', action='append', default=[], help='AREA:TOEE_MAP[:canvas_x,canvas_y]')
     ap.add_argument('--slot-max', type=int, default=1999)
+    ap.add_argument('--new-game', action='append', default=[], help='NAME=value: an IE GLOBAL a new game starts with (IWD2: CHAPTER=-1)')
     ap.add_argument('--quest-base', type=int, default=120, help='first ToEE quest id for IE journal entries (vanilla: 0-60)')
     ap.add_argument('--quest-max', type=int, default=199, help='last one (the logbook has 200 quests)')
     a = ap.parse_args()
@@ -332,6 +333,31 @@ def main():
         area, res = spec.split(':')
         m, nb, unk = bcs(res.lower(), 'area_' + area.upper(), area.upper())
         rep['area_scripts'].append({'area': area.upper(), 'module': m, 'blocks': nb})
+    # cutscene scripts started by StartCutScene("res") in any converted dialog / script (recursively) -> ie_bcs_<res>_area
+    cs_done = set(); asc = {}
+    for x in rep['area_scripts']:
+        asc[x['area']] = x['module']
+    while True:
+        todo = {}
+        for fn in sorted(os.listdir(scr)):
+            if not fn.endswith('.py'):
+                continue
+            src_ = open(os.path.join(scr, fn), encoding='cp1252').read()
+            am_ = re.search(r'^AREA = "(\w*)"', src_, re.M)
+            ar0 = am_.group(1) if am_ else dict((v, k) for k, v in asc.items()).get(fn[:-3], '')
+            for r_ in re.findall(r'StartCutScene\(c, "(\w+)"\)', src_):
+                if r_.lower() not in cs_done:
+                    todo.setdefault(r_.lower(), ar0)
+        todo = dict((k, v) for k, v in todo.items() if k not in cs_done)
+        if not todo:
+            break
+        for r_, ar_ in sorted(todo.items()):
+            cs_done.add(r_)
+            try:
+                m, nb, unk = bcs(r_, 'area_' + (ar_ or 'CUT').upper(), (ar_ or '').upper())
+                rep.setdefault('cutscenes', []).append({'res': r_, 'module': m, 'blocks': nb})
+            except Exception as e:
+                print('warning: cutscene %s: %s' % (r_, e))
     keys = sorted(allvars)
     if len(keys) > a.slot_max - a.slot_base + 1:
         raise SystemExit('too many variables (%d) for slots %d..%d' % (len(keys), a.slot_base, a.slot_max))
@@ -388,7 +414,7 @@ def main():
     except Exception:
         pass
     w(os.path.join(scr, 'ie_xp.py'), HEADER + 'XP = %r\n' % xp)
-    w(os.path.join(scr, 'ie_areas.py'), HEADER + 'MAPS = %r\nPLACEMENTS = %r\n' % (am, pl))
+    w(os.path.join(scr, 'ie_areas.py'), HEADER + 'MAPS = %r\nPLACEMENTS = %r\nSCRIPTS = %r\nNEWGAME = %r\n' % (am, pl, asc, dict((k.upper(), int(v)) for k, v in (x.split('=') for x in a.new_game))))
     json.dump(rep, open(os.path.join(a.out, 'report.json'), 'w'), indent=1)
     print(json.dumps({k: v for k, v in rep.items() if k != 'unknown'}, indent=1))
     print('unknown names:', rep['unknown'])

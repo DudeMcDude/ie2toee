@@ -10,6 +10,7 @@ modules\\ToEE_core (Temple+ discovers scripts before modules\\ToEE is mounted); 
 Nothing of IWD2 is shipped: everything is read from the install you point it at.
 """
 import argparse, json, os, re, shutil, sys
+import iefs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -86,7 +87,17 @@ def main():
     dlg = os.path.join(w, 'dialogue')
     amap = sum((['--area-map', '%s:%d:%d,%d' % ((ar, G[ar]['map']) + tuple(json.load(open(os.path.join(w, 'I2' + ar + '_objects.json')))
                 ['placement']['canvas_offset']))] for ar in ok), [])
-    run_soft('dialogue', ['ie_dialogue.py', ie, dlg, '--strip-directions', '--quest-base', '150', '--quest-max', '199'] + actors + amap)
+    ascr = []      # each area's own script (ARE V9.1 header +0xA4)
+    gm = iefs.IEGame(ie)
+    for ar in ok:
+        try:
+            d_ = gm.read(ar.lower(), 'are'); r_ = d_[0xa4 if d_[4:8] == b'V9.1' else 0x94:][:8].rstrip(b'\0').decode('latin-1')
+            if r_:
+                ascr += ['--area-script', '%s:%s' % (ar, r_.lower())]
+        except Exception as e:
+            print('warning: area script of %s: %s' % (ar, e))
+    run_soft('dialogue', ['ie_dialogue.py', ie, dlg, '--strip-directions', '--quest-base', '150', '--quest-max', '199',
+                          '--new-game', 'CHAPTER=-1'] + actors + amap + ascr)
     run('items', ['ie_items.py', 'convert', ie, os.path.join(w, 'items'), '--toee', toee] +
         sum((['--area', ar, '--objects', '%s=%s' % (ar, os.path.join(w, 'I2' + ar + '_objects.json'))] for ar in ok), []) + tpa)
     bake = os.path.join(w, 'bake')

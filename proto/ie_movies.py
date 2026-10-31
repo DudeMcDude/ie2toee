@@ -17,7 +17,8 @@ sys.path.insert(0, HERE)
 MOVIE_BASE = 1100
 # (key, IE resref) in id order; key 'intro' is what the runtime plays on a new game
 MOVIES = {'IWD': [('intro', 'intro'), ('bislogo', 'bislogo'), ('tsrlogo', 'tsrlogo'), ('avalanch', 'avalanch'),
-                  ('tower', 'tower'), ('scry', 'scry'), ('return', 'return'), ('credits', 'credits')],
+                  ('tower', 'tower'), ('scry', 'scry'), ('return', 'return'), ('credits', 'credits'),
+                  ('howseer', 'howseer'), ('howdrag', 'howdrag'), ('ecredit', 'ecredit')],   # (HoW: IWD:EE wbm only)
           'IWD2': [('intro', 'intro'), ('bislogo', 'bislogo'), ('wotc', 'wotc'), ('middle', 'middle'), ('end', 'end'),
                    ('credits', 'credits')]}
 
@@ -185,6 +186,19 @@ def _subtitle_lines(text, maxlen=160):
     return lines
 
 
+def _burn_title(jpg, title):
+    from PIL import Image, ImageDraw, ImageFont
+    im = Image.open(jpg).convert('RGB'); d = ImageDraw.Draw(im)
+    try:
+        f = ImageFont.truetype('DejaVuSerif-Bold.ttf', 20)
+    except Exception:
+        f = ImageFont.load_default()
+    w = d.textbbox((0, 0), title, font=f)[2]
+    x, y = (im.width - w) // 2, 28        # IWD2 guichp*b: top panel ~ y 25..55 of the 800x500 slide
+    d.text((x + 1, y + 1), title, font=f, fill=(0, 0, 0)); d.text((x, y), title, font=f, fill=(222, 190, 110))
+    im.save(jpg, quality=90)
+
+
 def slides(game, out, flavour):
     """Chapter screens -> ToEE slides: modules/ToEE/slide/<n>.jpg, sound/speech/slide/<n>.mp3, mes/subtitles/<n>.mes."""
     import iefs
@@ -192,7 +206,7 @@ def slides(game, out, flavour):
     from iegui import decode_mos, pvrz_loader_for
     g = iefs.IEGame(game); tlk = _tlk(game); pv = pvrz_loader_for(g)
     M = os.path.join(out, 'modules', 'ToEE')
-    for d in ('slide', 'sound/speech/slide', 'mes/subtitles'):
+    for d in ('slide', 'sound/speech/slide', 'mes/subtitles', 'rules/subtitles'):
         os.makedirs(os.path.join(M, d), exist_ok=True)
     done = {}
     tmp = tempfile.mkdtemp(prefix='ieslide')
@@ -217,6 +231,23 @@ def slides(game, out, flavour):
                 f.write('\n// %s chapter %d (converted from your own install)\n\n' % (flavour, ch))
                 for i, l in enumerate(lines):
                     f.write('{%d}{%s}\n' % (i, l.replace('{', '(').replace('}', ')')))
+            # the engine shows subtitles only with a control file rules/subtitles/<n>.mes (vanilla es01a.mes:
+            # "start ms;duration ms;font;r;g;b;text line"): title first, then the lines paced by their length
+            mp3 = os.path.join(M, 'sound', 'speech', 'slide', base + '.mp3')
+            dur = int(float(subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+                                                     '-of', 'csv=p=0', mp3]).decode().strip()) * 1000)
+            t0 = 500; tt = 3000 if ttl else 0; rest = max(1000, dur - t0 - tt - 300)
+            body = lines[1:] if ttl else lines; tot = float(sum(len(l) for l in body)) or 1.0
+            with open(os.path.join(M, 'rules', 'subtitles', base + '.mes'), 'w', encoding='latin-1') as f:
+                f.write('\n// start time (milliseconds) ; duration (milliseconds) ; font name ; red ; green ; blue ; text line\n\n')
+                t = t0; i = 0
+                if ttl:
+                    f.write('{0}{%d;%d;arial-12;193;154;62;0}\n' % (t, tt)); t += tt; i = 1
+                for k, l in enumerate(body):
+                    d_ = int(rest * len(l) / tot)
+                    f.write('{%d}{%d;%d;arial-12;255;255;255;%d}\n' % (i + k, t, d_, i + k)); t += d_
+            if ttl and flavour == 'IWD2':     # the IE drew the title into the frame's top panel
+                _burn_title(os.path.join(M, 'slide', base + '.jpg'), ttl)
             done[SLIDE_BASE + ch] = ('chapter%d' % ch, '%s.jpg;%s.mp3;%s.mes' % (base, base, base))
             print('slide chapter %d: guichp%db + %s (%d subtitle lines)' % (ch, ch, snd, len(lines)), flush=True)
         except Exception as e:

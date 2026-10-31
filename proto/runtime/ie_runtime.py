@@ -198,7 +198,7 @@ def N(c, name):
     """Object by IE script name / death variable."""
     if IN_GAME:
         for k, (ident, area) in _bound.items():
-            if ident.lower() == name.lower():
+            if ident.lower() == name.lower() or re.sub(r'^\d+', '', ident.lower()) == name.lower():   # IWD2 10hedron = "Hedron"
                 try:
                     o = game.get_obj_by_id(k)
                     if o:
@@ -256,6 +256,9 @@ class _Triggers(object):
         return unsupported
 
     def True_(self, c): return True
+    def InCutsceneMode(self, c):
+        import ie_cutscene; return ie_cutscene.active()
+    def EntirePartyOnMap(self, c): return True      # (the converted party always travels together)
     def False_(self, c): return False
 
     def Global(self, c, name, scope, v): return get_var(c, name, scope) == v
@@ -784,7 +787,6 @@ class _Actions(object):
             except Exception:
                 pass
         return 2
-    def CutSceneId(self, c, obj): return None
     def SetInterrupt(self, c, flag): return None
     def CreateCreature(self, c, cre, pt, face=0):
         log('IE_UNSUPPORTED CreateCreature %s at %r (needs CRE -> proto guidance)' % (cre, pt))
@@ -812,11 +814,11 @@ class _Actions(object):
             ie_movies_rt.play(res.lower())
     def IncrementChapter(self, c, res=''):
         """IE chapter break: CHAPTER += 1 and the chapter screen -> the converted ToEE slide (ie_movies.py).
-        IWD names the text ("CHPTXT<n>"); IWD2 passes "" and shows CHAPTERS.2DA row <old CHAPTER> (prologue first)."""
+        IWD names the text ("CHPTXT<n>"); IWD2 passes "" and shows CHAPTERS.2DA row <new CHAPTER> (new games start at -1: prologue first)."""
         old = get_var(c, 'CHAPTER', 'GLOBAL')
         set_var(c, 'CHAPTER', 'GLOBAL', old + 1)
         m = re.match(r'chptxt(\d+)$', (res or '').lower())
-        n = int(m.group(1)) if m else old
+        n = int(m.group(1)) if m else old + 1     # IWD2: CHAPTER starts at -1, the first call -> 0 = prologue
         log('CHAPTER %d -> slide %d' % (old + 1, n))
         if IN_GAME:
             import ie_movies_rt
@@ -834,8 +836,27 @@ class _Actions(object):
             u, v = ie_to_tile(area, pt[0], pt[1])
             game.fade_and_teleport(0, 0, 0, m, u, v)
     LeaveArea = LeaveAreaLUA
-    def StartCutSceneMode(self, c): log('CUTSCENE_MODE on')
-    def EndCutSceneMode(self, c): log('CUTSCENE_MODE off')
+    def StartCutSceneMode(self, c):
+        import ie_cutscene; ie_cutscene.mode(1)
+    def EndCutSceneMode(self, c):
+        import ie_cutscene; ie_cutscene.mode(0)
+    def StartCutScene(self, c, res):
+        import ie_cutscene; return ie_cutscene.start(res, c)
+    def CutSceneId(self, c, obj):
+        import ie_cutscene; return ie_cutscene.cutscene_id(c, obj)
+    def Dialogue(self, c, obj): return self.StartDialog(c, None, obj)
+    def PlaySequence(self, c, obj, seq): log('SEQUENCE %s %s (not animated)' % (obj, seq))
+    def FadeToColor(self, c, pt, n=0):
+        secs = max(1, (pt[0] if isinstance(pt, tuple) else 0) // 15)
+        if IN_GAME:
+            try:
+                game.fade(0, 0, 0, secs + 1)     # ToEE: fade out and back in (no separate hold)
+            except Exception as e:
+                log('IE_ERR fade: %s' % e)
+        return secs
+    def FadeFromColor(self, c, pt, n=0): return max(1, (pt[0] if isinstance(pt, tuple) else 0) // 15)
+    def SaveGame(self, c, strref): log('SAVEGAME %s (skipped)' % strref)
+    def ResetJoinRequests(self, c): return None
     def HideCreature(self, c, obj=None, flag=1):
         o = obj or c.me
         if IN_GAME and o is not None:
@@ -1054,6 +1075,13 @@ def _pick(responses):
             return a
     return responses[-1][1]
 
+def _cutscene_on():
+    try:
+        import ie_cutscene
+        return ie_cutscene.active()
+    except ImportError:
+        return False
+
 def tick(obj, ident, area, scripts, force=False):
     """Run one script round for a creature/area. `scripts` = list of generated BCS modules in IE priority order
     (override, specifics, class, race, general, default). Throttled to ROUND_SECS; skipped while the object's
@@ -1066,6 +1094,8 @@ def tick(obj, ident, area, scripts, force=False):
         script_ai(obj, ident, scripts)
     if not force and now - _last_tick.get(ident, -99) < ROUND_SECS:
         return
+    if _cutscene_on():
+        return                         # IE: creature scripts pause in cutscene mode
     if not MODE['round'] and IN_GAME and _in_combat(obj):
         return                         # turn-based combat: the critter's script runs from san_start_combat only
     _last_tick[ident] = now
