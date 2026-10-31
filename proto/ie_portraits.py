@@ -9,13 +9,38 @@ from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ART = os.path.join(os.path.dirname(HERE), 'art', 'portraits')
+MASTERS = os.environ.get('IE_PORTRAIT_MASTERS', '/workspace/portrait-art/masters')   # ie_<key>/ie_<key>_master.png
 # key -> (portraits.mes base id, display name used in file names)
 ART_IDS = {
     'hrothgar': (9900, 'Hrothgar'), 'everard': (9910, 'Everard'), 'arundel': (9920, 'Arundel'),
     'poquelin': (9930, 'Poquelin'), 'belhifet': (9940, 'Belhifet'), 'yxunomei': (9950, 'Yxunomei'),
     'kresselack': (9960, 'Kresselack'), 'conlan': (9970, 'Conlan'),
 }
+# Face boxes on the 1200x1384 master, set by eye: (centre x, top of head/hair/crown, bottom of chin/beard).
+# _m/_s are recropped from these (whole head + margin under the chin, like vanilla NPC_6001_m_Terjon);
+# the commissioned _m/_s PNGs are cropped too tight. A key without a box keeps its source _m/_s.
+FACE = {
+    'hrothgar': (590, 120, 800), 'everard': (630, 120, 820), 'arundel': (530, 90, 770), 'poquelin': (620, 80, 790),
+    'belhifet': (420, 170, 860), 'yxunomei': (580, 110, 840), 'kresselack': (620, 50, 880), 'conlan': (650, 170, 850),
+}
+TOP_PAD, CHIN_PAD = 0.06, 0.14   # fraction of head height above the top / below the chin
 SIZES = {'b': (130, 150), 'm': (42, 37), 's': (53, 47)}
+
+
+def face_crop(master, box, size):
+    """Crop master to size's aspect around box = (cx, top, chin), whole head in frame, then downscale."""
+    cx, top, chin = box; h = chin - top
+    y0 = top - TOP_PAD * h; ch = h * (1 + TOP_PAD + CHIN_PAD); cw = ch * size[0] / size[1]
+    x0 = min(max(cx - cw / 2, 0), master.width - cw); y0 = min(max(y0, 0), master.height - ch)
+    return master.crop((int(x0), int(y0), int(x0 + cw), int(y0 + ch))).resize(size, Image.LANCZOS)
+
+
+def recrop(key):
+    """Rewrite art/portraits/<key>/ie_<key>_{m,s}.png from the master (masters live outside the repo: MASTERS dir)."""
+    src = os.path.join(MASTERS, 'ie_%s' % key, 'ie_%s_master.png' % key)
+    m = Image.open(src).convert('RGB')
+    for k in ('m', 's'):
+        face_crop(m, FACE[key], SIZES[k]).save(os.path.join(ART, key, 'ie_%s_%s.png' % (key, k)))
 
 
 def grey(im):
@@ -60,5 +85,9 @@ def vanilla(toee):
     return toeedata.ToEEData(toee).mes('art/interface/portraits/portraits.mes')
 
 
-if __name__ == '__main__':   # ie_portraits.py <out>/data/art/interface/portraits [toee root]
+if __name__ == '__main__':   # ie_portraits.py <out>/data/art/interface/portraits [toee root] | ie_portraits.py recrop [key...]
+    if sys.argv[1] == 'recrop':
+        for k in sys.argv[2:] or sorted(FACE):
+            recrop(k)
+        sys.exit()
     build(sys.argv[1], vanilla(sys.argv[2]) if len(sys.argv) > 2 else None)
