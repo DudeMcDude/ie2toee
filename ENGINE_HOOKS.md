@@ -47,3 +47,11 @@ or the blocking.
 
 A Temple+ PR could expose the two functions as above. A more general option is a "tile patch" object type that
 the engine toggles together with a portal, so no polling is needed. The runtime currently polls every 250 ms.
+
+## Map script tick (Temple+ `feature/map-script-tick`)
+`TimeEventSystem::MapScriptTick` (TemplePlus/gamesystems/timeevents.cpp) calls the python function
+`map_tick.on_tick(map_id, elapsed_ms)` every N ms (return value = next interval, default 1000) of the anim game clock,
+which stops while the game is paused (Esc menu, inventory/charsheet, slides/movies). It does not use the time event
+queue, so it keeps running across save/load and map changes. `runtime/map_tick.py` forwards it to
+`ie_cutscene.map_tick`, which runs the current map's IE area script(s). Without the hook (older builds) ie_cutscene
+falls back to a self-rescheduling `game.timeevent_add` loop on the game clock.

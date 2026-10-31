@@ -11,7 +11,8 @@
 from toee import *
 import ie_runtime as rt
 
-STATE = {'gen': 0, 'cut': 0, 'cut_since': 0}
+STATE = {'gen': 0, 'cut': 0, 'cut_since': 0, 'hook': 0}   # hook: Temple+ map_tick.on_tick drives the area scripts
+AREA_TICK_MS = 1000
 _area = {}          # area -> (gen, module)
 
 NEWGAME_FLAG = 991  # ToEE global var: the new-game IE globals are set (ie_areas.NEWGAME, e.g. IWD2 CHAPTER = -1)
@@ -40,34 +41,66 @@ def area_start(area):
         mod = __import__(name)
     except ImportError:
         return 0
+    if STATE['hook']:
+        if A_ in _area:
+            return 1                  # engine tick: already running for this map visit
+        try:
+            if game.leader.map != rt.AREA_MAPS.get(A_):
+                return 0              # a critter of another area woke up here: its area script is not this map's
+        except Exception:
+            pass
     STATE['gen'] += 1
     _area[A_] = (STATE['gen'], mod)
     ev = rt._events.setdefault('area_' + A_, {})
     ev['OnCreation'] = game.leader     # IE: OnCreation() is true on the first script round after the area loads
-    rt.log('AREA_SCRIPT %s start (%s)' % (A_, name))
-    game.timeevent_add(_area_step, (A_, STATE['gen']), 500, 1)
+    rt.log('AREA_SCRIPT %s start (%s)%s' % (A_, name, STATE['hook'] and ' [engine tick]' or ''))
+    if not STATE['hook']:     # fallback for Temple+ builds without the map tick: game-clock time event loop
+        game.timeevent_add(_area_step, (A_, STATE['gen']), 500)
     return 1
 
+def map_tick(map_id, elapsed_ms):
+    """Temple+ engine tick (map_tick.on_tick): run the area script(s) of the current map."""
+    if not STATE['hook']:
+        STATE['hook'] = 1; rt.log('AREA_SCRIPT engine map tick active (%d ms)' % AREA_TICK_MS)
+    for area, m in rt.AREA_MAPS.items():
+        if m != map_id:
+            continue
+        if area not in _area:         # e.g. the map tick ran before the first critter heartbeat
+            area_start(area)
+        if area in _area:
+            _run_area(area, _area[area][1])
+    for area in [a for a in _area.keys() if rt.AREA_MAPS.get(a) != map_id]:
+        _area.pop(area, None); rt.log('AREA_SCRIPT %s stop (left the map)' % area)
+    return AREA_TICK_MS
+
 def _area_step(area, gen):
+    if STATE['hook']:
+        return 1                      # the engine tick took over
     ent = _area.get(area)
     if not ent or ent[0] != gen:
         return 1
-    l = game.leader
     try:
+        l = game.leader
         if l == OBJ_HANDLE_NULL or l.map != rt.AREA_MAPS.get(area):
             _area.pop(area, None); rt.log('AREA_SCRIPT %s stop (left the map)' % area)
             return 1
-    except Exception:
-        return 1
+        _run_area(area, ent[1])
+    except Exception as e:
+        rt.log('IE_ERR area loop %s: %s' % (area, e))
+    game.timeevent_add(_area_step, (area, gen), AREA_TICK_MS)   # always reschedule (an exception must not end the loop)
+    return 1
+
+def _run_area(area, mod):
+    l = game.leader
+    if l == OBJ_HANDLE_NULL:
+        return
     ident = 'area_' + area
     if rt._busy.get(ident, 0) <= rt._now():
         c = rt.Ctx(l, None, ident, area, rt._events.setdefault(ident, {}))
         try:
-            rt.run_script(c, ent[1].BLOCKS)
+            rt.run_script(c, mod.BLOCKS)
         except Exception as e:
             rt.log('IE_ERR area script %s: %s' % (area, e))
-    game.timeevent_add(_area_step, (area, gen), 1000, 1)
-    return 1
 
 # ------------------------------------------------------------------------------------------------ cutscenes
 def mode(on):
