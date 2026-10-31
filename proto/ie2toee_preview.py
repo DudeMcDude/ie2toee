@@ -213,6 +213,8 @@ def main():
         copytree(os.path.join(d, 'modules', 'ToEE', 'mes', 'description'), os.path.join(C, 'mes', 'description'))
     copytree(os.path.join(w, 'items', 'modules', 'ToEE', 'mes', 'description'), os.path.join(C, 'mes', 'description'))
     copytree(os.path.join(w, 'items', 'data'), os.path.join(inst, 'data'))
+    import ie_portraits   # commissioned NPC portraits (+ vanilla portraits.mes entries)
+    ie_portraits.build(os.path.join(inst, 'data', 'art', 'interface', 'portraits'), ie_portraits.vanilla(toee))
     scr = os.path.join(C, 'scr')
     for f in [os.path.join(HERE, 'runtime', m + '.py') for m in RUNTIME] + [
             os.path.join(w, 'spells', 'ie_spellmap.py'), os.path.join(w, 'items', 'ie_itemmap.py'),

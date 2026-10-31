@@ -51,3 +51,6 @@ progress.md
 *.tga
 *.diff.local
 local/
+
+# commissioned art (owner-made, not game data)
+!art/portraits/*/*.png

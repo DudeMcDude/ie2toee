@@ -140,6 +140,8 @@ def main():
             if re.match(r'ie_creatures_ar\d+\.py$', f): shutil.copy(os.path.join(d, f), scr)
     copytree(os.path.join(w, 'items', 'modules', 'ToEE', 'mes', 'description'), os.path.join(C, 'mes', 'description'))
     copytree(os.path.join(w, 'items', 'data'), os.path.join(inst, 'data'))
+    import ie_portraits   # commissioned NPC portraits (+ vanilla portraits.mes entries)
+    ie_portraits.build(os.path.join(inst, 'data', 'art', 'interface', 'portraits'), ie_portraits.vanilla(toee))
     if os.path.isfile(os.path.join(mov, 'ie_movies_data.py')):
         os.makedirs(scr, exist_ok=True); shutil.copy(os.path.join(mov, 'ie_movies_data.py'), scr)
         copytree(os.path.join(mov, 'data'), os.path.join(inst, 'data'))

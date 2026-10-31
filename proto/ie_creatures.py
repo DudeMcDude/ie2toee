@@ -766,11 +766,20 @@ class Converter(object):
 # Portraits (vanilla ToEE portraits.mes base ids only; no Co8 art). Keyed by IE CRE resref. Townsfolk rotate through
 # generic sets so the same face doesn't repeat across a map. Monsters and unlisted CREs keep their template proto's portrait.
 # TODO(ai-art): children (damien, eboy1/2, egirl1/2) and squirel have no fitting ToEE portrait; they keep the proto
-# fallback until AI-generated portraits are added (planned as new portraits.mes ids 9000+).
+# fallback until AI-generated portraits are added (new portraits.mes ids 9900+ via ie_portraits.py;
+# Co8 already uses 9000-9754).
 PORTRAITS = {
-    'apsel': 7020, 'innkpr': 6050, 'everard': 6000, 'accalia': 6250, 'hroth': 6330, 'gaspar': 6040,
+    'apsel': 7020, 'innkpr': 6050, 'accalia': 6250, 'gaspar': 6040,
     'pomab': 6100, 'hildreth': 2040, 'erevain': 1040, 'elisia': 7740, 'jhonen': 7640, 'oldjed': 6140,
     'churin': 6610, 'barkeep': 7620,
+    # commissioned art (ie_portraits.py, ids 9900+); IWD
+    'hroth': 9900, 'hroth1': 9900, 'everard': 9910, 'everard2': 9910, 'arundel': 9920, 'arundel1': 9920,
+    'poquelin': 9930, 'belhif': 9940, 'yxungirl': 9950, 'kress': 9960, 'conlan': 9970,
+    # IWD2
+    '11ulbrec': 9980, '12shawfo': 9990, '10hedron': 10000, '11oswald': 10010, '40oswald': 10010, '53oswald': 10010,
+    '41nate': 10020, '60nate': 10020, '60nateh': 10020, '50isair': 10030, '60isair': 10030, '63isair': 10030,
+    '63isair2': 10030, '31madae': 10040, '50madae': 10040, '60madae': 10040, '63madae': 10040, '63madae2': 10040,
+    '30enneli': 10050,
 }
 PORTRAIT_TODO = ('damien', 'eboy1', 'eboy2', 'egirl1', 'egirl2', 'squirel')
 ORC_PORTRAITS = (6470, 6480)   # ToEE's half-orc NPCs Pintark (14207) and Tuelk (14206)
