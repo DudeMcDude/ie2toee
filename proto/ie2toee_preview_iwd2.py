@@ -104,6 +104,8 @@ def main():
     run('path nodes', ['ie_pathnodes.py', '--travel', tr, '--maps', os.path.join(bake, 'modules', 'ToEE', 'maps')])
 
     print('== assemble', flush=True)
+    mov = os.path.join(w, 'movies')   # IWD2's .mve are Bink 1 already: a plain copy (ie_movies.py)
+    run_soft('movies', ['ie_movies.py', 'convert', '--game', ie, '--toee', toee, '--out', mov, '--flavour', 'IWD2'])
     inst = os.path.join(out, 'install'); shutil.rmtree(inst, ignore_errors=True)
     M = os.path.join(inst, 'modules', 'ToEE'); C = os.path.join(inst, 'modules', 'ToEE_core'); scr = os.path.join(C, 'scr')
     for d in (os.path.join(M, 'rules'), scr, os.path.join(C, 'mes', 'description')):
@@ -127,6 +129,10 @@ def main():
             if re.match(r'ie_creatures_ar\d+\.py$', f): shutil.copy(os.path.join(d, f), scr)
     copytree(os.path.join(w, 'items', 'modules', 'ToEE', 'mes', 'description'), os.path.join(C, 'mes', 'description'))
     copytree(os.path.join(w, 'items', 'data'), os.path.join(inst, 'data'))
+    if os.path.isfile(os.path.join(mov, 'ie_movies_data.py')):
+        os.makedirs(scr, exist_ok=True); shutil.copy(os.path.join(mov, 'ie_movies_data.py'), scr)
+        copytree(os.path.join(mov, 'data'), os.path.join(inst, 'data'))
+        copytree(os.path.join(mov, 'modules', 'ToEE', 'movies'), os.path.join(M, 'movies'))
     if os.path.isdir(os.path.join(dlg, 'modules', 'ToEE', 'dlg')):
         copytree(os.path.join(dlg, 'modules', 'ToEE', 'dlg'), os.path.join(C, 'dlg'))
         copytree(os.path.join(dlg, 'modules', 'ToEE', 'scr'), scr)
