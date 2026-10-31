@@ -799,6 +799,22 @@ VARIANT_NAMES = {
 }
 
 
+def helper_actor(act, cre, cv):
+    """IE actors that are script helpers, not creatures: return why to skip, or None. Generic across IE games:
+    - hint text anchors (IWD2 10HINT 'Door_Hint_Text_*': named 'Hint', no dialog/scripts; region scripts
+      DisplayStringHead over them);
+    - guidance "skip_actors": ["cre" or "actor name", ...]."""
+    skip = set(x.lower() for x in cv.gd.g.get('skip_actors', ()))
+    if act['cre'].lower() in skip or act['name'].lower() in skip:
+        return 'guidance skip_actors'
+    scripts = [v for v in (act.get('scripts') or {}).values() if v and v.lower() != 'none']
+    nm = cv.text(cre.name_strref).strip().lower() if cre.name_strref >= 0 else ''
+    if not act.get('dialog') and not scripts and (cre.dialog or '').lower() in ('', 'none') and (
+            nm == 'hint' or re.match(r'.*hint', act['name'], re.I)):
+        return 'hint text anchor'
+    return None
+
+
 def convert_area(game, toee_root, out, area, name_base=27000, options=None, script_base=None, tp_root=None):
     import toeedata
     tx = ToEEIndex(toeedata.ToEEData(toee_root))
@@ -812,6 +828,9 @@ def convert_area(game, toee_root, out, area, name_base=27000, options=None, scri
             cre = iecre.Cre(data, act['cre'])
         except Exception as e:
             specs.append({'actor': act['name'], 'resref': act['cre'], 'status': 'error', 'error': str(e)}); continue
+        why = helper_actor(act, cre, cv)
+        if why:    # invisible script helper (text anchor etc.): not a creature, don't spawn it
+            specs.append({'actor': act['name'], 'resref': act['cre'], 'status': 'skipped', 'reason': why}); continue
         s = cv.convert(cre, act)
         s.update(actor=act['name'], x=act['x'], y=act['y'], orient=act['orient'], schedule=act['schedule'])
         fx = cv.gd.g.get('spawn_fix', {}).get('%s/%s/%s' % (area.upper(), act['name'], act['cre'].lower()))

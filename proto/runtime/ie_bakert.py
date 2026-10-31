@@ -79,7 +79,25 @@ def finalize_critter(o, d, F):
                 o.critter_kill_by_effect()
             except Exception, e:
                 _log('IE_BAKE kill corpse %s: %s' % (s.get('ident') or s.get('resref'), e))
+    if not s.get('dead'):
+        arm(o, s)
     return first
+
+
+def arm(o, s):
+    """Safety net (every load, also fixes old saves): a living critter with an empty main hand that carries a
+    weapon wields its best gear (the bake puts weapons in the wielded slot; this catches saves / spawns that lost it)."""
+    try:
+        if o.item_worn_at(3) != OBJ_HANDLE_NULL:     # item_wear_weapon_primary
+            return
+        if not any(it.get('slot') in ('weapon', 'weapon1', 'quiver', 'ranged') or 'weapon' in str(it.get('slot'))
+                   for it in s.get('items') or ()):
+            return
+        o.item_wield_best_all()
+        if o.item_worn_at(3) != OBJ_HANDLE_NULL:
+            _log('IE_BAKE armed %s' % (s.get('ident') or s.get('resref')))
+    except Exception, e:
+        _log('IE_BAKE arm %s: %s' % (s.get('ident') or s.get('resref'), e))
 
 
 def finalize_item(o, d, F):
