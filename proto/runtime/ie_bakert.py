@@ -140,6 +140,13 @@ def first_heartbeat(o, area):
         pass
     except Exception, e:
         _log('IE_BAKE travel start failed: %s' % e)
+    try:      # the converted intro movie, once per new game
+        import ie_movies_rt
+        ie_movies_rt.play_intro()
+    except ImportError:
+        pass
+    except Exception, e:
+        _log('IE_BAKE intro movie failed: %s' % e)
     a = area.upper(); g = _guid(o)
     seen = _members.get(a)
     now = time.time()

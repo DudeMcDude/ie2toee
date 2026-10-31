@@ -41,7 +41,7 @@ def script_base(i):
 def name_base(i):
     """interior n's creature name ids (description .mes): 20 per area, 60 for the cave (AR1201, 45 actors)"""
     return 27000 + 20 * i + 80 if i <= 18 else 27000 + 20 * 18 + 80 + 60 * (i - 18)
-RUNTIME = ['ie_runtime', 'ie_critters', 'ie_spellrt', 'ie_combat', 'ie_doors', 'ie_bakert', 'ie_itemrt', 'ie_travel']
+RUNTIME = ['ie_runtime', 'ie_critters', 'ie_spellrt', 'ie_combat', 'ie_doors', 'ie_bakert', 'ie_itemrt', 'ie_travel', 'ie_movies_rt']
 
 
 IWD_START = ('AR1006', 440, 464)   # STARTARE.2DA of IWD:EE; classic IWD's copy is encrypted, so it is used for both
@@ -118,6 +118,9 @@ def main():
     ap.add_argument('--toee', required=True, help='your Temple of Elemental Evil folder (GOG or Steam)')
     ap.add_argument('--tp', help='the preview Temple+ folder (default: the folder with TemplePlus.exe next to this one)')
     ap.add_argument('--out', default='iwd_preview_out')
+    ap.add_argument('--movies-ee', help='IWD:EE folder to take the movies from (movies/*.wbm) when --iwd is classic IWD '
+                    'without its CD movie BIFs; needs RAD Video Tools for the Bink 1 encode (ie_movies.py)')
+    ap.add_argument('--no-movies', action='store_true')
     ap.add_argument('--install', action='store_true', help='also copy the result into the ToEE folder')
     ap.add_argument('--engine-pathnodes', action='store_true',
                     help='after --install: let Temple+ itself recalculate every map\'s path node links and write clearance.bin '
@@ -208,6 +211,10 @@ def main():
                        '--jumppoints', os.path.join(bake, 'rules', 'jumppoint.tab')])
     run('path nodes', ['ie_pathnodes.py', '--travel', os.path.join(w, 'ie_travel_data.py'), '--maps', os.path.join(bake, 'modules', 'ToEE', 'maps')])
     print('== assemble', flush=True)
+    mov = os.path.join(w, 'movies')
+    if not a.no_movies:   # intro only for now (long encode); the others: ie_movies.py convert ... without --only
+        run_soft('movies', ['ie_movies.py', 'convert', '--game', ie, '--toee', toee, '--out', mov, '--only', 'intro', '--flavour', 'IWD'] +
+                 (['--ee', os.path.abspath(a.movies_ee)] if a.movies_ee else []))
     inst = os.path.join(out, 'install'); shutil.rmtree(inst, ignore_errors=True)
     M = os.path.join(inst, 'modules', MODULE); C = os.path.join(inst, 'modules', MODULE + '_core')
     os.makedirs(os.path.join(inst, 'modules'), exist_ok=True)   # modules\IWD.dat: see the install step
@@ -239,6 +246,10 @@ def main():
             os.path.join(w, 'ie_travel_data.py')] + [os.path.join(w, 'ie_doors_%s.py' % ar.lower()) for ar in interiors] + [
             os.path.join(bake, 'ie_bake_%s.py' % ar.lower()) for ar in interiors]:
         shutil.copy(f, scr)
+    if os.path.isfile(os.path.join(mov, 'ie_movies_data.py')):
+        shutil.copy(os.path.join(mov, 'ie_movies_data.py'), scr)
+        copytree(os.path.join(mov, 'data'), os.path.join(inst, 'data'))
+        copytree(os.path.join(mov, 'modules', 'ToEE', 'movies'), os.path.join(M, 'movies'))
     with open(os.path.join(scr, 'iwd.py'), 'w') as f:      # (optional now: new games start in Easthaven)      # console helper:  import iwd; iwd.go()
         f.write('from toee import *\n\ndef go():\n    """Travel to the converted town (map %d)."""\n'
                 '    import ie_travel\n    ie_travel.start()      # walk into a building door / the road exit: the party travels (docs/travel.md)\n'
