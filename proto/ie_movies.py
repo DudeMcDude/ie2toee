@@ -46,8 +46,14 @@ def duration(src):
     try:
         return float(subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of',
                                               'csv=p=0', src]).decode().strip())
-    except Exception:
-        return 0.0
+    except Exception:     # Interplay MVE: no container duration -> decode it once
+        try:
+            err = subprocess.run(['ffmpeg', '-v', 'info', '-i', src, '-f', 'null', '-'], stderr=subprocess.PIPE,
+                                 stdout=subprocess.DEVNULL).stderr.decode('latin-1', 'replace')
+            t = re.findall(r'time=(\d+):(\d+):([\d.]+)', err)[-1]
+            return int(t[0]) * 3600 + int(t[1]) * 60 + float(t[2])
+        except Exception:
+            return 0.0
 
 
 def to_bink1(src, dst, tmp):
@@ -60,13 +66,16 @@ def to_bink1(src, dst, tmp):
     for k in range(n):
         avi = os.path.join(tmp, 'in.avi'); out = os.path.join(tmp, 'out.bik')
         subprocess.check_call(['ffmpeg', '-v', 'error', '-y', '-ss', str(k * CHUNK_S), '-t', str(CHUNK_S), '-i', src,
-                               '-c:v', 'rawvideo', '-pix_fmt', 'bgr24', '-c:a', 'pcm_s16le', '-ar', '22050', avi])
+                               ] + (['-r', '15'] if src.lower().endswith('.mve') else []) + ['-c:v', 'rawvideo', '-pix_fmt', 'bgr24', '-c:a', 'pcm_s16le', '-ar', '22050', avi])
         wp = (lambda p: p) if os.name == 'nt' else (lambda p: 'Z:' + p.replace('/', '\\'))   # '/x' would be a switch
         cmd = [rv, 'binkc', wp(avi), wp(out), '/v1', '/o', '/#']
         if os.name != 'nt':
             env = dict(os.environ, WINEDEBUG='-all')
             env.setdefault('WINEPREFIX', rv.split('/drive_c/')[0])
-            subprocess.call(['xvfb-run', '-a', 'wine'] + cmd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            try:
+                subprocess.call(['xvfb-run', '-a', 'wine'] + cmd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=900)
+            except subprocess.TimeoutExpired:
+                pass
         else:
             subprocess.call(cmd)
         os.remove(avi)
