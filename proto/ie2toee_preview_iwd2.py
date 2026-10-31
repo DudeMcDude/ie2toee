@@ -132,7 +132,7 @@ def main():
     if os.path.isfile(os.path.join(mov, 'ie_movies_data.py')):
         os.makedirs(scr, exist_ok=True); shutil.copy(os.path.join(mov, 'ie_movies_data.py'), scr)
         copytree(os.path.join(mov, 'data'), os.path.join(inst, 'data'))
-        copytree(os.path.join(mov, 'modules', 'ToEE', 'movies'), os.path.join(M, 'movies'))
+        copytree(os.path.join(mov, 'modules', 'ToEE'), M)   # movies/, slide/, sound/speech/slide/, mes/subtitles/
     if os.path.isdir(os.path.join(dlg, 'modules', 'ToEE', 'dlg')):
         copytree(os.path.join(dlg, 'modules', 'ToEE', 'dlg'), os.path.join(C, 'dlg'))
         copytree(os.path.join(dlg, 'modules', 'ToEE', 'scr'), scr)
