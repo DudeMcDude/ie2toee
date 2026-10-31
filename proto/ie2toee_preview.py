@@ -213,7 +213,7 @@ def main():
     print('== assemble', flush=True)
     mov = os.path.join(w, 'movies')
     if not a.no_movies:   # intro only for now (long encode); the others: ie_movies.py convert ... without --only
-        run_soft('movies', ['ie_movies.py', 'convert', '--game', ie, '--toee', toee, '--out', mov, '--only', 'intro', '--flavour', 'IWD'] +
+        run_soft('movies', ['ie_movies.py', 'convert', '--game', ie, '--toee', toee, '--out', mov, '--only', 'intro', 'slides', '--flavour', 'IWD'] +
                  (['--ee', os.path.abspath(a.movies_ee)] if a.movies_ee else []))
     inst = os.path.join(out, 'install'); shutil.rmtree(inst, ignore_errors=True)
     M = os.path.join(inst, 'modules', MODULE); C = os.path.join(inst, 'modules', MODULE + '_core')
@@ -249,7 +249,7 @@ def main():
     if os.path.isfile(os.path.join(mov, 'ie_movies_data.py')):
         shutil.copy(os.path.join(mov, 'ie_movies_data.py'), scr)
         copytree(os.path.join(mov, 'data'), os.path.join(inst, 'data'))
-        copytree(os.path.join(mov, 'modules', 'ToEE', 'movies'), os.path.join(M, 'movies'))
+        copytree(os.path.join(mov, 'modules', 'ToEE'), M)   # movies/, slide/, sound/speech/slide/, mes/subtitles/
     with open(os.path.join(scr, 'iwd.py'), 'w') as f:      # (optional now: new games start in Easthaven)      # console helper:  import iwd; iwd.go()
         f.write('from toee import *\n\ndef go():\n    """Travel to the converted town (map %d)."""\n'
                 '    import ie_travel\n    ie_travel.start()      # walk into a building door / the road exit: the party travels (docs/travel.md)\n'

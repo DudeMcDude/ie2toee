@@ -16,3 +16,18 @@ def play_intro():
         game.moviequeue_add(m)
     game.moviequeue_play()
     return 1
+
+
+def play(key):
+    """Queue and play a converted movie / chapter slide by key ('intro', 'chapter1', 'middle', ...)."""
+    try:
+        import ie_movies_data
+        ids = ie_movies_data.MOVIES.get(key)
+    except ImportError:
+        return 0
+    if not ids:
+        return 0
+    for m in ids:
+        game.moviequeue_add(m)
+    game.moviequeue_play()
+    return 1

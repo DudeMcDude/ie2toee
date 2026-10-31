@@ -14,7 +14,7 @@
 # Variables: IE GLOBAL / LOCALS / <area> / MYAREA variables are kept in game.global_vars slots that the converter
 # allocated (module ie_varslots: SLOTS = {'global:name': index, ...}); unallocated ones fall back to an in-memory
 # dict (logged, not saved). Timers (SetGlobalTimer) store the expiry time in game seconds.
-import random
+import random, re
 try:
     _NUM = (int, long, float)
 except NameError:      # python 3 (offline tests)
@@ -783,7 +783,27 @@ class _Actions(object):
         if xp:
             self.AddXPVar(c, row, xp)
     def RevealAreaOnMap(self, c, area): log('REVEAL %s' % area)
-    def StartMovie(self, c, res): log('MOVIE %s (not played)' % res)
+    def StartMovie(self, c, res):
+        log('MOVIE %s' % res)
+        if IN_GAME:
+            import ie_movies_rt
+            ie_movies_rt.play(res.lower())
+    def IncrementChapter(self, c, res=''):
+        """IE chapter break: CHAPTER += 1 and the chapter screen -> the converted ToEE slide (ie_movies.py).
+        IWD names the text ("CHPTXT<n>"); IWD2 passes "" and shows CHAPTERS.2DA row <old CHAPTER> (prologue first)."""
+        old = get_var(c, 'CHAPTER', 'GLOBAL')
+        set_var(c, 'CHAPTER', 'GLOBAL', old + 1)
+        m = re.match(r'chptxt(\d+)$', (res or '').lower())
+        n = int(m.group(1)) if m else old
+        log('CHAPTER %d -> slide %d' % (old + 1, n))
+        if IN_GAME:
+            import ie_movies_rt
+            ie_movies_rt.play('chapter%d' % n)
+    def TextScreen(self, c, res):
+        m = re.match(r'chptxt(\d+)$', (res or '').lower())
+        if m and IN_GAME:
+            import ie_movies_rt
+            ie_movies_rt.play('chapter%s' % m.group(1))
     def ReturnToSavedLocation(self, c): return None
     def LeaveAreaLUA(self, c, area, parchment, pt, face=0):
         m = AREA_MAPS.get(area.upper())
