@@ -784,11 +784,50 @@ PORTRAITS = {
     '11elytha': 10060, '11deird': 10070, '11koluhm': 10080, '11phaen': 10090, '12phaen': 10090,
     '10reig': 10100, '12reig': 10100, '10guthe': 10110, '60iselor': 10120, '10kicksh': 10130, '12kicksh': 10130,
 }
-PORTRAIT_TODO = ('damien', 'eboy1', 'eboy2', 'egirl1', 'egirl2', 'squirel')
+PORTRAIT_TODO = ()   # batch 4 covered the children and the squirrel
 ORC_PORTRAITS = (6470, 6480)   # ToEE's half-orc NPCs Pintark (14207) and Tuelk (14206)
 ORC_FAMILIES = ('orc', 'orog')
-TOWNSMEN = (7830, 6620, 6700, 7660)
-TOWNSWOMEN = (7840, 7670, 7910, 7920, 7690)
+TOWNSMEN = (7830, 6620, 6700, 7660, 10210)            # + commissioned old townsman
+TOWNSWOMEN = (7840, 7670, 7910, 7920, 7690, 10200)     # + commissioned fisherwoman
+# Commissioned children / critters (batch 4), IWD + IWD2 resrefs.
+PORTRAITS.update({
+    'damien': 10140, 'damien2': 10140, 'eboy1': 10150, '50childm': 10150, 'eboy2': 10160, 'kukid': 10160,
+    '10kidboy': 10160, 'egirl1': 10170, '10kidgrl': 10170, 'egirl2': 10180, '50childf': 10180,
+})
+# Generic monsters (batch 5): resref -> art family. Each instance picks a portrait from the family's normal pool
+# (art + mirrored flip, ie_portraits.FLIPS) by a hash of area/position, so a pack doesn't share one face;
+# resrefs in MONSTER_UPGRADED (elite, chief, high-level random-spawn entries) use the family's upgraded pool.
+MONSTER_POOLS = {   # family -> (normal ids, upgraded ids); upgraded falls back to normal when there's no art
+    'yeti': ((10230, 10310), (10240, 10320)), 'verbeeg': ((10250, 10330), ()),
+    'frost_giant': ((10260, 10340), (10270, 10350)), 'winter_wolf': ((10280, 10360), ()),
+    'boring_beetle': ((10290, 10370), (10300, 10380)), 'squirrel': ((10190, 10390), ()),
+}
+MONSTER_FAMILY = {}
+for _fam, _rs in {
+    'yeti': 'ms4yeti rvsyeti vslyeti vsyeti kuyeti yetitund 40ryetit 40yetitu 52yettu 52yettur 52yetuh 00syeti '
+            'vscyeti wtcyeti wtyeti 52yetgh 52yettg 52yettgr 00sdyet 00sshyet 00ssyet 41sdyet',
+    'verbeeg': 'ms5verb rtfgverb ss2vrb6 ss2vrb7 ss2vrb8 verbdead verbeeg verbeegd 21verb 31giaver',
+    'frost_giant': 'giantfn giantfro 30frgnt 00ssfgnt 41ssfgnt giantfg 00sdfgnt 00sfrgnt 00sshfgt 41sdfgnt 41sfrgnt 41sshfgt',
+    'winter_wolf': 'as3wint wolfwint winwolf winwolfp rwtwwolf 00swtwlf 41swtwlf 30wwlf 40rwolfw 40wolfwi 50wfwh 50wlfwi '
+                   '50wlfwir druidww 50wfwgh 50wlfwg 50wlfwgr',
+    'boring_beetle': 'beetbor beetleb mbbr druidbb gisborb ms3borb psborbtl 40rbetbo 40betbor 00sbtl13',
+    'squirrel': 'squirel squirel2 eesquirl',
+}.items():
+    MONSTER_FAMILY.update(dict.fromkeys(_rs.split(), _fam))
+MONSTER_UPGRADED = set('vscyeti wtcyeti wtyeti 52yetgh 52yettg 52yettgr 00sdyet 00sshyet 00ssyet 41sdyet '
+                       'giantfg 00sdfgnt 00sfrgnt 00sshfgt 41sdfgnt 41sfrgnt 41sshfgt 00sbtl13 '
+                       '50wfwgh 50wlfwg 50wlfwgr'.split())   # greater winter wolves: no upgraded art yet
+
+
+def monster_portrait(resref, seed):
+    """Per-instance portrait for a generic monster resref (None if not ours). seed: stable per spawn, e.g. 'AREA:x:y'."""
+    import zlib
+    r = (resref or '').lower(); fam = MONSTER_FAMILY.get(r)
+    if not fam:
+        return None
+    normal, up = MONSTER_POOLS[fam]
+    pool = (up if r in MONSTER_UPGRADED else ()) or normal
+    return pool[zlib.crc32(('%s:%s' % (r, seed)).encode()) % len(pool)]
 
 
 def pick_portrait(resref, gender, n):
@@ -850,6 +889,8 @@ def convert_area(game, toee_root, out, area, name_base=27000, options=None, scri
             s['x'], s['y'] = fx
         if s.get('status') == 'ok':
             por = pick_portrait(act['cre'], s.get('gender'), gen[s.get('gender') == 'female'])
+            if por is None:
+                por = monster_portrait(act['cre'], '%s:%s:%s' % (area.upper(), act['x'], act['y']))
             if por is None and (s.get('family') in ORC_FAMILIES or s.get('model') == 104):   # orc / half-orc body
                 por = ORC_PORTRAITS[i % 2]
             if por is not None:
