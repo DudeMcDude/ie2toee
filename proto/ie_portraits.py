@@ -1,6 +1,6 @@
 """Commissioned (AI-generated, owner's own) NPC portraits -> ToEE portrait TGAs + portraits.mes entries.
 
-Ids are 9900+ in steps of 10 (batch 2 runs past 9999: 10000-10054) (Co8 uses 9000-9754). Per id: +0 _b 130x150, +1 _m 42x37, +2 _s 53x47, +3 _s_grey, +4 _m_grey,
+Ids are 9900+ in steps of 10 (batches 2-3 run past 9999: 10000-10134) (Co8 uses 9000-9754). Per id: +0 _b 130x150, +1 _m 42x37, +2 _s 53x47, +3 _s_grey, +4 _m_grey,
 the vanilla NPC layout (vanilla leaves +0 empty for NPCs; we put the big portrait there like the PC entries do).
 Sources: art/portraits/<key>/ie_<key>_{big,m,s}.png (see /workspace/portrait-commission specs).
 """
@@ -18,6 +18,9 @@ ART_IDS = {
     # batch 2: IWD2
     'ulbrec': (9980, 'Ulbrec'), 'shawford': (9990, 'Shawford'), 'hedron': (10000, 'Hedron'), 'oswald': (10010, 'Oswald'),
     'nathaniel': (10020, 'Nathaniel'), 'isair': (10030, 'Isair'), 'madae': (10040, 'Madae'), 'ennelia': (10050, 'Ennelia'),
+    # batch 3: IWD2 secondary NPCs
+    'elytharra': (10060, 'Elytharra'), 'deirdre': (10070, 'Deirdre'), 'koluhm': (10080, 'Koluhm'), 'phaen': (10090, 'Phaen'),
+    'reig': (10100, 'Reig'), 'guthewulf': (10110, 'Guthewulf'), 'iselore': (10120, 'Iselore'), 'kickshaw': (10130, 'Kickshaw'),
 }
 # Face boxes on the 1200x1384 master, set by eye: (centre x, top of head/hair/crown, bottom of chin/beard).
 # _m/_s are recropped from these (whole head + margin under the chin, like vanilla NPC_6001_m_Terjon);
@@ -27,6 +30,8 @@ FACE = {
     'belhifet': (420, 170, 860), 'yxunomei': (580, 110, 840), 'kresselack': (620, 50, 880), 'conlan': (650, 170, 850),
     'ulbrec': (520, 150, 730), 'shawford': (560, 180, 830), 'hedron': (580, 130, 810), 'oswald': (620, 120, 800),
     'nathaniel': (500, 200, 880), 'isair': (560, 150, 850), 'madae': (600, 120, 870), 'ennelia': (600, 220, 880),
+    'elytharra': (590, 90, 700), 'deirdre': (560, 90, 700), 'koluhm': (650, 150, 870), 'phaen': (600, 100, 810),
+    'reig': (565, 120, 820), 'guthewulf': (670, 150, 800), 'iselore': (625, 120, 900), 'kickshaw': (550, 160, 830),
 }
 TOP_PAD, CHIN_PAD = 0.06, 0.14   # fraction of head height above the top / below the chin
 SIZES = {'b': (130, 150), 'm': (42, 37), 's': (53, 47)}

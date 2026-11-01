@@ -780,6 +780,9 @@ PORTRAITS = {
     '41nate': 10020, '60nate': 10020, '60nateh': 10020, '50isair': 10030, '60isair': 10030, '63isair': 10030,
     '63isair2': 10030, '31madae': 10040, '50madae': 10040, '60madae': 10040, '63madae': 10040, '63madae2': 10040,
     '30enneli': 10050,
+    # batch 3
+    '11elytha': 10060, '11deird': 10070, '11koluhm': 10080, '11phaen': 10090, '12phaen': 10090, '63phaen': 10090,
+    '10reig': 10100, '12reig': 10100, '10guthe': 10110, '60iselor': 10120, '10kicksh': 10130, '12kicksh': 10130,
 }
 PORTRAIT_TODO = ('damien', 'eboy1', 'eboy2', 'egirl1', 'egirl2', 'squirel')
 ORC_PORTRAITS = (6470, 6480)   # ToEE's half-orc NPCs Pintark (14207) and Tuelk (14206)
