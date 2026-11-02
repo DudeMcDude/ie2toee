@@ -727,13 +727,34 @@ PORTRAITS.update({
     'damien': 10140, 'damien2': 10140, 'eboy1': 10150, '50childm': 10150, 'eboy2': 10160, 'kukid': 10160,
     '10kidboy': 10160, 'egirl1': 10170, '10kidgrl': 10170, 'egirl2': 10180, '50childf': 10180,
 })
+PORTRAITS.update({'51hhrma': 10420, '50abomin': 10640})   # batch 6 bosses (own art, no flip)
 # Generic monsters (batch 5): resref -> art family. Each instance picks a portrait from the family's normal pool
 # (art + mirrored flip, ie_portraits.FLIPS) by a hash of area/position, so a pack doesn't share one face;
 # resrefs in MONSTER_UPGRADED (elite, chief, high-level random-spawn entries) use the family's upgraded pool.
 MONSTER_POOLS = {   # family -> (normal ids, upgraded ids); upgraded falls back to normal when there's no art
     'yeti': ((10230, 10310), (10240, 10320)), 'verbeeg': ((10250, 10330), ()),
-    'frost_giant': ((10260, 10340), (10270, 10350)), 'winter_wolf': ((10280, 10360), ()),
+    'frost_giant': ((10260, 10340), (10270, 10350)), 'winter_wolf': ((10280, 10360), (10650, 10930)),
     'boring_beetle': ((10290, 10370), (10300, 10380)), 'squirrel': ((10190, 10390), ()),
+    # batch 6
+    'dire_wolf': ((10520, 10810), (10530, 10820)),
+    'rhino_beetle': ((10580, 10870), ()),
+    'skeleton_elite': ((10630, 10920), ()),
+    'goblin_elite': ((10680, 10960), ()),
+    'ice_troll': ((10450, 10740), (10460, 10750)),
+    'salamander_frost': ((10620, 10910), ()),
+    'snow_troll': ((10430, 10720), (10440, 10730)),
+    'wight': ((10590, 10880), (10600, 10890)),
+    'lizardman': ((10500, 10790), (10510, 10800)),
+    'orc_elite': ((10670, 10950), ()),
+    'orc_shaman': ((10660, 10940), ()),
+    'salamander': ((10610, 10900), ()),
+    'yuanti': ((10470, 10760), (10480, 10770)),
+    'umber_hulk': ((10560, 10850), ()),
+    'yuanti_abomination': ((10490, 10780), ()),
+    'bombardier_beetle': ((10570, 10860), ()),
+    'hook_horror': ((10400, 10700), (10410, 10710)),
+    'wyvern': ((10690, 10970), ()),
+    'malarite': ((10540, 10830), (10550, 10840)),
 }
 MONSTER_FAMILY = {}
 for _fam, _rs in {
@@ -745,11 +766,32 @@ for _fam, _rs in {
                    '50wlfwir druidww 50wfwgh 50wlfwg 50wlfwgr',
     'boring_beetle': 'beetbor beetleb mbbr druidbb gisborb ms3borb psborbtl 40rbetbo 40betbor 00sbtl13',
     'squirrel': 'squirel squirel2 eesquirl',
+    # batch 6 (CRE name based, both games: placed, rest-table, 00s/41s spawnables)
+    'dire_wolf': '00sdwlf 41sdwlf 50wfdfh 50wfdh 50wlfdf 50wlfdfr 50wlfdi 50wlfdir as2dire',
+    'rhino_beetle': '00sbtl15 41sbtl15 beetrhin mbrh',
+    'skeleton_elite': '00sabgd 00sarskl 00sbgd 00segbgd 00sgrbgd 41sabgd 41sarskl 41sbgd 41sbgd2 41segbgd 41sgrbgd 61skearm 63abgd 63abgden 63abgdn 65sarskl 67abgd 67grbgd 67grbgd2 bon8005 bon8013 bonegard ktskh1 ktskh2 ktskh3 ktsks1 kttga1 kttga2 kttga3 kttgm1 kttgm3 lskarmms lskarmsw ms7bgrd mskb rkttguam skarmax skarmms skarmsw skelarm skelblad skelbong skelserr skelwaxe skelwham skelwswd sklich undeadlt',
+    'goblin_elite': '00gobare 00gobe 10gobec 12gobare 12gobe 30dgobe 30gobaes 30gobes 31gobhc 62hagob 62hagob1 67ehagob 67hagobe gobehq1 gobline goblinea goblinsp goboeaxe goboebow mgo3 ms2gobb ms2gobe rkpgobe rkpgobea ss2gob1 ss2gob2 ss2gob3',
+    'ice_troll': '20troice 30firtlg 30firtrl 30icetrl 41rtroic 41troice 51troic icetroll rwtgice trollice wticetr1 wticetr2 wticetrl',
+    'salamander_frost': '00sfsal 61salfro invissal ms6salc msmsalc rwtsalf sal8013 salamanf wtsalf1 wtsalf2 wtsalf3',
+    'snow_troll': '41trosno 50trosg 50trosgr 50trosh 50trosn 50trosnr 50tross 50trossh invistrl mtsn trollsno wtsnotro',
+    'wight': '00sbwht 41sbwht 50wit 60wight 60wighth 60wightl 62bwht 63swlmr 63wlmr 65sbwht 65wlmr 67wlmrs ktwgt1 ktwgti1 lwight mwig rdecwig udwight wight wight2 wight3 wightcld wightimb',
+    'lizardman': '00selzds 61dlizle 61lizlea 61lizler 61lizsha 61lizshr 61lizwar 61lizwrr lizdead lizking lizman lm1hwax lm1hwaxy lm1hwms lm1hwmsy lm1hwpo lm1hwpoy lm2hwla lm2hwlay lm2hwna lm2hwnay lm2hwte lm2hwtey lmsham1 lmsham2 lmsham3 lmshkid mliz ms2lizm ms3tliz rdeliza rdeliztl slizman ss1liz3 ss1liz4 ss1liz5 ss2liz5 ss2liz6 ss2liz7 tlizman',
+    'orc_elite': '00orcare 21orcace 21orcelt 31orcare 31orchc 31orcwa mor3 mor4 orcewaxe orcewbow sdorcax3 udorc',
+    'orc_shaman': '20orcshm 20orcshv 30orcsh1 30orcshh 30orcwd 31orchsb 31orchsh 31orcsh1 31orcsh2 31orcwd 31orcwd2 mor5 orcsham sdorcshm',
+    'salamander': '00sdsal 00ssal 00sshsal 00sssal 41sdsal 41sssal ms6salf msmsalf rldsalfi sal8001 sal8005 sal8008 salamand salamanr',
+    'yuanti': '60abprie 60ranyta 60ytarch 60ytcook 60ytelit 60ythipr 60ytprie 60ytsorc 61dyaarc 61dyapri 61dyasen 61dyhpri 61dyhsor 61dypbla 61dypfig 61ryhpri 61ryhsor 61yaarch 61yaprie 61yasent 61yasumm 61yhprie 61yhsorc 61ypblad 61ypblar 61ypfigh 61ypfigr 62hayua 62hayua1 62hayua2 62hayua3 62hayua4 62hayua5 66hayua 66hayua1 66hayua2 66hayua3 ms6yuan msmyuan rdeyuane yuaewax yuaewbl yuaewbo yuaewsw yuanti yuantie yuantip yuanwax yuanwbi yuanwsw yuaxdin yubldin yuchamp yuswdin',
+    'umber_hulk': '00sduhk 00sshuhk 00ssuhk 00suhk 41sduhk 41ssuhk 51umb 51umbr ms7umbh psumbh rldumbh ss3umb8 ss3umb9 traphulk uhlk8004 uhlk8009 uhlk8010 umberhlk',
+    'yuanti_abomination': '60ranyt 60yuanti yuantia',
+    'bombardier_beetle': '00sbtl11 41sbtl11 beetbomb gisbomb ms2bbtl',
+    'hook_horror': '00shkh 51hhr 51hhrgh 51hhrgu 51hhrh',
+    'wyvern': '00swyv 41swyv 50wyv 50wyvh 50wyvr 61awyver 61dawyve 61wyvern 61wyverr',
+    'malarite': '20malara 20malarh 20malarp 20rndmal',
 }.items():
     MONSTER_FAMILY.update(dict.fromkeys(_rs.split(), _fam))
 MONSTER_UPGRADED = set('vscyeti wtcyeti wtyeti 52yetgh 52yettg 52yettgr 00sdyet 00sshyet 00ssyet 41sdyet '
                        'giantfg 00sdfgnt 00sfrgnt 00sshfgt 41sdfgnt 41sfrgnt 41sshfgt 00sbtl13 '
-                       '50wfwgh 50wlfwg 50wlfwgr'.split())   # greater winter wolves: no upgraded art yet
+                       '50wfwgh 50wlfwg 50wlfwgr'.split())   # greater winter wolves (batch 6 art)
+MONSTER_UPGRADED |= set('00selzds 20malarh 20malarp 30firtlg 30firtrl 30icetrl 50trosg 50trosgr 50tross 50trossh 50wfdfh 50wlfdf 50wlfdfr 51hhrgh 51hhrgu 60abprie 60wightl 60ytelit 60ythipr 60ytprie 60ytsorc 61dlizle 61dyapri 61dyasen 61dyhpri 61dyhsor 61lizlea 61lizler 61lizsha 61lizshr 61ryhpri 61ryhsor 61yaprie 61yasent 61yasumm 61yhprie 61yhsorc 63swlmr 63wlmr 65wlmr 67wlmrs ktwgti1 lizking lm2hwla lm2hwlay lm2hwna lm2hwnay lm2hwte lm2hwtey lmsham1 lmsham2 lmsham3 lmshkid ms3tliz ms6yuan msmyuan rdeliztl rdeyuane rwtgice slizman ss2liz5 ss2liz6 ss2liz7 tlizman wightimb wticetr1 wticetrl yuaewax yuaewbl yuaewbo yuaewsw yuantie yuantip yuchamp'.split())   # batch 6 elites
 
 
 def monster_portrait(resref, seed):
