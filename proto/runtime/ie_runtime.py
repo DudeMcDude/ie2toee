@@ -648,6 +648,10 @@ class _Actions(object):
             return
         log('DIALOG %s -> %s' % (c.ident, obj))
         try:
+            c.me.turn_towards(obj); obj.turn_towards(c.me)      # Co8 style: face each other, then talk
+        except Exception:
+            pass
+        try:
             if obj in game.party:
                 c.me.object_script_execute(obj, san_dialog)    # same path as the player clicking the NPC
             else:
@@ -740,10 +744,7 @@ class _Actions(object):
         txt = text(strref)
         log('FLOAT %s' % txt)
         if IN_GAME and (obj or c.me) is not None:
-            try:
-                (obj or c.me).float_text_line(txt, 0)
-            except Exception:
-                pass
+            speech_bubble(obj or c.me, strref, txt)
     def Face(self, c, d):
         # IE orientation: 16 steps, 0 = south (screen down), clockwise: 4 = west, 8 = north, 12 = east
         if IN_GAME and c.me is not None:
@@ -840,6 +841,34 @@ class _Actions(object):
     def CutSceneId(self, c, obj):
         import ie_cutscene; return ie_cutscene.cutscene_id(c, obj)
     def Dialogue(self, c, obj): return self.StartDialog(c, None, obj)
+    def MoveViewPoint(self, c, pt, speed=0):
+        u, v = ie_to_tile(c.area, pt[0], pt[1])
+        log('CAMERA %s -> IE(%d,%d) tile(%d,%d)' % (c.ident, pt[0], pt[1], u, v))
+        if IN_GAME:
+            try:
+                game.scroll_to(long(location_from_axis(u, v)))     # Temple+: smooth CenterOn
+            except Exception as e:
+                log('IE_ERR MoveViewPoint: %s' % e)
+        return 1
+    def MoveViewObject(self, c, obj, speed=0):
+        log('CAMERA %s -> %s' % (c.ident, obj))
+        if IN_GAME and obj is not None:
+            try:
+                game.scroll_to(obj)
+            except Exception as e:
+                log('IE_ERR MoveViewObject: %s' % e)
+        return 1
+    def HideGUI(self, c):
+        import ie_cutscene; ie_cutscene.gui(0)
+    def UnhideGUI(self, c):
+        import ie_cutscene; ie_cutscene.gui(1)
+    def ClearPartyEffects(self, c): return None
+    def SpellHitEffectSprite(self, c, src, tgt, eff, height=0):
+        if IN_GAME and (tgt or c.me) is not None:
+            try:
+                game.particles('sp-Summon Monster I', tgt or c.me)    # a generic magical flash for IE VVC hit sprites
+            except Exception as e:
+                log_once('vvc', 'IE_ERR SpellHitEffectSprite: %s' % e)
     def PlaySequence(self, c, obj, seq):
         play_sequence(obj, seq, c)
     def FadeToColor(self, c, pt, n=0):
@@ -908,6 +937,34 @@ class _Actions(object):
     SpellPointRES, ForceSpellPointRES, ReallyForceSpellPointRES = SpellPoint, ForceSpellPoint, ReallyForceSpellPoint
 
 A = _Actions()
+
+def speech_bubble(o, strref, txt):
+    """Floating text as a ToEE speech bubble (objhndl.float_line on the shared ie_barks dialog file: line id = strref;
+    the bubble stays up for the length of the line). Fallback: the short float_text_line."""
+    try:
+        import ie_strings
+        sid = getattr(ie_strings, 'BARKS_SID', 0)
+    except ImportError:
+        sid = 0
+    if sid and isinstance(strref, _NUM):
+        old = None
+        try:
+            old = o.scripts[san_dialog]
+            o.scripts[san_dialog] = sid
+            o.float_line(int(strref), game.leader)
+            return
+        except Exception as e:
+            log_once('bubble:%s' % strref, 'IE_ERR speech bubble %s on %s (dialog script %r): %s' % (strref, o, old, e))
+        finally:
+            if old is not None:
+                try:
+                    o.scripts[san_dialog] = old
+                except Exception:
+                    pass
+    try:
+        o.float_text_line(txt, 0)
+    except Exception:
+        pass
 
 # IE SEQ.IDS -> ToEE: ('anim', id) = objhndl.anim_goal_push(id) (ToEE animate ids: 76 + NormalAnimType, e.g. 94 =
 # conjuration casting as in ToEE's own Jaroo script), 'fall' = fall_down(), 'hit' = hit-by-weapon, 'attack' = swing.

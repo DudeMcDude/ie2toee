@@ -189,6 +189,9 @@ def active():
         mode(0)
     return bool(STATE['cut'])
 
+_SKIP_IN_DIALOG = ('Wait', 'SmallWait', 'MultiPlayerSync', 'StartCutSceneMode', 'EndCutSceneMode')
+_RUN = {'res': None, 'left': 0}     # the running cutscene and its blocks still busy (auto EndCutSceneMode)
+
 def start(res, c):
     name = 'ie_bcs_%s_area' % res.lower()
     try:
@@ -196,8 +199,12 @@ def start(res, c):
     except ImportError:
         rt.log('IE_UNSUPPORTED cutscene %s (not converted)' % res); mode(0)
         return None
-    rt.log('CUTSCENE %s (%d blocks) by %s' % (res, len(mod.BLOCKS), c.ident))
+    kind = getattr(mod, 'KIND', 'scene')
+    rt.log('CUTSCENE %s (%d blocks, %s) by %s' % (res, len(mod.BLOCKS), kind, c.ident))
+    if kind == 'dialog':
+        return _dialog_start(res, c, mod)
     mode(1)
+    blocks = []
     for i, (cond, resps) in enumerate(mod.BLOCKS):
         c2 = rt.Ctx(c.me, c.other, 'cs_%s_%d' % (res.lower(), i), c.area, {})
         try:
@@ -205,8 +212,51 @@ def start(res, c):
         except Exception as e:
             rt.log('IE_ERR cutscene %s #%d: %s' % (res, i, e)); ok = False
         if ok and resps:
-            _run_block(c2, list(resps[0][1]))
+            blocks.append((c2, list(resps[0][1])))
+    _RUN['res'] = res.lower(); _RUN['left'] = len(blocks)
+    for c2, acts in blocks:
+        _run_block(c2, acts + [lambda c, r=res.lower(): _block_done(r)])
     return None
+
+def _block_done(res):
+    """A cutscene block ran its last action. IE scripts end with EndCutSceneMode; many IWD2 ones never do (the next
+    dialogue / area script takes over), so the cutscene ends here once every block is through."""
+    if _RUN['res'] != res:
+        return None
+    _RUN['left'] -= 1
+    if _RUN['left'] <= 0:
+        _RUN['res'] = None
+        if STATE['cut']:
+            rt.log('CUTSCENE_END %s (all blocks done)' % res); mode(0)
+    return None
+
+def _dialog_start(res, c, mod):
+    """Dialogue-only cutscene (turn + one dialogue): a plain scripted dialogue start, Co8 style - no cutscene mode,
+    letterbox or waits; ToEE's dialogue pans the camera to the speaker itself."""
+    for i, (cond, resps) in enumerate(mod.BLOCKS):
+        c2 = rt.Ctx(c.me, c.other, 'cs_%s_%d' % (res.lower(), i), c.area, {})
+        try:
+            if not (cond(c2) and resps):
+                continue
+            acts = list(resps[0][1])
+            if acts:
+                acts[0](c2)          # CutSceneId: pick the actor
+            for f in acts[1:]:
+                src = getattr(f, 'func_code', None) or getattr(f, '__code__', None)
+                names = src and src.co_names or ()
+                if any(n in names for n in _SKIP_IN_DIALOG):
+                    continue
+                f(c2)
+        except Exception as e:
+            rt.log('IE_ERR dialog cutscene %s #%d: %s' % (res, i, e))
+    rt.log('CUTSCENE_AS_DIALOG %s' % res)
+    return None
+
+def gui(show):
+    """HideGUI / UnhideGUI -> the cutscene letterbox (outside cutscene mode too)."""
+    if rt.IN_GAME:
+        _lock(0 if show and not STATE['cut'] else 1)
+    rt.log('CUTSCENE_GUI %s' % (show and 'show' or 'hide'))
 
 def _run_block(c2, acts):
     """Run a cutscene block: a leading CutSceneId picks the actor; the rest joins that actor's action queue."""
