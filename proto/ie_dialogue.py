@@ -354,6 +354,8 @@ def main():
                 rep.setdefault('cutscenes', []).append({'res': r_, 'module': m, 'blocks': nb})
             except Exception as e:
                 print('warning: cutscene %s: %s' % (r_, e))
+    for am_ in a.area_map:     # ie_spawn.area_spawns: ARE spawn points fire once per game (saved flag)
+        allvars.add('global:#spawned_' + am_.split(':')[0].lower())
     keys = sorted(allvars)
     if len(keys) > a.slot_max - a.slot_base + 1:
         raise SystemExit('too many variables (%d) for slots %d..%d' % (len(keys), a.slot_base, a.slot_max))

@@ -41,7 +41,7 @@ def script_base(i):
 def name_base(i):
     """interior n's creature name ids (description .mes): 20 per area, 60 for the cave (AR1201, 45 actors)"""
     return 27000 + 20 * i + 80 if i <= 18 else 27000 + 20 * 18 + 80 + 60 * (i - 18)
-RUNTIME = ['ie_runtime', 'ie_critters', 'ie_spellrt', 'ie_combat', 'ie_doors', 'ie_bakert', 'ie_itemrt', 'ie_travel', 'ie_movies_rt', 'ie_cutscene', 'map_tick']
+RUNTIME = ['ie_runtime', 'ie_critters', 'ie_spellrt', 'ie_combat', 'ie_doors', 'ie_bakert', 'ie_itemrt', 'ie_travel', 'ie_movies_rt', 'ie_cutscene', 'map_tick', 'ie_spawn']
 
 
 IWD_START = ('AR1006', 440, 464)   # STARTARE.2DA of IWD:EE; classic IWD's copy is encrypted, so it is used for both
@@ -167,6 +167,9 @@ def main():
         sum((['--area-map', '%s:%d:%d,%d' % ((ar, mid) + tuple(json.load(open(os.path.join(w, ar + '_objects.json')))
                                                               ['placement']['canvas_offset']))]      # (merges the interiors into ie_areas.py)
              for ar, mid in sorted(interiors.items())), []))
+    spw = os.path.join(w, 'spawnables')   # CreateCreature / ARE spawn-point CREs of the converted areas (ie_spawn.py)
+    run_soft('spawnables', ['ie_creatures.py', 'spawnables', ie, toee, spw, '--scr', os.path.join(cre, 'dialogue'),
+                            '--area', AREA] + sum((['--area', ar] for ar in sorted(interiors)), []) + tpa)
     stores, shop_of = set(), {}   # the IE stores the converted dialogues open (StartStore) -> ToEE barter stock
     for root, _, fs in os.walk(os.path.join(cre, 'dialogue')):
         for fn in fs:
@@ -237,6 +240,9 @@ def main():
     copytree(os.path.join(bake, 'modules', 'ToEE', 'scr'), os.path.join(C, 'scr'))
     for d in [cre] + list(icre.values()):
         copytree(os.path.join(d, 'modules', 'ToEE', 'mes', 'description'), os.path.join(C, 'mes', 'description'))
+    if os.path.isfile(os.path.join(spw, 'ie_spawnables.py')):
+        shutil.copy(os.path.join(spw, 'ie_spawnables.py'), os.path.join(C, 'scr'))
+        copytree(os.path.join(spw, 'modules', 'ToEE', 'mes', 'description'), os.path.join(C, 'mes', 'description'))
     copytree(os.path.join(w, 'items', 'modules', 'ToEE', 'mes', 'description'), os.path.join(C, 'mes', 'description'))
     copytree(os.path.join(w, 'items', 'data'), os.path.join(inst, 'data'))
     import ie_portraits   # commissioned NPC portraits (+ vanilla portraits.mes entries)

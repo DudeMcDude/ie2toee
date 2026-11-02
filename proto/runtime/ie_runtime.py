@@ -633,6 +633,11 @@ class _Actions(object):
     def Dialog(self, c, obj): return self.StartDialog(c, None, obj)
     def StartDialogNoSet(self, c, obj): return self.StartDialog(c, None, obj)
     def StartDialog(self, c, dlg, obj):
+        if IN_GAME:       # a dialogue inside a cutscene needs the mouse: drop the cutscene input lock
+            try:
+                import ie_cutscene; ie_cutscene._lock(0)
+            except Exception:
+                pass
         if obj is None or not IN_GAME:
             return
         log('DIALOG %s -> %s' % (c.ident, obj))
@@ -767,7 +772,13 @@ class _Actions(object):
         return 2
     def SetInterrupt(self, c, flag): return None
     def CreateCreature(self, c, cre, pt, face=0):
-        log('IE_UNSUPPORTED CreateCreature %s at %r (needs CRE -> proto guidance)' % (cre, pt))
+        import ie_spawn; ie_spawn.create(c, cre, pt, face)
+    CreateCreatureImpassable = CreateCreature
+    def CreateCreatureObject(self, c, cre, obj, *rest):
+        import ie_spawn; ie_spawn.create(Ctx(obj or c.me, c.other, c.ident, c.area, c.events), cre, (-1, -1), 0)
+    CreateCreatureObjectOffscreen = CreateCreatureObject
+    def CreateCreatureObjectOffset(self, c, cre, obj, pt=(0, 0)):
+        import ie_spawn; ie_spawn.create(Ctx(obj or c.me, c.other, c.ident, c.area, c.events), cre, (-1, -1), 0)
     def SetHomeLocation(self, c, pt): return None
     def MoveToSavedLocationn(self, c, name, scope): return None
     MoveToSavedLocation = MoveToSavedLocationn
@@ -823,7 +834,8 @@ class _Actions(object):
     def CutSceneId(self, c, obj):
         import ie_cutscene; return ie_cutscene.cutscene_id(c, obj)
     def Dialogue(self, c, obj): return self.StartDialog(c, None, obj)
-    def PlaySequence(self, c, obj, seq): log('SEQUENCE %s %s (not animated)' % (obj, seq))
+    def PlaySequence(self, c, obj, seq):
+        play_sequence(obj, seq, c)
     def FadeToColor(self, c, pt, n=0):
         secs = max(1, (pt[0] if isinstance(pt, tuple) else 0) // 15)
         if IN_GAME:
@@ -890,6 +902,39 @@ class _Actions(object):
     SpellPointRES, ForceSpellPointRES, ReallyForceSpellPointRES = SpellPoint, ForceSpellPoint, ReallyForceSpellPoint
 
 A = _Actions()
+
+# IE SEQ.IDS -> ToEE: ('anim', id) = objhndl.anim_goal_push(id) (ToEE animate ids: 76 + NormalAnimType, e.g. 94 =
+# conjuration casting as in ToEE's own Jaroo script), 'fall' = fall_down(), 'hit' = hit-by-weapon, 'attack' = swing.
+SEQUENCES = {0: 'attack', 11: 'attack', 12: 'attack', 13: 'attack', 8: 'attack',   # ATTACK*, SHOOT
+             2: ('anim', 76 + 16), 3: ('anim', 76 + 18),                         # CAST, CONJURE
+             4: 'hit', 5: 'fall', 16: 'fall', 1: ('anim', 76 + 3),               # DAMAGE, DIE, SLEEP, AWAKE (get up)
+             14: ('anim', 76 + 34), 15: ('anim', 76 + 32),                        # EMERGE (unconceal), HIDE (conceal)
+             6: ('anim', 76 + 7), 9: ('anim', 76 + 7)}                            # HEAD_TURN, TWITCH -> examine
+
+def play_sequence(obj, seq, c=None):
+    try:
+        seq = int(seq)
+    except Exception:
+        seq = {'attack': 0, 'cast': 2, 'conjure': 3, 'damage': 4, 'die': 5, 'sleep': 16, 'awake': 1}.get(str(seq).lower(), -1)
+    how = SEQUENCES.get(seq)
+    log('SEQUENCE %s %s -> %s' % (obj, seq, how))
+    if not IN_GAME or obj is None or how is None:
+        return None
+    try:
+        if how == 'fall':
+            obj.fall_down()
+        elif how == 'hit':
+            src = (c and c.me is not obj and c.me) or game.leader
+            obj.anim_goal_push_hit_by_weapon(src)
+        elif how == 'attack':
+            tgt = _nearest_enemy(obj) or (game.leader if obj not in game.party else None)
+            if tgt is not None:
+                obj.anim_goal_push_attack(tgt, random.randint(0, 2), 0, 0)
+        else:
+            obj.anim_goal_push(how[1])
+    except Exception as e:
+        log('IE_ERR PlaySequence: %s' % e)
+    return None
 
 def _on_waypoints(o):
     try:
