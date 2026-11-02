@@ -148,6 +148,8 @@ def main():
     copytree(os.path.join(w, 'items', 'data'), os.path.join(inst, 'data'))
     import ie_portraits   # commissioned NPC portraits (+ vanilla portraits.mes entries)
     ie_portraits.build(os.path.join(inst, 'data', 'art', 'interface', 'portraits'), ie_portraits.vanilla(toee))
+    import ie_ui_art   # cutscene letterbox textures (generated)
+    ie_ui_art.write_ui_art(M)
     if os.path.isfile(os.path.join(mov, 'ie_movies_data.py')):
         os.makedirs(scr, exist_ok=True); shutil.copy(os.path.join(mov, 'ie_movies_data.py'), scr)
         copytree(os.path.join(mov, 'data'), os.path.join(inst, 'data'))

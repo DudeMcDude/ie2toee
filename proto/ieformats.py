@@ -1,6 +1,6 @@
 """Parsers for the IE area formats needed to rebuild a map: TIS (palette + PVRZ), WED V1.3,
 ARE V1.0 (BG/IWD) and V9.1 (IWD2), and the SR/HT/LM bitmaps. Layouts per IESDP."""
-import io, struct, zlib
+import io, re, struct, zlib
 import numpy as np
 from PIL import Image
 
@@ -216,11 +216,16 @@ class Are:
                 method=struct.unpack_from('<H', data, o + 0x7a)[0],
                 schedule=struct.unpack_from('<I', data, o + 0x88)[0] & 0xFFFFFF))
         ri_off = u('<I', 0xc0)
-        self.rest_spawns = []
+        self.rest_spawns = []; self.rest = None
         if ri_off and ri_off + 0xE4 <= len(data):
             n = struct.unpack_from('<H', data, ri_off + 0x98)[0]
             self.rest_spawns = [c for c in (cstr(data[ri_off + 0x48 + k * 8:ri_off + 0x50 + k * 8])
                                             for k in range(min(n, 10))) if c]
+            H = lambda o: struct.unpack_from('<H', data, ri_off + o)[0]
+            # IESDP ARE rest interruptions: difficulty 0x9a, removal time 0x9c, max creatures 0xa4, enabled 0xa6,
+            # chance per hour day 0xa8 / night 0xaa (percent)
+            self.rest = dict(creatures=self.rest_spawns, difficulty=H(0x9a), max=H(0xa4), enabled=H(0xa6),
+                             day=H(0xa8), night=H(0xaa), removal=struct.unpack_from('<I', data, ri_off + 0x9c)[0])
         self.regions = []
         for i in range(reg_n):
             o = reg_off + i * 0xC4
@@ -277,3 +282,44 @@ def load_index_bmp(data):
     if im.mode != 'P':
         im = im.convert('P')
     return np.asarray(im)
+
+
+def parse_spawn_ini(text):
+    """IWD/IWD2 area spawn .INI (<area>.ini): [spawn_main] enter=/events= name spawn groups ([group] critters=a,b
+    interval=ticks), each critter section has cre_file, spawn_point=[x.y:face][...], point_select, create_qty,
+    spec_qty, spec_var (+ _value/_operation/_inc), script_name/script_override... Returns
+    {'enter': [group], 'events': [group]} with group = {'name', 'interval' (IE ticks, 15/s), 'critters': [critter]}."""
+    secs, cur = {}, None
+    for line in text.splitlines():
+        line = line.split('//')[0].split(';')[0].strip()
+        m = re.match(r'\[(.+?)\]', line)
+        if m:
+            cur = secs.setdefault(m.group(1).strip().lower(), {}); continue
+        if cur is not None and '=' in line:
+            k, v = line.split('=', 1); cur[k.strip().lower()] = v.strip()
+    def num(v, d=0):
+        m = re.match(r'-?\d+', v or '')
+        return int(m.group()) if m else d
+    def critter(n):
+        s = secs.get(n.lower())
+        if not s or not s.get('cre_file'):
+            return None
+        pts = [(int(x), int(y), int(f or 0)) for x, y, f in re.findall(r'\[(\d+)\.(\d+)(?::(\d+))?\]', s.get('spawn_point', ''))]
+        c = {'name': n, 'cre': s['cre_file'].lower(), 'points': pts, 'select': (s.get('point_select') or 'r')[:1].lower(),
+             'qty': max(1, num(s.get('create_qty'), 1)), 'spec_qty': num(s.get('spec_qty'), 0)}
+        if s.get('spec_var'):
+            c.update(var=s['spec_var'], value=num(s.get('spec_var_value'), 0),
+                     op=(s.get('spec_var_operation') or '').lower(), inc=num(s.get('spec_var_inc'), 0))
+        for k in ('script_name', 'script_override', 'area_diff_1', 'area_diff_2', 'area_diff_3'):
+            if s.get(k):
+                c[k] = s[k]
+        return c
+    out = {'enter': [], 'events': []}
+    main = secs.get('spawn_main', {})
+    for key in ('enter', 'events'):
+        for g in [x.strip() for x in main.get(key, '').split(',') if x.strip()]:
+            gs = secs.get(g.lower(), {})
+            cs = [c for c in (critter(n.strip()) for n in gs.get('critters', '').split(',') if n.strip()) if c]
+            if cs:
+                out[key].append({'name': g, 'interval': num(gs.get('interval'), 1), 'critters': cs})
+    return out

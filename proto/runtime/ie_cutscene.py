@@ -39,7 +39,8 @@ def area_start(area):
     try:
         if game.leader.map == rt.AREA_MAPS.get(A_):
             import ie_spawn
-            ie_spawn.area_spawns(A_)      # ARE spawn points: once per game, on the first visit
+            ie_spawn.hook_rest()          # Co8 resting -> ARE rest tables on IE maps
+            ie_spawn.area_spawns(A_)      # area .INI enter= spawns
     except Exception as e:
         rt.log('IE_ERR area spawns %s: %s' % (A_, e))
     try:
@@ -103,6 +104,11 @@ def _run_area(area, mod):
     l = game.leader
     if l == OBJ_HANDLE_NULL:
         return
+    try:
+        import ie_spawn
+        ie_spawn.tick(area)           # INI events= (timed) spawns
+    except Exception as e:
+        rt.log_once('spawntick', 'IE_ERR spawn tick %s: %s' % (area, e))
     ident = 'area_' + area
     if rt._busy.get(ident, 0) <= rt._now():
         c = rt.Ctx(l, None, ident, area, rt._events.setdefault(ident, {}))
@@ -113,6 +119,37 @@ def _run_area(area, mod):
 
 # ------------------------------------------------------------------------------------------------ cutscenes
 _LOCK = {'w': None, 'clicks': 0}
+
+BAR_TGA = 'art/interface/ie2toee/cs_bar.tga'     # written by the builder (ie_rest_patch.write_ui_art): opaque black
+WASH_TGA = 'art/interface/ie2toee/cs_wash.tga'   # black at ~25% alpha
+
+def _screen_h():
+    """UI height = Temple+ renderHeight from the player's TemplePlus.ini (no Python API exposes it)."""
+    try:
+        import os
+        p = os.path.join(os.environ.get('USERPROFILE', ''), 'Saved Games', 'TemplePlus', 'TemplePlus.ini')
+        h = {}
+        for line in open(p).readlines():
+            if '=' in line:
+                k, v = line.split('=', 1); h[k.strip().lower()] = v.strip()
+        return int(h.get('renderheight') or h.get('windowheight') or 768)
+    except Exception:
+        return 768
+
+def _letterbox(root):
+    """IE cutscene look: black bars top and bottom plus a light dark wash over the view."""
+    try:
+        h = _screen_h(); bar = max(40, h / 9)
+        w = root.add_image(WASH_TGA)
+        if w is not None:
+            w.x, w.y, w.width, w.height = 0, 0, 4096, 4096
+        for y in (0, h - bar):
+            b = root.add_image(BAR_TGA)
+            if b is not None:
+                b.x, b.y, b.width, b.height = 0, y, 4096, bar
+        rt.log('CUTSCENE_LETTERBOX screen h %d bars %d' % (h, bar))
+    except Exception as e:
+        rt.log('IE_ERR letterbox: %s' % e)
 
 def _lock(on):
     """Party input lock: a full-screen transparent button on top of the UI eats mouse clicks (tpgui, Temple+ only)."""
@@ -131,6 +168,7 @@ def _lock(on):
             def eat():
                 _LOCK['clicks'] += 1
             b.set_click_handler(eat)
+            _letterbox(root)
             _LOCK['w'] = root
         if on:
             _LOCK['w'].show(); _LOCK['w'].bring_to_front()
