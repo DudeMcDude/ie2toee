@@ -9,6 +9,9 @@
   Per critter: spec_var condition (GLOBAL, equal_to / greater_than / less_than; no operation = always) and
   spec_var_inc, spec_qty = cap on living copies (counted by converted name), create_qty per run, spawn_point list
   (point_select s = sequential, else random), script_name = the IE name scripts address it by.
+* A spawn whose CRE has a dialog or scripts gets the spec's script_id: the generated pyNNNNNie_<ident>.py (written
+  by ie_dialogue.py with AREA = "") runs its override/class/race/general/default BCS and its dialogue, per instance
+  (instance_ident + ie_runtime.who), like a .mob-placed actor.
 * Several spawns of one batch go to distinct free tiles near their point (ie_critters.free_spot).
 * Rest encounters (ARE rest table -> REST[area]): hook_rest() wraps Co8's random_encounter.can_sleep /
   check_sleep_encounter / encounter_create in memory (installed when an IE area starts; the file is not touched).
@@ -45,7 +48,7 @@ def portrait_for(s, seed):
         return pool[int(_hash('%s:%s' % (s.get('resref', '').lower(), seed)) % len(pool))]
     return s.get('portrait')
 
-def spawn(res, area, u, v, face=None, seed=None, near=None, taken=None, ident=None):
+def spawn(res, area, u, v, face=None, seed=None, near=None, taken=None, ident=None, script_id=None):
     """Spawn converted CRE `res` at tile (u, v); returns the object or None."""
     d = _data()
     s = d and d.SPECS.get(res.lower())
@@ -62,16 +65,37 @@ def spawn(res, area, u, v, face=None, seed=None, near=None, taken=None, ident=No
     if face is not None:
         s['orient'] = face
     try:
-        o = cr.spawn(s, location_from_axis(u, v))
+        o = cr.spawn(s, location_from_axis(u, v), script_id)
         try:
             cr.place_near(o, u, v, _taken() if taken is None else taken)
         except Exception:
             pass
     except Exception, e:
         rt.log('IE_ERR spawn %s: %s' % (res, e)); return None
-    rt.bind(o, ident or s.get('ident') or res.lower(), area)
+    rt.bind(o, instance_ident(ident or s.get('ident') or res.lower()), area)
     rt.log('SPAWN %s at tile(%d,%d) portrait %s' % (res, u, v, por))
+    if script_id or s.get('script_id'):
+        game.timeevent_add(_heartbeat, (o, 1), HEARTBEAT_MS, 1)
     return o
+
+# The engine schedules NPC heartbeats only for objects whose scripts were set when they entered the map, so a
+# runtime spawn's san_first_heartbeat / san_heartbeat would never run: drive them from a time event instead
+# (tick() is throttled to ROUND_SECS, so an engine heartbeat on top of this does no harm).
+HEARTBEAT_MS = 1000
+
+def _heartbeat(o, first=0):
+    try:
+        if o == OBJ_HANDLE_NULL or (o.object_flags_get() & (OF_DESTROYED | OF_OFF)):
+            return 0
+        if first:
+            o.object_script_execute(o, san_first_heartbeat)
+        if o.stat_level_get(stat_hp_current) <= -10:
+            return 0
+        o.object_script_execute(o, san_heartbeat)
+    except Exception, e:
+        rt.log('IE_ERR spawn heartbeat %s: %s' % (o, e)); return 0
+    game.timeevent_add(_heartbeat, (o, 0), HEARTBEAT_MS, 1)
+    return 0
 
 def create(c, res, pt, face=0):
     """IE CreateCreature(res, point, face)."""
@@ -85,6 +109,17 @@ def create(c, res, pt, face=0):
     else:
         u, v = rt.ie_to_tile(c.area, x, y)
     return spawn(res, c.area or '', u, v, face, seed='%s:%s:%s' % ((c.area or '').upper(), x, y) if x >= 0 and _N[0] == 0 else None)
+
+_IDS = {}
+
+def instance_ident(base):
+    """First copy answers to the IE script name itself (N("Veira")); further copies get base#2, base#3.. so each runs
+    its own script round, timers and events (ie_runtime keys those by ident)."""
+    n = _IDS.get(base, 0) + 1
+    _IDS[base] = n
+    if n == 1:
+        return base
+    return '%s#%d' % (base, n)
 
 _TK = {'t': None, 'at': -99999}
 
@@ -132,7 +167,57 @@ def _cond(c):
     if op == 'greater_than': return x > want
     if op == 'less_than': return x < want
     if op == 'not_equal_to': return x != want
+    if op == 'less_or_equal_to': return x <= want
+    if op == 'greater_or_equal_to': return x >= want
+    return x != 0          # spec_var without an operation: spawn while the variable is set (GemRB IniSpawn)
+
+SPECIFICS = {}     # object key -> IE SPECIFICS (INI ai_specifics), for spec = [..specifics] counts
+SEE_FT = 90        # "the party can see the point": a party member this close (ToEE has no IE visibility map)
+
+def _area_diff(area):
+    """IWD2 area difficulty 1..3: average party level against the ARE V9.1 thresholds (ini['diff'])."""
+    t = (_ini(area) or {}).get('diff')
+    if not t:
+        return 1
+    try:
+        p = [x for x in game.party]
+        lvl = sum([x.stat_level_get(stat_level) for x in p]) / max(1, len(p))
+    except Exception:
+        return 1
+    if t[1] and lvl >= t[1]: return 3
+    if t[0] and lvl >= t[0]: return 2
     return 1
+
+def _seen(loc):
+    try:
+        for p in game.party:
+            if p.distance_to(loc) < SEE_FT:
+                return 1
+    except Exception:
+        pass
+    return 0
+
+def _alive(o):
+    try:
+        return o.stat_level_get(stat_hp_current) > -10 and not (o.object_flags_get() & OF_DESTROYED)
+    except Exception:
+        return 0
+
+def _count_spec(spec):
+    """Living spawns matching an INI spec [EA.GENERAL.RACE.CLASS.SPECIFICS..]: by SPECIFICS (the only field the
+    IWD2 INIs set); None when the spec names nothing countable."""
+    if len(spec) < 6 or not spec[5]:
+        return None
+    n = 0
+    for k, sp in SPECIFICS.items():
+        if sp == spec[5]:
+            try:
+                o = game.get_obj_by_id(k)
+            except Exception:
+                o = None
+            if o and _alive(o):
+                n += 1
+    return n
 
 def ini_critter(area, c):
     """Run one INI critter section; returns the number spawned."""
@@ -140,22 +225,37 @@ def ini_critter(area, c):
     s = d and d.SPECS.get(c['cre'])
     if not s or not c.get('points') or not _cond(c):
         return 0
+    if c.get('no_diff') and _area_diff(area) in c['no_diff']:
+        return 0
+    if c.get('spec_name') and rt.N(None, c['spec_name']) is not None:
+        return 0
     if c.get('select') == 's':
         k = _SEQ.get((area, c['name']), 0); _SEQ[(area, c['name'])] = k + 1
         x, y, f = c['points'][k % len(c['points'])]
     else:
         x, y, f = c['points'][game.random_range(0, len(c['points']) - 1)]
     u, v = rt.ie_to_tile(area, x, y)
+    from utilities import location_from_axis
+    loc = location_from_axis(u, v)
+    if not c.get('ignore_can_see') and _seen(loc):
+        return 0
     qty = c.get('qty', 1)
     if c.get('spec_qty'):
-        from utilities import location_from_axis
-        qty = min(qty, c['spec_qty'] - _alive_named(s.get('name_id'), location_from_axis(u, v)))
+        have = _count_spec(c['spec']) if c.get('spec') else None
+        if have is None:
+            have = _alive_named(s.get('name_id'), loc)
+        qty = min(qty, c['spec_qty'] - have)
     n = 0
     for i in range(max(0, min(qty, 12))):
-        if spawn(c['cre'], area, u, v, f, ident=(c.get('script_name') or '').lower() or None):
+        o = spawn(c['cre'], area, u, v, f, ident=c.get('ident') or (c.get('script_name') or '').lower() or None,
+                  script_id=c.get('script_id'))
+        if o:
             n += 1
+            sp = (c.get('ai') or {}).get('specifics')
+            if sp:
+                SPECIFICS[rt._key(o)] = sp
     if n and c.get('inc'):
-        rt.set_var(None, c['var'], 'GLOBAL', (rt.get_var(None, c['var'], 'GLOBAL') or 0) + c['inc'])
+        rt.set_var(None, c['var'], 'GLOBAL', (rt.get_var(None, c['var'], 'GLOBAL') or 0) + c['inc'] * n)
     return n
 
 def _ini(area):
@@ -288,3 +388,78 @@ def rest_spawn(encounter):
             n += 1
     rt.log('REST_SPAWN %s: %d creatures' % (a, n))
     return 1
+
+# --- summon spells (ie_spellmap.SUMMONS, from SPL opcode 67 / IWD2 410 friendly, 411 hostile) ---
+SUMMON_SECS = 300      # IE duration 0: no fixed time; ToEE has no dismissal UI for these, so they leave after 5 min
+
+def _caster_level(o):
+    try:
+        return max(1, o.stat_level_get(stat_level))
+    except Exception:
+        return 1
+
+def _unsummon(o):
+    try:
+        if o.stat_level_get(stat_hp_current) > -10:
+            try:
+                o.leader_get().ai_follower_remove(o)
+            except Exception:
+                pass
+            o.destroy()
+            rt.log('UNSUMMON %s' % o)
+    except Exception:
+        pass
+    return 0
+
+def summon(caster, res, target=None, pt=None):
+    """IE summon spell cast by a script (Spell/ForceSpell...): roll the ability band for the caster level, create
+    the IE creature(s) next to the target point / target / caster, on the caster's side (opcode 411: against it),
+    and dismiss them when the duration ends. Returns the number summoned, or None if `res` is no summon spell."""
+    try:
+        import ie_spellmap
+        bands = getattr(ie_spellmap, 'SUMMONS', {}).get(res)
+    except ImportError:
+        bands = None
+    if not bands:
+        return None
+    lvl = _caster_level(caster)
+    band = bands[0][1]
+    for m, l in bands:
+        if m <= lvl:
+            band = l
+    roll = game.random_range(1, 100)
+    pick = [x for x in band if x[0] <= roll <= x[1]] or band[-1:]
+    lo, hi, cre, n, secs, side = pick[0]
+    from utilities import location_to_axis
+    if pt is not None:
+        u, v = pt
+    else:
+        u, v = location_to_axis((target or caster).location)
+    area = _cur_area() or ''
+    party = caster in game.party or caster.leader_get() != OBJ_HANDLE_NULL
+    kos = (caster.npc_flags_get() & ONF_KOS) != 0 if caster.type == obj_t_npc else 0
+    if side == 'foe':
+        party, kos = 0, not kos or party
+    taken, k = set(), 0
+    for i in range(max(1, min(n, 8))):
+        o = spawn(cre, area, u, v, taken=taken)
+        if o is None:
+            continue
+        k += 1
+        try:
+            if party:
+                o.npc_flag_unset(ONF_KOS)
+                (caster.leader_get() if caster.type == obj_t_npc and caster.leader_get() != OBJ_HANDLE_NULL
+                 else caster).ai_follower_add(o)
+            elif kos:
+                o.npc_flag_set(ONF_KOS)
+                if game.combat_is_active():
+                    o.attack(game.leader)
+            else:
+                o.npc_flag_unset(ONF_KOS)
+        except Exception, e:
+            rt.log('IE_ERR summon side %s: %s' % (cre, e))
+        game.timeevent_add(_unsummon, (o,), int(1000 * (secs or SUMMON_SECS)), 1)
+    rt.log('SUMMON %s by %s (lvl %d, roll %d): %d x %s side %s for %ds' % (
+        res, caster, lvl, roll, k, cre, party and 'party' or kos and 'hostile' or 'neutral', secs or SUMMON_SECS))
+    return k

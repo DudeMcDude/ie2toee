@@ -19,6 +19,7 @@ from ie2toee_preview import run, run_soft, copytree, mes_with, RUNTIME
 
 GUIDE = os.path.join(HERE, 'guidance', 'iwd2.json')
 AREAS = ['AR1000', 'AR1001', 'AR1002', 'AR1003', 'AR1004', 'AR1005', 'AR1006', 'AR1100']
+SPAWN_SCRIPT_BASE = 2400   # runtime-spawned creatures with a dialog/scripts: 2400..2999
 SCRIPT_BASE = 1500  # area i's actor scripts 1500+100i.. (vanilla ToEE: <= 1374); dialogue for the actors with a DLG
 START = (450, 490)   # fallback: I2AR1000 tile of IWD2's own new-game spot (STARTARE.2DA 2390,860, the docks)
 
@@ -84,6 +85,8 @@ def main():
             p_ = l.split()[-1].split(':') if l.strip() else []
             if len(p_) > 3 and p_[3]:
                 actors += ['--actor', l.split()[-1]]
+            elif len(p_) > 2:   # no DLG: a stub script (binds the ident; the .mob names this id, so no "Failed to build script name")
+                actors += ['--actor', '%s:%s:%s::' % tuple(p_[:3])]
     dlg = os.path.join(w, 'dialogue')
     amap = sum((['--area-map', '%s:%d:%d,%d' % ((ar, G[ar]['map']) + tuple(json.load(open(os.path.join(w, 'I2' + ar + '_objects.json')))
                 ['placement']['canvas_offset']))] for ar in ok), [])
@@ -96,11 +99,16 @@ def main():
                 ascr += ['--area-script', '%s:%s' % (ar, r_.lower())]
         except Exception as e:
             print('warning: area script of %s: %s' % (ar, e))
-    run_soft('dialogue', ['ie_dialogue.py', ie, dlg, '--strip-directions', '--quest-base', '150', '--quest-max', '199',
-                          '--new-game', 'CHAPTER=-1'] + actors + amap + ascr)
+    dlg_cmd = ['ie_dialogue.py', ie, dlg, '--strip-directions', '--quest-base', '150', '--quest-max', '199',
+               '--new-game', 'CHAPTER=-1'] + actors + amap + ascr
+    run_soft('dialogue', dlg_cmd)
     spw = os.path.join(w, 'spawnables')   # CreateCreature / spawn-point / summon CREs (ie_spawn.py at runtime)
-    run_soft('spawnables', ['ie_creatures.py', 'spawnables', ie, toee, spw, '--whole-game', '--scr', dlg] +
+    run_soft('spawnables', ['ie_creatures.py', 'spawnables', ie, toee, spw, '--whole-game', '--scr', dlg,
+                            '--script-base', str(SPAWN_SCRIPT_BASE), '--script-max', str(SPAWN_SCRIPT_BASE + 599)] +
              sum((['--area', ar] for ar in ok), []) + tpa)
+    sa = os.path.join(spw, 'dialogue_actors.txt')     # spawned creatures' own scripts/dialogue: second dialogue pass
+    if os.path.isfile(sa) and open(sa).read().split():
+        run_soft('dialogue + spawnables', dlg_cmd + open(sa).read().split())
     run('items', ['ie_items.py', 'convert', ie, os.path.join(w, 'items'), '--toee', toee] +
         sum((['--area', ar, '--objects', '%s=%s' % (ar, os.path.join(w, 'I2' + ar + '_objects.json'))] for ar in ok), []) + tpa)
     bake = os.path.join(w, 'bake')

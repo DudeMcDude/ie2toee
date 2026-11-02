@@ -277,14 +277,17 @@ def actor_script(sid, ident, area, dlg_parts, bcs_mods):
         src.append('\n'.join(funcs))
     src.append('def san_heartbeat(attachee, triggerer):\n'
                '    if SCRIPTS:\n        rt.tick(attachee, IDENT, AREA, SCRIPTS)\n    return RUN_DEFAULT\n')
+    # AREA "" = a runtime-spawned creature (ie_spawn): ident/area per instance from rt.who (binding made at spawn)
+    me = 'rt.who(attachee, IDENT, AREA)[0]' if not area else 'IDENT'
     src.append('def san_first_heartbeat(attachee, triggerer):\n'
-               '    rt.bind(attachee, IDENT, AREA)\n    return RUN_DEFAULT\n')
+               + ('    rt.bind(attachee, IDENT, AREA)\n' if area else '    rt.who(attachee, IDENT, AREA)\n')
+               + '    return RUN_DEFAULT\n')
     for san, ev in (('san_dying', 'Die'), ('san_enter_combat', 'AttackedBy')):
-        src.append('def %s(attachee, triggerer):\n    rt.event(IDENT, %s, triggerer)\n    return RUN_DEFAULT\n'
-                   % (san, pystr(ev)))
+        src.append('def %s(attachee, triggerer):\n    rt.event(%s, %s, triggerer)\n    return RUN_DEFAULT\n'
+                   % (san, me, pystr(ev)))
     # each combat turn: one IE script round with engine feasibility checks (runtime/ie_combat.py); the first feasible
     # block's Spell/Attack becomes the turn's Temple+ strategy, else the converted static strategy (both end in "stop")
-    src.append('def san_start_combat(attachee, triggerer):\n    rt.event(IDENT, "AttackedBy", triggerer)\n'
+    src.append('def san_start_combat(attachee, triggerer):\n    rt.event(%s, "AttackedBy", triggerer)\n' % me +
                '    if SCRIPTS:\n        return rt.combat_round(attachee, IDENT, AREA, SCRIPTS)\n'
                '    return RUN_DEFAULT\n')
     return '\n'.join(src)

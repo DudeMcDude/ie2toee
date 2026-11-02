@@ -199,6 +199,17 @@ def cast(caster, spell, target=None, mode='spell', point=None):
     'force' (ForceSpell: no memorisation needed), 'really' (ReallyForceSpell), 'apply' (ApplySpell: the target
     casts it on itself). Returns the Temple+ spell id cast, or None."""
     res = resref(spell)
+    if res and caster is not None and IN_GAME:      # IE summon spell: the IE creatures themselves (00s*/41s*...)
+        try:
+            import ie_spawn
+            pt = point
+            if pt is not None and mode != 'apply':
+                pt = tuple(pt)
+            n = ie_spawn.summon(caster, res, target, pt)
+            if n is not None:
+                return n and 1 or None
+        except Exception, ex:
+            log('summon %s failed: %s' % (res, ex))
     e = entry(res) if res else None
     if not e or e.get('t') is None:
         log('UNMAPPED %s (%s) mode=%s class=%s' % (res, spell, mode, (e or {}).get('c')))
