@@ -6,7 +6,10 @@
 * Cutscenes (StartCutScene("res") -> ie_bcs_<res>_area): IE runs every true block of a cutscene script once, each
   block on its own actor (CutSceneId) and action queue; Wait/SmallWait/MoveToPoint delays come from ie_runtime's
   queue. Cutscene mode (StartCutSceneMode .. EndCutSceneMode) pauses the creature scripts and is reported by
-  InCutsceneMode(); party input is not locked (no Python hook for it).
+  InCutsceneMode(). Party mouse input is locked by a full-screen invisible tpgui button (Temple+ python UI) that
+  swallows clicks until EndCutSceneMode (or the 120 s safety timeout).
+* Each cutscene block's actions run on its CutSceneId actor's own queue: two blocks for the same actor run one after
+  the other (IE action-queue semantics), not at the same time.
 """
 from toee import *
 import ie_runtime as rt
@@ -33,6 +36,12 @@ def area_start(area):
     """(Re)start the area script loop of `area` (idempotent per map load)."""
     A_ = area.upper()
     new_game_init()
+    try:
+        if game.leader.map == rt.AREA_MAPS.get(A_):
+            import ie_spawn
+            ie_spawn.area_spawns(A_)      # ARE spawn points: once per game, on the first visit
+    except Exception as e:
+        rt.log('IE_ERR area spawns %s: %s' % (A_, e))
     try:
         import ie_areas
         name = getattr(ie_areas, 'SCRIPTS', {}).get(A_)
@@ -103,9 +112,38 @@ def _run_area(area, mod):
             rt.log('IE_ERR area script %s: %s' % (area, e))
 
 # ------------------------------------------------------------------------------------------------ cutscenes
+_LOCK = {'w': None, 'clicks': 0}
+
+def _lock(on):
+    """Party input lock: a full-screen transparent button on top of the UI eats mouse clicks (tpgui, Temple+ only)."""
+    try:
+        import tpgui
+    except ImportError:
+        return
+    try:
+        if _LOCK['w'] is None:
+            if not on:
+                return
+            root = tpgui._add_root_container('ie_cutscene_lock', 4096, 4096)
+            if root is None:
+                root = tpgui._get_container('ie_cutscene_lock')
+            b = tpgui._add_button('ie_cutscene_lock', 'ie_cutscene_lock_btn', 4096, 4096)
+            def eat():
+                _LOCK['clicks'] += 1
+            b.set_click_handler(eat)
+            _LOCK['w'] = root
+        if on:
+            _LOCK['w'].show(); _LOCK['w'].bring_to_front()
+        else:
+            _LOCK['w'].hide()
+    except Exception as e:
+        rt.log('IE_ERR input lock: %s' % e)
+
 def mode(on):
     STATE['cut'] = on and 1 or 0
     STATE['cut_since'] = rt._now()
+    if rt.IN_GAME:
+        _lock(on)
     rt.log('CUTSCENE_MODE %s' % (on and 'on' or 'off'))
 
 def active():
@@ -129,8 +167,28 @@ def start(res, c):
         except Exception as e:
             rt.log('IE_ERR cutscene %s #%d: %s' % (res, i, e)); ok = False
         if ok and resps:
-            rt.run_actions(c2, list(resps[0][1]))
+            _run_block(c2, list(resps[0][1]))
     return None
+
+def _run_block(c2, acts):
+    """Run a cutscene block: a leading CutSceneId picks the actor; the rest joins that actor's action queue."""
+    if acts and getattr(acts[0], '__name__', '') == '<lambda>':
+        try:
+            r = acts[0](c2)       # CutSceneId(...) (sets c2.me / c2.ident) or an ordinary first action
+        except Exception as e:
+            rt.log('IE_ERR cutscene action: %s' % e); r = None
+        acts = acts[1:]
+        if r is not None and r is not rt.CONTINUE and isinstance(r, rt._NUM) and r > 0:
+            acts = [lambda c, r=r: r] + acts
+    pend = rt._queues.get(c2.ident)
+    if pend:                      # the actor is still busy with an earlier block: queue behind it
+        pend[1].extend(acts); return
+    left = rt._busy.get(c2.ident, 0) - rt._now()
+    if left > 0 and rt.IN_GAME and acts:
+        rt._queues[c2.ident] = (c2, acts)
+        game.timeevent_add(rt._resume, (c2.me, c2.other, c2.ident, c2.area, len(acts)), int(left * 1000), 1)
+        return
+    rt.run_actions(c2, acts)
 
 def cutscene_id(c, obj):
     """CutSceneId(obj): the rest of this block acts as obj."""
@@ -140,4 +198,7 @@ def cutscene_id(c, obj):
     b = rt._bound.get(rt._key(obj))
     if b:
         c.area = b[1] or c.area
+    # the block now runs on obj's own queue (LOCALS of obj; blocks for the same actor queue up)
+    c.ident = (b and b[0]) or 'cs_obj_%s' % rt._key(obj)
+    rt.log('CUTSCENE_ID %s' % c.ident)
     return None

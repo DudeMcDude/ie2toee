@@ -98,6 +98,9 @@ def main():
             print('warning: area script of %s: %s' % (ar, e))
     run_soft('dialogue', ['ie_dialogue.py', ie, dlg, '--strip-directions', '--quest-base', '150', '--quest-max', '199',
                           '--new-game', 'CHAPTER=-1'] + actors + amap + ascr)
+    spw = os.path.join(w, 'spawnables')   # CreateCreature / spawn-point / summon CREs (ie_spawn.py at runtime)
+    run_soft('spawnables', ['ie_creatures.py', 'spawnables', ie, toee, spw, '--whole-game', '--scr', dlg] +
+             sum((['--area', ar] for ar in ok), []) + tpa)
     run('items', ['ie_items.py', 'convert', ie, os.path.join(w, 'items'), '--toee', toee] +
         sum((['--area', ar, '--objects', '%s=%s' % (ar, os.path.join(w, 'I2' + ar + '_objects.json'))] for ar in ok), []) + tpa)
     bake = os.path.join(w, 'bake')
@@ -138,6 +141,9 @@ def main():
         copytree(os.path.join(d, 'modules', 'ToEE', 'mes', 'description'), os.path.join(C, 'mes', 'description'))
         for f in os.listdir(d):
             if re.match(r'ie_creatures_ar\d+\.py$', f): shutil.copy(os.path.join(d, f), scr)
+    if os.path.isfile(os.path.join(spw, 'ie_spawnables.py')):
+        shutil.copy(os.path.join(spw, 'ie_spawnables.py'), scr)
+        copytree(os.path.join(spw, 'modules', 'ToEE', 'mes', 'description'), os.path.join(C, 'mes', 'description'))
     copytree(os.path.join(w, 'items', 'modules', 'ToEE', 'mes', 'description'), os.path.join(C, 'mes', 'description'))
     copytree(os.path.join(w, 'items', 'data'), os.path.join(inst, 'data'))
     import ie_portraits   # commissioned NPC portraits (+ vanilla portraits.mes entries)
