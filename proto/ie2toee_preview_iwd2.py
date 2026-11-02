@@ -75,7 +75,7 @@ def main():
         if ar in ok:
             d = os.path.join(w, 'cre_' + ar.lower())
             if run_soft('creatures %s' % ar, ['ie_creatures.py', 'convert', ie, toee, d, '--area', ar,
-                                              '--name-base', str(28000 + 300 * i), '--script-base', str(SCRIPT_BASE + 100 * i)] + tpa):
+                                              '--name-base', str(28000 + 250 * i), '--script-base', str(SCRIPT_BASE + 100 * i)] + tpa):
                 cre[ar] = d
     # dialogue: the actors that have a DLG (IE scripts of dialogue-less actors such as the goblins stay unconverted)
     actors = []
@@ -139,11 +139,15 @@ def main():
     copytree(os.path.join(bake, 'modules', 'ToEE', 'scr'), scr)
     for d in cre.values():
         copytree(os.path.join(d, 'modules', 'ToEE', 'mes', 'description'), os.path.join(C, 'mes', 'description'))
+        if os.path.isdir(os.path.join(d, 'modules', 'ToEE', 'rules', 'protos')):   # critter protos on a foreign mesh
+            copytree(os.path.join(d, 'modules', 'ToEE', 'rules', 'protos'), os.path.join(C, 'rules', 'protos'))
         for f in os.listdir(d):
             if re.match(r'ie_creatures_ar\d+\.py$', f): shutil.copy(os.path.join(d, f), scr)
     if os.path.isfile(os.path.join(spw, 'ie_spawnables.py')):
         shutil.copy(os.path.join(spw, 'ie_spawnables.py'), scr)
         copytree(os.path.join(spw, 'modules', 'ToEE', 'mes', 'description'), os.path.join(C, 'mes', 'description'))
+        if os.path.isdir(os.path.join(spw, 'modules', 'ToEE', 'rules', 'protos')):   # critter protos on a foreign mesh
+            copytree(os.path.join(spw, 'modules', 'ToEE', 'rules', 'protos'), os.path.join(C, 'rules', 'protos'))
     copytree(os.path.join(w, 'items', 'modules', 'ToEE', 'mes', 'description'), os.path.join(C, 'mes', 'description'))
     copytree(os.path.join(w, 'items', 'data'), os.path.join(inst, 'data'))
     import ie_portraits   # commissioned NPC portraits (+ vanilla portraits.mes entries)

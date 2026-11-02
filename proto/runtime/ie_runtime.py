@@ -168,6 +168,8 @@ def _pc(c):
 # ------------------------------------------------------------------------------------------------ objects
 def O(c, name, inner=None):
     """object.ids reference (Myself, Player1, Protagonist, LastTalkedToBy, NearestEnemyOf(x), ...)."""
+    if not isinstance(name, str):
+        return name
     n = name.lower()
     base = inner if inner is not None else c.me
     if n in ('myself',):
@@ -195,7 +197,9 @@ def O(c, name, inner=None):
     return None
 
 def N(c, name):
-    """Object by IE script name / death variable."""
+    """Object by IE script name / death variable (an object or None passes through: Dead(N("x")) style calls)."""
+    if not isinstance(name, str):
+        return name
     if IN_GAME:
         for k, (ident, area) in _bound.items():
             if ident.lower() == name.lower() or re.sub(r'^\d+', '', ident.lower()) == name.lower():   # IWD2 10hedron = "Hedron"
@@ -345,7 +349,7 @@ class _Triggers(object):
     def Dead(self, c, name):
         o = N(c, name)
         return o is None or _dead(o)
-    def See(self, c, obj):
+    def See(self, c, obj, *unused):   # IWD2 See(O, I:SkipHidden)
         if obj is None or c.me is None or not IN_GAME:
             return False
         try:
@@ -353,7 +357,9 @@ class _Triggers(object):
         except Exception:
             return False
     def LOS(self, c, obj, rng): return self.See(c, obj)
-    def Range(self, c, obj, rng):
+    def Range(self, c, obj, rng=None, *unused):   # IWD2 adds a comparison arg; Range(rng) = the caller's target
+        if rng is None:
+            return False
         try:
             return c.me.distance_to(obj) <= rng / 3.0     # IE search-map units ~ 1/3 ToEE ft (rough)
         except Exception:
