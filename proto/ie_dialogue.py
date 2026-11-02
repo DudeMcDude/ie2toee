@@ -229,6 +229,25 @@ class DlgConv(object):
         entry = base + (roots[0] + 1) * st if roots else None
         return out_lines, funcs, states, entry
 
+# cutscene classes (shai 11-02): a cutscene that only turns actors and starts one dialogue is a plain scripted dialogue
+# start in ToEE (Co8 style: npc.turn_towards(pc); pc begins the dialogue; the engine pans the camera itself); anything
+# with walking, camera moves, sequences, appearing/vanishing creatures, effects or floating text is a real cutscene.
+DIALOG_ONLY = set(x.lower() for x in (
+    'CutSceneId', 'FaceObject', 'Face', 'Wait', 'SmallWait', 'MultiPlayerSync', 'SetDialogueRange', 'Dialogue', 'Dialog',
+    'StartDialog', 'StartDialogNoSet', 'StartDialogueNoSet', 'StartDialogOverride', 'ActionOverride', 'StartCutSceneMode',
+    'EndCutSceneMode', 'ClearAllActions', 'ClearActions', 'SetGlobal', 'SetGlobalTimer', 'IncrementGlobal', 'NoAction',
+    'SetInterrupt', 'Continue'))
+DIALOG_ACTS = set(x.lower() for x in ('Dialogue', 'Dialog', 'StartDialog', 'StartDialogNoSet', 'StartDialogueNoSet',
+                                      'StartDialogOverride'))
+
+def cutscene_kind(b):
+    names = [c.name.lower() for trig, resp in b.blocks for w, acts in resp for c in S.walk_calls(acts)]
+    if not any(n == 'cutsceneid' for n in names):
+        return 'script'
+    if set(names) <= DIALOG_ONLY and sum(1 for n in names if n in DIALOG_ACTS) == 1:
+        return 'dialog'
+    return 'scene'
+
 def bcs_module(game, ids, resref, ident, area, gen):
     b = S.Bcs(game.read(resref, 'bcs'), ids, resref)
     src = [HEADER, 'import ie_runtime as rt\nfrom ie_runtime import T, A, O, N, F\n',
@@ -238,6 +257,8 @@ def bcs_module(game, ids, resref, ident, area, gen):
         rs = ', '.join('(%d, %s)' % (w, gen.action_list(acts)) for w, acts in resp)
         src.append('    (lambda c: %s,\n     [%s]),' % (cond, rs))
     src.append(']\n')
+    src.append('KIND = %r   # cutscene class: dialog = only faces/waits + one dialogue (run as a scripted dialogue start)\n'
+               % cutscene_kind(b))
     casts = any(re.search(r'\bA\.(Spell|ForceSpell|ReallyForceSpell|ApplySpell|SpellPoint|ForceSpellPoint)', x) for x in src)
     src.append('CASTS = %r   # the script casts spells (SPL-ADJ-18)\n' % casts)
     return '\n'.join(src), len(b.blocks), sorted(b.unknown)
@@ -278,6 +299,7 @@ def main():
     ap.add_argument('--area-map', action='append', default=[], help='AREA:TOEE_MAP[:canvas_x,canvas_y]')
     ap.add_argument('--slot-max', type=int, default=1999)
     ap.add_argument('--new-game', action='append', default=[], help='NAME=value: an IE GLOBAL a new game starts with (IWD2: CHAPTER=-1)')
+    ap.add_argument('--barks-sid', type=int, default=1499, help='dialog script id of the speech-bubble file (dlg/NNNNNie_barks.dlg)')
     ap.add_argument('--quest-base', type=int, default=120, help='first ToEE quest id for IE journal entries (vanilla: 0-60)')
     ap.add_argument('--quest-max', type=int, default=199, help='last one (the logbook has 200 quests)')
     a = ap.parse_args()
@@ -365,8 +387,18 @@ def main():
     w(os.path.join(scr, 'ie_varslots.py'), HEADER + 'SLOTS = {\n%s\n}\n' %
       '\n'.join('    %s: %d,' % (pystr(k), v) for k, v in sorted(slots.items(), key=lambda kv: kv[1])))
     rep['vars'] = len(keys)
+    # speech bubbles for floating text (FloatMessage/DisplayStringHead): one shared dialog file whose line ids are the
+    # strrefs; ie_runtime floats them with objhndl.float_line (ToEE text bubble, lasts by text length) instead of the
+    # short combat-style float_text_line.
+    os.makedirs(dlgd, exist_ok=True)
+    def _dl(t):
+        return t.replace('{', '(').replace('}', ')').replace('\r', ' ').replace('\n', ' ')
+    w(os.path.join(dlgd, '%05die_barks.dlg' % a.barks_sid), '\n'.join(
+        '{%d}{%s}{%s}{}{}{}{}' % (r, _dl(subst(text(r), False)), _dl(subst(text(r), True))) for r in sorted(strrefs)) + '\n')
+    # ToEE finds a dialog file through its script file (scr/pyNNNNN<name>.py -> dlg/NNNNN<name>.dlg): an empty stub
+    w(os.path.join(scr, 'py%05die_barks.py' % a.barks_sid), HEADER + '# speech-bubble lines for ie_runtime.speech_bubble (no events)\n')
     w(os.path.join(scr, 'ie_strings.py'), HEADER + 'STRINGS = {\n%s\n}\n' %
-      '\n'.join('    %d: %s,' % (r, pystr(subst(text(r), False))) for r in sorted(strrefs)))
+      '\n'.join('    %d: %s,' % (r, pystr(subst(text(r), False))) for r in sorted(strrefs)) + 'BARKS_SID = %d\n' % a.barks_sid)
     # journal entries -> ToEE logbook quests (mes/gamequestlog.mes: title at id, description at id + 200)
     qids = list(range(a.quest_base, a.quest_max + 1)); jmap = {}; jl = []
     merged = merge_journals(journals, origin, text, jvars, jerase)
