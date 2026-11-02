@@ -240,9 +240,13 @@ def main():
     copytree(os.path.join(bake, 'modules', 'ToEE', 'scr'), os.path.join(C, 'scr'))
     for d in [cre] + list(icre.values()):
         copytree(os.path.join(d, 'modules', 'ToEE', 'mes', 'description'), os.path.join(C, 'mes', 'description'))
+        if os.path.isdir(os.path.join(d, 'modules', 'ToEE', 'rules', 'protos')):   # critter protos on a foreign mesh
+            copytree(os.path.join(d, 'modules', 'ToEE', 'rules', 'protos'), os.path.join(C, 'rules', 'protos'))
     if os.path.isfile(os.path.join(spw, 'ie_spawnables.py')):
         shutil.copy(os.path.join(spw, 'ie_spawnables.py'), os.path.join(C, 'scr'))
         copytree(os.path.join(spw, 'modules', 'ToEE', 'mes', 'description'), os.path.join(C, 'mes', 'description'))
+        if os.path.isdir(os.path.join(spw, 'modules', 'ToEE', 'rules', 'protos')):   # critter protos on a foreign mesh
+            copytree(os.path.join(spw, 'modules', 'ToEE', 'rules', 'protos'), os.path.join(C, 'rules', 'protos'))
     copytree(os.path.join(w, 'items', 'modules', 'ToEE', 'mes', 'description'), os.path.join(C, 'mes', 'description'))
     copytree(os.path.join(w, 'items', 'data'), os.path.join(inst, 'data'))
     import ie_portraits   # commissioned NPC portraits (+ vanilla portraits.mes entries)

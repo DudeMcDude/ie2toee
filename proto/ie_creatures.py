@@ -825,6 +825,7 @@ def convert_area(game, toee_root, out, area, name_base=27000, options=None, scri
             s['script_id'] = script_base + i
             dlg_args.append('%s:%s:%d:%s:%s' % (s['ident'], area.upper(), s['script_id'], s['dialog'], ','.join(s['scripts'])))
         specs.append(s)
+    mesh_protos(cv.toee, specs, out)
     os.makedirs(out, exist_ok=True)
     mesd = os.path.join(out, 'modules', 'ToEE', 'mes', 'description'); os.makedirs(mesd, exist_ok=True)
     if names:      # (an empty .mes in mes/description hangs the game at "Loading game system Description")
@@ -858,7 +859,29 @@ def spawnable_pool(resref):
     return list((up if r in MONSTER_UPGRADED else ()) or normal)
 
 
-def convert_spawnables(game, toee_root, out, areas, scr_dirs=(), name_base=34000, options=None, tp_root=None, whole_game=False):
+def mesh_protos(toee, specs, out):
+    """A critter on a foreign mesh (IWD2 kegs: barrel) gets its own critter proto: a copy of its proto row with the
+    model column swapped, in an additive rules/protos/*.tab (Temple+ ProtoSystem). Swapping obj_f_base_mesh at runtime
+    does not work: obj_create already built the model. Ids are stable per (proto, mesh), one file per pair."""
+    d = os.path.join(out, 'modules', 'ToEE', 'rules', 'protos')
+    for s in specs:
+        if not s.get('mesh') or s.get('proto') not in toee.protos:
+            continue
+        key = (int(s['proto']), int(s['mesh']))
+        pid = 14000 + (key[0] * 31 + key[1] * 7) % 1000
+        while pid in toee.protos and toee.protos[pid][34].strip() != str(key[1]):
+            pid = 14000 + (pid - 14000 + 1) % 1000
+        if pid not in toee.protos:
+            row = list(toee.protos[key[0]]); row[0] = str(pid); row[34] = str(key[1])
+            toee.protos[pid] = row
+            os.makedirs(d, exist_ok=True)
+            open(os.path.join(d, 'ie2toee_%d.tab' % pid), 'w', encoding='latin-1').write('\t'.join(row).rstrip('\t') + '\n')
+        s['proto'] = pid; s.pop('mesh', None)
+
+
+# name ids: the engine shows description ids only below ~30000 (30100 fails, 29800 works), so spawn names live
+# in the free gap above vanilla description.mes (max 20207) and below the item names (22000+)
+def convert_spawnables(game, toee_root, out, areas, scr_dirs=(), name_base=20300, options=None, tp_root=None, whole_game=False):
     """Creatures that appear at runtime: CreateCreature("cre", ...) in the converted scripts/dialogs (scanned in
     scr_dirs), plus the area .INI spawns and ARE rest-encounter tables of `areas`. Writes <out>/ie_spawnables.py
     (SPECS: cre -> spawn spec, INI_SPAWNS, REST) and <out>/modules/ToEE/mes/description/ie2toee_spawn.mes."""
@@ -924,6 +947,7 @@ def convert_spawnables(game, toee_root, out, areas, scr_dirs=(), name_base=34000
         names[nid] = (VARIANT_NAMES.get(r, {}).get(nm.strip(), nm) or r).replace('{', '(').replace('}', ')')
         s['name_id'] = nid
         specs[r] = {k: s[k] for k in keep if k in s}
+    mesh_protos(cv.toee, specs.values(), out)
     os.makedirs(out, exist_ok=True)
     mesd = os.path.join(out, 'modules', 'ToEE', 'mes', 'description'); os.makedirs(mesd, exist_ok=True)
     if names:
@@ -950,7 +974,7 @@ def main():
     s2.add_argument('--tp', help='Temple+ install (tpdata/*.dat) for the Temple+ spell list')
     s3 = sub.add_parser('spawnables'); s3.add_argument('game'); s3.add_argument('toee'); s3.add_argument('out')
     s3.add_argument('--area', action='append', default=[]); s3.add_argument('--scr', action='append', default=[])
-    s3.add_argument('--name-base', type=int, default=34000); s3.add_argument('--tp'); s3.add_argument('--whole-game', action='store_true')
+    s3.add_argument('--name-base', type=int, default=20300); s3.add_argument('--tp'); s3.add_argument('--whole-game', action='store_true')
     s3.add_argument('--option', action='append', default=[])
     a = ap.parse_args()
     if a.cmd == 'spawnables':
