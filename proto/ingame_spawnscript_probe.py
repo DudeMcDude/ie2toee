@@ -43,7 +43,7 @@ def step2():
             b and rt._last_tick.get(b[0]), b and b[0] in rt._events))
     log('combat %d; mob idents ticked: %d' % (game.combat_is_active(), len(rt._first)))
     # summons: party caster (friendly) and a hostile NPC caster
-    for res in ('sppr150', 'sppr150', 'sppr150', 'sppr150', 'spwi514', 'spwi520', 'spwi622', 'spwi716', 'spwi626', 'sppr402', 'effsf'):
+    for res in ('effg', 'spwi715', 'sppr723', 'spin282', 'sppr150', 'spwi514', 'spwi520', 'spwi622', 'spwi716', 'spwi626', 'sppr402', 'effsf'):
         n = ie_spawn.summon(game.leader, res)
         log('SUMMON_PARTY %s -> %s followers=%d' % (res, n, len(list(game.leader.group_list() if hasattr(game.leader, 'group_list') else []))))
     objs = getattr(__main__, '_probe_objs', [])
