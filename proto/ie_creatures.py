@@ -49,7 +49,10 @@ class Guidance(object):
         self.class_ranges = [(int(a, 16), int(b, 16)) for a, b in cb['anim_ranges']]
         self.cb = cb
 
-    def family(self, fl, anim):
+    def family(self, fl, anim, resref=None):
+        f = self.g.get('resref_families', {}).get((resref or '').lower())
+        if f:
+            return f
         f = self.by_anim[fl].get(anim)
         if f:
             return f
@@ -342,7 +345,7 @@ class Converter(object):
 
     def convert(self, cre, actor=None):
         o, notes = self.opt, []
-        fam = self.gd.family(self.fl, cre.animation)
+        fam = self.gd.family(self.fl, cre.animation, cre.resref)
         track = 'class' if (fam and fam.get('track') == 'class') else ('monster' if fam else 'unmapped')
         cls_name = self.idsname('class', cre.cls); race_name = self.idsname('race', cre.race)
         effs, gear = self.effects(cre)

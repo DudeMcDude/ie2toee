@@ -43,7 +43,7 @@ def step2():
             b and rt._last_tick.get(b[0]), b and b[0] in rt._events))
     log('combat %d; mob idents ticked: %d' % (game.combat_is_active(), len(rt._first)))
     # summons: party caster (friendly) and a hostile NPC caster
-    for res in ('sppr150', 'spwi124', 'sppr301', 'spin114'):
+    for res in ('sppr150', 'sppr150', 'sppr150', 'sppr150', 'spwi514', 'spwi520', 'spwi622', 'spwi716', 'spwi626', 'sppr402', 'effsf'):
         n = ie_spawn.summon(game.leader, res)
         log('SUMMON_PARTY %s -> %s followers=%d' % (res, n, len(list(game.leader.group_list() if hasattr(game.leader, 'group_list') else []))))
     objs = getattr(__main__, '_probe_objs', [])
@@ -54,7 +54,7 @@ def step2():
         log('SUMMON_HOSTILE spwi124 by %s -> %s' % (foe, n))
     log('SUMMON_NONE %r' % ie_spawn.summon(game.leader, 'spwi112'))
     import ie_spellrt
-    log('CAST_VIA_SPELLRT %r' % ie_spellrt.cast(game.leader, 'sppr150', None, 'force'))
+    log('CAST_VIA_SPELLRT %r' % ie_spellrt.cast(game.leader, 'spwi515', None, 'force'))
     log('SHOT summoned')
     game.timeevent_add(step3, (), 2000, 1)
 def step3():
