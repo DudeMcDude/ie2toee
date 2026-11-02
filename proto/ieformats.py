@@ -305,14 +305,40 @@ def parse_spawn_ini(text):
         if not s or not s.get('cre_file'):
             return None
         pts = [(int(x), int(y), int(f or 0)) for x, y, f in re.findall(r'\[(\d+)\.(\d+)(?::(\d+))?\]', s.get('spawn_point', ''))]
-        c = {'name': n, 'cre': s['cre_file'].lower(), 'points': pts, 'select': (s.get('point_select') or 'r')[:1].lower(),
-             'qty': max(1, num(s.get('create_qty'), 1)), 'spec_qty': num(s.get('spec_qty'), 0)}
+        # (defaults per the originals / GemRB IniSpawn: spec_qty 1, create_qty = spec_qty)
+        sq = num(s.get('spec_qty'), 1)
+        c = {'name': n, 'cre': s['cre_file'].split(',')[0].strip().lower(), 'points': pts,
+             'select': (s.get('point_select') or 'r')[:1].lower(),
+             'qty': max(1, num(s.get('create_qty'), sq)), 'spec_qty': sq}
         if s.get('spec_var'):
-            c.update(var=s['spec_var'], value=num(s.get('spec_var_value'), 0),
+            c.update(var=s['spec_var'].split('::')[-1], value=num(s.get('spec_var_value'), 0),
                      op=(s.get('spec_var_operation') or '').lower(), inc=num(s.get('spec_var_inc'), 0))
-        for k in ('script_name', 'script_override', 'area_diff_1', 'area_diff_2', 'area_diff_3'):
-            if s.get(k):
-                c[k] = s[k]
+        if s.get('script_name'):
+            c['script_name'] = s['script_name']
+        # creature scripts the spawn gets instead of its CRE's, in IE slot order (IWD2 names; PST names too):
+        # override, area (special_1), specifics (team), class (special_2), race (combat), general (special_3), default (movement)
+        slots = (('script_override',), ('script_special_1', 'script_area'), ('script_team', 'script_specifics'),
+                 ('script_special_2', 'script_class'), ('script_combat', 'script_race'),
+                 ('script_special_3', 'script_general'), ('script_movement', 'script_default'))
+        scr = [next((s[k] for k in ks if s.get(k) and s[k].lower() != 'none'), '') for ks in slots]
+        if any(scr):
+            c['scripts'] = [x.lower() for x in scr if x]
+        if s.get('dialog'):
+            c['dialog'] = s['dialog'].lower()
+        if num(s.get('ignore_can_see'), 0):     # else: no spawn while the party can see the point
+            c['ignore_can_see'] = 1
+        m_ = re.match(r'\[([\d.]+)\]', s.get('spec', ''))
+        if m_:                                   # object spec counted against spec_qty: EA.GENERAL.RACE.CLASS.SPECIFICS..
+            c['spec'] = [int(x) for x in m_.group(1).split('.') if x != '']
+        elif s.get('spec'):
+            c['spec_name'] = s['spec']           # a script name: no spawn while one by that name lives
+        ai = dict((k[3:], num(s[k])) for k in ('ai_ea', 'ai_general', 'ai_race', 'ai_class', 'ai_specifics', 'ai_gender',
+                                                 'ai_alignment', 'ai_team', 'ai_faction') if s.get(k))
+        if ai:
+            c['ai'] = ai
+        off = [d for d in (1, 2, 3) if s.get('area_diff_%d' % d) is not None and not num(s['area_diff_%d' % d], 1)]
+        if off:                                  # IWD2: no spawn at these area difficulty levels (1..3)
+            c['no_diff'] = off
         return c
     out = {'enter': [], 'events': []}
     main = secs.get('spawn_main', {})

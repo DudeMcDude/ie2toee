@@ -142,6 +142,27 @@ def _key(obj):
     except Exception:
         return id(obj)
 
+def who(obj, ident, area):
+    """Generated script of a runtime-spawned creature (ie_spawn: CreateCreature / INI / rest / summons) carries
+    AREA = "": its instance ident and area come from the binding ie_spawn made (each copy its own ident, so copies
+    keep their own script round, timers and events); after a reload (bindings are not saved) the converted ident
+    and the area of the map the creature stands on."""
+    if area:
+        return ident, area
+    b = _bound.get(_key(obj))
+    if b:
+        return b
+    a = ''
+    try:
+        m = obj.map
+        for k, v in AREA_MAPS.items():
+            if v == m:
+                a = k.upper(); break
+    except Exception:
+        pass
+    _bound[_key(obj)] = (ident, a)
+    return ident, a
+
 def bind(obj, ident, area):
     _bound[_key(obj)] = (ident, area)
     try:      # baked maps: finalize the prefab objects + attach the doors once per map load (ie_bakert)
@@ -512,6 +533,7 @@ def times_talked(c):
 def dlg_start(npc, pc, ident, area, states, entry):
     """Called from the generated san_dialog. `states` = [(state_line, cond_fn)] in IE evaluation order (state
     trigger table order); the first whose condition holds is the entry line. NumTimesTalkedTo counts up after."""
+    ident, area = who(npc, ident, area)
     c = Ctx(npc, pc, ident, area)
     bind(npc, ident, area)
     line = None
@@ -541,6 +563,7 @@ def dlg_start(npc, pc, ident, area, states, entry):
     return SKIP_DEFAULT if IN_GAME else None
 
 def dlg_cond(npc, pc, ident, area, fn):
+    ident, area = who(npc, ident, area)
     try:
         return bool(fn(Ctx(npc, pc, ident, area)))
     except Exception as e:
@@ -549,6 +572,7 @@ def dlg_cond(npc, pc, ident, area, fn):
 
 def dlg_do(npc, pc, ident, area, actions, journal=None):
     """Dialogue transition effect: run the IE actions (queued on the NPC, like the IE) and note journal text."""
+    ident, area = who(npc, ident, area)
     c = Ctx(npc, pc, ident, area)
     if journal is not None:
         journal_add(journal[0], journal[1]) if isinstance(journal, tuple) else log('JOURNAL %s' % journal)
@@ -1172,6 +1196,7 @@ def tick(obj, ident, area, scripts, force=False):
     """Run one script round for a creature/area. `scripts` = list of generated BCS modules in IE priority order
     (override, specifics, class, race, general, default). Throttled to ROUND_SECS; skipped while the object's
     action queue is busy (unless an event is pending)."""
+    ident, area = who(obj, ident, area)
     now = _now()
     ev = _events.setdefault(ident, {})
     if ident not in _first:
@@ -1248,6 +1273,7 @@ def combat_round(obj, ident, area, scripts):
     """san_start_combat, every turn of the critter: one IE script round with feasibility checks (ie_combat). The
     first feasible block's Spell/Attack becomes this round's Temple+ strategy; with no feasible block the converted
     static strategy is the fallback. Both end in "stop", so Temple+ never adds its own DefaultCast."""
+    ident, area = who(obj, ident, area)
     if not IN_GAME:
         return 1
     if ident not in _first:

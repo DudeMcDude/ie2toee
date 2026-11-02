@@ -449,6 +449,30 @@ def pct(c, keys=('direct', 'close')):
     return round(100.0 * sum(c.get(k, 0) for k in keys) / tot, 1) if tot else 0.0
 
 
+SUMMON_OPS = {67: 'summon', 410: 'friend', 411: 'foe'}   # IE Creature summoning; IWD2 Summon friendly / hostile creature
+
+def summon_table(game):
+    """SPL summon effects -> {spell resref: [(min caster level, [(lo%, hi%, cre, count, secs, side)])]}: each
+    ability band rolls d100 once and summons the CRE whose [prob2, prob1] range it falls in (IWD2 Animal Summoning
+    I: 33% dog / cat / dire rat), param1 = count (IWD2), duration in seconds (0 = the runtime default)."""
+    out = {}
+    for r in game.list('spl'):
+        try:
+            sp = iespl.Spl(game.read(r, 'spl'), r)
+        except Exception:
+            continue
+        bands = {}
+        for i, e in sp.all_effects():
+            res = (getattr(e, 'resource', '') or '').strip().lower()
+            if e.opcode not in SUMMON_OPS or not res:
+                continue
+            lvl = sp.abilities[i]['level'] if i != 'cast' else 0
+            n = e.param1 if e.opcode in (410, 411) and 0 < e.param1 < 20 else 1
+            bands.setdefault(lvl, []).append((e.prob2, e.prob1 or 100, res, n, e.duration, SUMMON_OPS[e.opcode]))
+        if bands:
+            out[r.lower()] = sorted(bands.items())
+    return out
+
 def convert(game, tp, out, options=None):
     """Write <out>/ie_spellmap.py for the runtime: every spell the install has -> Temple+ spell + levels."""
     mp = SpellMapper(game, tp, options)
@@ -465,6 +489,7 @@ def convert(game, tp, out, options=None):
     for r in sorted(rows):
         py.append('    %r: %r,' % (r, rows[r]))
     py.append('}')
+    py.append('SUMMONS = %r   # IE summon spells cast by scripts -> the IE creatures (ie_spawn.summon)' % summon_table(game))
     open(os.path.join(out, 'ie_spellmap.py'), 'w').write('\n'.join(py) + '\n')
     return rows
 

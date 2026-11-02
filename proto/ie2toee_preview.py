@@ -162,14 +162,19 @@ def main():
                                          '--name-base', str(name_base(i))] + tpa):
             icre[ar] = d
             actors += open(os.path.join(d, 'dialogue_actors.txt')).read().split()
-    run('dialogue', ['ie_dialogue.py', ie, os.path.join(cre, 'dialogue'), '--quest-base', str(QUEST_BASE)] + actors +
+    dlg_cmd = (['ie_dialogue.py', ie, os.path.join(cre, 'dialogue'), '--quest-base', str(QUEST_BASE)] + actors +
         ['--area-script', '%s:%s' % (AREA, a1), '--area-map', '%s:%d:%d,%d' % (AREA, MAP_ID, px, py)] +
         sum((['--area-map', '%s:%d:%d,%d' % ((ar, mid) + tuple(json.load(open(os.path.join(w, ar + '_objects.json')))
                                                               ['placement']['canvas_offset']))]      # (merges the interiors into ie_areas.py)
              for ar, mid in sorted(interiors.items())), []))
+    run('dialogue', dlg_cmd)
     spw = os.path.join(w, 'spawnables')   # CreateCreature / ARE spawn-point CREs of the converted areas (ie_spawn.py)
     run_soft('spawnables', ['ie_creatures.py', 'spawnables', ie, toee, spw, '--scr', os.path.join(cre, 'dialogue'),
+                            '--script-base', '1400', '--script-max', '1498',     # (1499: speech bubbles)
                             '--area', AREA] + sum((['--area', ar] for ar in sorted(interiors)), []) + tpa)
+    sa = os.path.join(spw, 'dialogue_actors.txt')     # spawned creatures' own scripts/dialogue: second dialogue pass
+    if os.path.isfile(sa) and open(sa).read().split():
+        run('dialogue + spawnables', dlg_cmd + open(sa).read().split())
     stores, shop_of = set(), {}   # the IE stores the converted dialogues open (StartStore) -> ToEE barter stock
     for root, _, fs in os.walk(os.path.join(cre, 'dialogue')):
         for fn in fs:

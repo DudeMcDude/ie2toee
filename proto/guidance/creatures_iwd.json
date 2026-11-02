@@ -702,7 +702,9 @@
   {
    "id": "dog",
    "label": "Dog",
-   "classic": [],
+   "classic": [
+    "0x7400"
+   ],
    "ee": [
     "0x7400",
     "0x7401"

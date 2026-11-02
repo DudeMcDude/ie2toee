@@ -923,7 +923,20 @@ def mesh_protos(toee, specs, out):
 
 # name ids: the engine shows description ids only below ~30000 (30100 fails, 29800 works), so spawn names live
 # in the free gap above vanilla description.mes (max 20207) and below the item names (22000+)
-def convert_spawnables(game, toee_root, out, areas, scr_dirs=(), name_base=20300, options=None, tp_root=None, whole_game=False):
+def _actor_have(game, a):
+    """Drop a --actor arg's DLG / BCS refs the game doesn't have (CREs naming e.g. 10catw.dlg that never shipped)."""
+    def has(r, ext):
+        try:
+            game.read(r, ext); return True
+        except Exception:
+            return False
+    idt, ar, sid, dlg, bcs = a.split(':')
+    dlg = dlg if dlg and has(dlg, 'dlg') else ''
+    return ':'.join((idt, ar, sid, dlg, ','.join(b for b in bcs.split(',') if b and has(b, 'bcs'))))
+
+
+def convert_spawnables(game, toee_root, out, areas, scr_dirs=(), name_base=20300, options=None, tp_root=None, whole_game=False,
+                       script_base=None, script_max=None):
     """Creatures that appear at runtime: CreateCreature("cre", ...) in the converted scripts/dialogs (scanned in
     scr_dirs), plus the area .INI spawns and ARE rest-encounter tables of `areas`. Writes <out>/ie_spawnables.py
     (SPECS: cre -> spawn spec, INI_SPAWNS, REST) and <out>/modules/ToEE/mes/description/ie2toee_spawn.mes."""
@@ -942,6 +955,11 @@ def convert_spawnables(game, toee_root, out, areas, scr_dirs=(), name_base=20300
         refs.update(r for r in r_ if set(where[r]) - {'area actor'})
         # IWD2 00s*/41s*: summoned/spawned monsters named only by SPL effects (summon spells), not by scripts
         refs.update(r.lower() for r in game.list('cre') if r.lower().startswith(('00s', '41s')))
+    try:     # creatures named by summon spells (SPL opcode 67 / IWD2 410/411): ie_spawn.summon at runtime
+        import ie_spells
+        refs.update(c[2] for b in ie_spells.summon_table(game).values() for _, l in b for c in l)
+    except Exception as e:
+        print('warning: summon spells: %s' % e)
     for ar in areas:
         try:
             a = F.Are(game.read(ar, 'are'))
@@ -953,6 +971,9 @@ def convert_spawnables(game, toee_root, out, areas, scr_dirs=(), name_base=20300
             ini = None
         if ini and (ini['enter'] or ini['events']):
             points[ar.upper()] = ini
+            d_ = game.read(ar, 'are')
+            if d_[4:8] == b'V9.1':        # ARE V9.1 0x54: average party level for area difficulty 2 / 3
+                ini['diff'] = (d_[0x54], d_[0x55])
             refs.update(c['cre'] for k in ini for g in ini[k] for c in g['critters'])
         r_ = a.rest
         if r_ and r_['creatures'] and r_['enabled']:
@@ -960,8 +981,9 @@ def convert_spawnables(game, toee_root, out, areas, scr_dirs=(), name_base=20300
             refs.update(rest[ar.upper()]['creatures'])
     keep = ('resref', 'family', 'proto', 'model', 'scale', 'gender', 'alignment', 'hostility', 'abilities', 'levels',
             'monster_hd', 'hp', 'natural_ac', 'bab', 'to_hit_bonus', 'save_bonus', 'conditions', 'no_flee', 'cr', 'items',
-            'spells', 'ai_strategy', 'name_id', 'portrait', 'portrait_pool', 'difficulty', 'feats', 'skills', 'mesh', 'ident')
-    specs, names = {}, {}
+            'spells', 'ai_strategy', 'name_id', 'portrait', 'portrait_pool', 'difficulty', 'feats', 'skills', 'mesh', 'ident',
+            'script_id')
+    specs, names, dlg_args, used, cre_dlg = {}, {}, [], set(), {}
     for i, r in enumerate(sorted(refs)):
         try:
             cre = iecre.Cre(game.read(r, 'cre'), r)
@@ -984,13 +1006,43 @@ def convert_spawnables(game, toee_root, out, areas, scr_dirs=(), name_base=20300
         dv = re.sub(r'\W', '', (cre.death_var or '').lower())
         if dv and dv != 'none':
             s['ident'] = dv          # IE: a created creature answers to its script name (N("Veira"))
+        cre_dlg[r] = s.get('dialog') or ''
+        if script_base and (s.get('dialog') or s.get('scripts')):
+            # its own IE scripts + dialogue (ie_dialogue.py --actor IDENT::SID:DLG:BCS; AREA "" = per-instance at runtime)
+            sid = script_base + len(dlg_args)
+            if script_max and sid > script_max:
+                print('spawnable %s: no script id left (%d..%d), its scripts stay off' % (r, script_base, script_max))
+            else:
+                idt = s.get('ident') or re.sub(r'\W', '', r)
+                if idt in used:
+                    idt = '%s_%s' % (idt, r)
+                used.add(idt); s['ident'] = idt; s['script_id'] = sid
+                dlg_args.append('%s::%d:%s:%s' % (idt, sid, s.get('dialog') or '', ','.join(s.get('scripts') or ())))
         nid = name_base + i
         nm = cv.text(cre.name_strref) if cre.name_strref >= 0 else ''
         names[nid] = (VARIANT_NAMES.get(r, {}).get(nm.strip(), nm) or r).replace('{', '(').replace('}', ')')
         s['name_id'] = nid
         specs[r] = {k: s[k] for k in keep if k in s}
+    # INI critters with their own scripts (script_override / script_special_1.. / script_movement) or dialog: a
+    # script of their own, ident = their script_name (ie_spawn.ini_critter passes the id to the spawn)
+    for ar in sorted(points):
+        for k in ('enter', 'events'):
+            for g in points[ar][k]:
+                for c in g['critters']:
+                    if not script_base or c['cre'] not in specs or not (c.get('scripts') or c.get('dialog')):
+                        continue
+                    sid = script_base + len(dlg_args)
+                    if script_max and sid > script_max:
+                        print('INI spawn %s/%s: no script id left' % (ar, c['name'])); continue
+                    idt = re.sub(r'\W', '', (c.get('script_name') or c['name']).lower())
+                    if idt in used:
+                        idt = '%s_%s' % (idt, ar.lower())
+                    used.add(idt); c['ident'] = idt; c['script_id'] = sid
+                    dlg_args.append('%s::%d:%s:%s' % (idt, sid, c.get('dialog') or cre_dlg.get(c['cre'], ''),
+                                                      ','.join(c.get('scripts') or ())))
     mesh_protos(cv.toee, specs.values(), out)
     os.makedirs(out, exist_ok=True)
+    dlg_args = [_actor_have(game, a) for a in dlg_args]
     mesd = os.path.join(out, 'modules', 'ToEE', 'mes', 'description'); os.makedirs(mesd, exist_ok=True)
     if names:
         open(os.path.join(mesd, 'ie2toee_spawn.mes'), 'w', encoding='cp1252', errors='replace').write(
@@ -999,6 +1051,7 @@ def convert_spawnables(game, toee_root, out, areas, scr_dirs=(), name_base=20300
           'SPECS = {'] + ['    %r: %r,' % kv for kv in sorted(specs.items())] + ['}',
           'INI_SPAWNS = %r' % points, 'REST = %r' % rest]
     open(os.path.join(out, 'ie_spawnables.py'), 'w').write('\n'.join(py) + '\n')
+    open(os.path.join(out, 'dialogue_actors.txt'), 'w').write(''.join('--actor %s\n' % a for a in dlg_args))
     print('spawnables: %d CREs (%d refs), INI spawns in %d areas, rest tables in %d' % (len(specs), len(refs), len(points), len(rest)))
     return specs
 
@@ -1018,10 +1071,13 @@ def main():
     s3.add_argument('--area', action='append', default=[]); s3.add_argument('--scr', action='append', default=[])
     s3.add_argument('--name-base', type=int, default=20300); s3.add_argument('--tp'); s3.add_argument('--whole-game', action='store_true')
     s3.add_argument('--option', action='append', default=[])
+    s3.add_argument('--script-base', type=int, help='script ids base.. for spawnables with a dialog/scripts (dialogue_actors.txt)')
+    s3.add_argument('--script-max', type=int)
     a = ap.parse_args()
     if a.cmd == 'spawnables':
         convert_spawnables(iefs.IEGame(a.game), a.toee, a.out, a.area, a.scr, a.name_base,
-                           dict(kv.split('=', 1) for kv in a.option), a.tp, a.whole_game)
+                           dict(kv.split('=', 1) for kv in a.option), a.tp, a.whole_game,
+                           a.script_base, a.script_max)
         return
     if a.cmd == 'survey':
         reps = [survey(iefs.IEGame(g)) for g in a.games]
