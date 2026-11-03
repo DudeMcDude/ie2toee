@@ -132,7 +132,18 @@ def main():
                     print('  icon %d (%s): no room to use it at %d,%d -> moved to %d,%d' % (jp, area, u, v, nu, nv))
                     u, v = nu, nv
                 elif not use_room(K, u, v):
-                    print('  icon %d (%s) at %d,%d: no room to use it within 2 tiles (fix by hand)' % (jp, area, u, v))
+                    # the icon sits inside an unwalkable gate (I2AR1100 To1200: the palisade gate), so no walkable path
+                    # leads out of it: take the nearest tile within 5 that has room, on the side the party arrives
+                    # from (nearest to the area's entrances)
+                    ent = list(areas[area].get('entrances', {}).values())
+                    good = [(u + du, v + dv) for du in range(-5, 6) for dv in range(-5, 6) if use_room(K, u + du, v + dv)]
+                    if good:
+                        nu, nv = min(good, key=lambda q: ((q[0] - u) ** 2 + (q[1] - v) ** 2,
+                                                         min([(q[0] - e[0]) ** 2 + (q[1] - e[1]) ** 2 for e in ent] or [0])))
+                        print('  icon %d (%s): inside a wall at %d,%d -> moved to %d,%d' % (jp, area, u, v, nu, nv))
+                        u, v = nu, nv
+                    else:
+                        print('  icon %d (%s) at %d,%d: no room to use it within 5 tiles (fix by hand)' % (jp, area, u, v))
             p = os.path.join(a.maps, area, '%d.sec' % T.sector_of(u, v))
             if not os.path.exists(p):
                 skipped.append('%s icon at %d,%d: sector file missing' % (area, u, v)); continue
