@@ -49,6 +49,7 @@ while [ $(( $(date +%s) - T0 )) -lt "$SECS" ]; do
                      xy=$(python3 "$HERE/find_exit_icon.py" /tmp/ie_icon_$$.png ${line#CLICKICON}); echo "clickicon at '$xy'" >> "$OUT/clicks.txt"
                      [ -n "$xy" ] && { set -- $xy; xdotool mousemove "$1" "$2"; sleep 0.6; xdotool click 1; }; echo "clickicon $xy";;
           CSHOT\ *) ffmpeg -loglevel error -y -f x11grab -draw_mouse 1 -i "$DISPLAY" -frames:v 1 "$OUT/${line#CSHOT }.png"; echo "cshot ${line#CSHOT }";;   # with the X cursor
+          REC\ *) set -- ${line#REC }; ( ffmpeg -loglevel error -y -f x11grab -draw_mouse 0 -framerate 25 -video_size 1300x840 -i "$DISPLAY" -t "$1" -c:v libx264 -preset veryfast -crf 18 -pix_fmt yuv420p "$OUT/$2.mp4" > "$OUT/$2.ffmpeg.log" 2>&1 & ); echo "rec $1 s -> $2.mp4";;   # video of the virtual display
           XDO\ *) xdotool ${line#XDO }; echo "xdo ${line#XDO }";;   # raw xdotool args, e.g. XDO keydown alt
           MOVE\ *) set -- ${line#MOVE }; xdotool mousemove "$1" "$2"; echo "move $1 $2";;
         esac

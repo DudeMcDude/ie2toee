@@ -1,10 +1,10 @@
-"""IWD2 proof of concept: converts Targos (IE areas AR1000-AR1006 + AR1100) of YOUR OWN Icewind Dale II install
+"""IWD2 proof of concept: converts Targos (IE areas AR1000-AR1006, AR1100, AR1200-AR1201) of YOUR OWN Icewind Dale II install
 (GOG or retail) into ToEE maps for the preview Temple+ build.
 
   python ie2toee_preview_iwd2.py --iwd2 "C:\\GOG Games\\Icewind Dale 2" --toee "C:\\GOG Games\\ToEE-IWD2" [--out iwd2_out] [--install]
 
 Same converter steps as ie2toee_preview.py (map, spells, creatures, items, bake, travel exits, exit icons, path nodes),
-plus dialogue for the Targos NPCs (ie_dialogue.py; journal/quests not yet). Maps are named I2AR1000.. (map ids 5950-5957, guidance/iwd2.json) so they never clash with IWD's.
+plus dialogue for the Targos NPCs (ie_dialogue.py; journal/quests not yet). Maps are named I2AR1000.. (map ids 5950-5959, guidance/iwd2.json) so they never clash with IWD's.
 Install target (use a COPY of ToEE): maps, ground art, rules -> modules\\ToEE; scripts and description .mes ->
 modules\\ToEE_core (Temple+ discovers scripts before modules\\ToEE is mounted); item icons -> data\\.
 Nothing of IWD2 is shipped: everything is read from the install you point it at.
@@ -18,8 +18,11 @@ import toeedata
 from ie2toee_preview import run, run_soft, copytree, mes_with, RUNTIME
 
 GUIDE = os.path.join(HERE, 'guidance', 'iwd2.json')
-AREAS = ['AR1000', 'AR1001', 'AR1002', 'AR1003', 'AR1004', 'AR1005', 'AR1006', 'AR1100']
-SPAWN_SCRIPT_BASE = 2400   # runtime-spawned creatures with a dialog/scripts: 2400..2999
+AREAS = ['AR1000', 'AR1001', 'AR1002', 'AR1003', 'AR1004', 'AR1005', 'AR1006', 'AR1100', 'AR1200', 'AR1201']
+SPAWN_SCRIPT_BASE = 2600   # runtime-spawned creatures with a dialog/scripts: 2600..2999
+# name ids stay below the ~30000 description cap: 28000+250i for the first 8 areas, then the free gap 20800-21999
+# (spawn names 20300.., item names 22000..); AR1200 has >100 actors, so its scripts get 150 slots
+AREA_BASES = {'AR1200': (21000, 2300), 'AR1201': (21400, 2450)}
 SCRIPT_BASE = 1500  # area i's actor scripts 1500+100i.. (vanilla ToEE: <= 1374); dialogue for the actors with a DLG
 START = (450, 490)   # fallback: I2AR1000 tile of IWD2's own new-game spot (STARTARE.2DA 2390,860, the docks)
 
@@ -76,7 +79,8 @@ def main():
         if ar in ok:
             d = os.path.join(w, 'cre_' + ar.lower())
             if run_soft('creatures %s' % ar, ['ie_creatures.py', 'convert', ie, toee, d, '--area', ar,
-                                              '--name-base', str(28000 + 250 * i), '--script-base', str(SCRIPT_BASE + 100 * i)] + tpa):
+                                              '--name-base', str(AREA_BASES.get(ar, (28000 + 250 * i,))[0]),
+                                              '--script-base', str(AREA_BASES.get(ar, (0, SCRIPT_BASE + 100 * i))[1])] + tpa):
                 cre[ar] = d
     # dialogue: the actors that have a DLG (IE scripts of dialogue-less actors such as the goblins stay unconverted)
     actors = []
@@ -86,8 +90,13 @@ def main():
             if len(p_) > 3 and p_[3]:
                 actors += ['--actor', l.split()[-1]]
             elif len(p_) > 2:   # no DLG: a stub script (binds the ident; the .mob names this id, so no "Failed to build script name")
-                actors += ['--actor', '%s:%s:%s::' % tuple(p_[:3])]
+                # plus the actor's area-specific BCS (cutscene/battle scripts, e.g. AR1200's 12caba05 -> 12cSpn1a);
+                # the generic 00* combat/AI scripts stay with ToEE's own AI
+                own = [x for x in (p_[4].split(',') if len(p_) > 4 else []) if x and not x.lower().startswith('00')]
+                actors += ['--actor', '%s:%s:%s::%s' % (tuple(p_[:3]) + (','.join(own),))]
     dlg = os.path.join(w, 'dialogue')
+    shutil.rmtree(dlg, ignore_errors=True)   # regenerated each build: no stale scripts from earlier id layouts
+    shutil.rmtree(os.path.join(w, 'spawnables'), ignore_errors=True)
     amap = sum((['--area-map', '%s:%d:%d,%d' % ((ar, G[ar]['map']) + tuple(json.load(open(os.path.join(w, 'I2' + ar + '_objects.json')))
                 ['placement']['canvas_offset']))] for ar in ok), [])
     ascr = []      # each area's own script (ARE V9.1 header +0xA4)
@@ -104,7 +113,7 @@ def main():
     run_soft('dialogue', dlg_cmd)
     spw = os.path.join(w, 'spawnables')   # CreateCreature / spawn-point / summon CREs (ie_spawn.py at runtime)
     run_soft('spawnables', ['ie_creatures.py', 'spawnables', ie, toee, spw, '--whole-game', '--scr', dlg,
-                            '--script-base', str(SPAWN_SCRIPT_BASE), '--script-max', str(SPAWN_SCRIPT_BASE + 599)] +
+                            '--script-base', str(SPAWN_SCRIPT_BASE), '--script-max', str(SPAWN_SCRIPT_BASE + 399)] +
              sum((['--area', ar] for ar in ok), []) + tpa)
     sa = os.path.join(spw, 'dialogue_actors.txt')     # spawned creatures' own scripts/dialogue: second dialogue pass
     if os.path.isfile(sa) and open(sa).read().split():
@@ -196,6 +205,15 @@ def main():
         open(ml, 'w', encoding='latin-1', newline='').write('\n'.join(t))
     print('overlay: %s  (%d areas: %s)' % (inst, len(ok), ' '.join('I2' + x for x in ok)))
     if a.install:
+        # scripts/dialogs of an earlier install in our id range (1500-2999) that this build no longer has (ids moved):
+        # moved aside (out/stale_install), never deleted, so Temple+ sees one file per script id
+        for sub in ('scr', 'dlg'):
+            d_ = os.path.join(toee, 'modules', 'ToEE_core', sub)
+            for f in (os.listdir(d_) if os.path.isdir(d_) else []):
+                m_ = re.match(r'(?:py)?(\d{5})ie_', f)
+                if m_ and 1500 <= int(m_.group(1)) <= 2999 and not os.path.exists(os.path.join(C, sub, f)):
+                    os.makedirs(os.path.join(out, 'stale_install', sub), exist_ok=True)
+                    shutil.move(os.path.join(d_, f), os.path.join(out, 'stale_install', sub, f))
         copytree(inst, toee)
         for root, _, fs in os.walk(os.path.join(toee, 'modules', 'ToEE_core', 'scr')):
             for f in fs:

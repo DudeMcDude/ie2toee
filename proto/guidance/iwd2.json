@@ -111,6 +111,14 @@
     "AR1100": {
       "map": 5957,
       "ground": 957
+    },
+    "AR1200": {
+      "map": 5958,
+      "ground": 958
+    },
+    "AR1201": {
+      "map": 5959,
+      "ground": 959
     }
   },
   "map_name_prefix": "I2",

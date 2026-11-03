@@ -161,7 +161,10 @@
    "label": "Goblin elite",
    "classic": [
     "0xe428",
-    "0xe432"
+    "0xe432",
+    "0xe468",
+    "0xe479",
+    "0xe498"
    ],
    "ee": [
     "0xe420",

@@ -213,6 +213,10 @@ def start(res, c):
             rt.log('IE_ERR cutscene %s #%d: %s' % (res, i, e)); ok = False
         if ok and resps:
             blocks.append((c2, list(resps[0][1])))
+    if _RUN.get('res') and _RUN['res'] != res.lower() and STATE['cut']:
+        # StartCutScene from inside a running cutscene (IWD2 12cSpn1a -> 12cSpn1b): the parent's remaining actions
+        # (camera back, protagonist back, EndCutSceneMode) still run after the child's blocks
+        _RUN.setdefault('stack', []).append((_RUN['res'], _RUN['left']))
     _RUN['res'] = res.lower(); _RUN['left'] = len(blocks)
     for c2, acts in blocks:
         _run_block(c2, acts + [lambda c, r=res.lower(): _block_done(r)])
@@ -226,6 +230,10 @@ def _block_done(res):
     _RUN['left'] -= 1
     if _RUN['left'] <= 0:
         _RUN['res'] = None
+        if _RUN.get('stack'):
+            _RUN['res'], _RUN['left'] = _RUN['stack'].pop()
+            rt.log('CUTSCENE_END %s (back to %s)' % (res, _RUN['res']))
+            return None
         if STATE['cut']:
             rt.log('CUTSCENE_END %s (all blocks done)' % res); mode(0)
     return None
