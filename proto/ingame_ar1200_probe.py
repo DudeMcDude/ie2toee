@@ -63,7 +63,9 @@ def step2():
     for nm in ('12caball_103', '12ghotra', '12gob_69', '12caball'):
         log('IDENT %s bound=%s' % (nm, nm in ids))
     c = rt.Ctx(game.leader, None, 'probe', 'AR1200', {})
-    for k in ('05_Caballus', '05_Ghotrag', 'AR1200_Door4_WallNE'):
+    for k in ('08_Phaen', '05_Caballus', '05_Ghotrag', 'AR1200_Door4_WallNE'):
+        o_ = rt.N(c, k)
+        o_ and log('AT %s %s' % (k, location_to_axis(o_.location)))
         o = rt.N(c, k)
         log('N %s -> %s off=%s' % (k, o, o and (o.object_flags_get() & OF_OFF) != 0))
     try:

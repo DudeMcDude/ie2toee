@@ -954,7 +954,11 @@ class _Actions(object):
     def SpellHitEffectSprite(self, c, src, tgt, eff, height=0):
         if IN_GAME and (tgt or c.me) is not None:
             try:
-                game.particles('sp-Summon Monster I', tgt or c.me)    # a generic magical flash for IE VVC hit sprites
+                # SHEFFECT.IDS: 1-8 spell school sparkles (AR1200: 5 CONJURATION = Caballus teleporting himself and
+                # the goblin wave in), 21-30 summoning; ToEE has school cast particles for conjuration/illusion only
+                p_ = {5: 'cast-Conjuration-Conj', 7: 'cast-Illusion-Conj'}.get(eff) or \
+                     (21 <= eff <= 30 and 'sp-Summon Monster I') or 'cast-Conjuration-Conj'
+                game.particles(p_, tgt or c.me)
             except Exception as e:
                 log_once('vvc', 'IE_ERR SpellHitEffectSprite: %s' % e)
     def PlaySequence(self, c, obj, seq):
