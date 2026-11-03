@@ -956,8 +956,7 @@ class _Actions(object):
             try:
                 # SHEFFECT.IDS: 1-8 spell school sparkles (AR1200: 5 CONJURATION = Caballus teleporting himself and
                 # the goblin wave in), 21-30 summoning; ToEE has school cast particles for conjuration/illusion only
-                p_ = {5: 'cast-Conjuration-Conj', 7: 'cast-Illusion-Conj'}.get(eff) or \
-                     (21 <= eff <= 30 and 'sp-Summon Monster I') or 'cast-Conjuration-Conj'
+                p_ = eff == 7 and 'cast-Illusion-Conj' or 'sp-Summon Monster I'   # owner prefers the summon hexagram
                 game.particles(p_, tgt or c.me)
             except Exception as e:
                 log_once('vvc', 'IE_ERR SpellHitEffectSprite: %s' % e)
@@ -1093,11 +1092,18 @@ def _cutscene_spell_fx(c, spell, pt):
                 pass
             play_sequence(c.me, 3, c)      # CONJURE
         if name:
-            game.particles('sp-%s-Hit' % name, loc)
+            # the script waits 1 s after the cast, then opens the wall: land the hit with the wall opening
+            try:
+                game.timevent_add(_fx_hit, ('sp-%s-Hit' % name, loc), 900, 1)
+            except Exception:
+                game.particles('sp-%s-Hit' % name, loc)
         log('CUTSCENE_SPELL_FX %s (%s) at tile(%d,%d)' % (spell, name, x, y))
     except Exception as ex:
         log('IE_ERR cutscene spell fx %s: %s' % (spell, ex))
-    return 6
+    return 0
+
+def _fx_hit(p, loc):
+    game.particles(p, loc)
 
 def speech_bubble(o, strref, txt):
     """Floating text as a ToEE speech bubble (objhndl.float_line on the shared ie_barks dialog file: line id = strref;
