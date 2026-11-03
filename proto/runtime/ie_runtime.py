@@ -217,6 +217,23 @@ def O(c, name, inner=None):
     log_once('obj:' + n, 'IE_UNSUPPORTED object %s' % name)
     return None
 
+_aliases = {}   # area -> {ARE actor name (lower): ident}
+
+def _actor_ident(c, name):
+    area = ((c and c.area) or '').upper()
+    if area not in _aliases:
+        m = {}
+        try:
+            for s_ in __import__('ie_creatures_' + area.lower()).CREATURES:
+                if s_.get('ident') and s_.get('actor'):
+                    m[s_['actor'].lower()] = s_['ident']
+        except Exception:
+            pass
+        _aliases[area] = m
+    return _aliases[area].get(name.lower())
+
+_saved = {}     # ident -> saved location (SetSavedLocation), memory only
+
 def N(c, name):
     """Object by IE script name / death variable (an object or None passes through: Dead(N("x")) style calls)."""
     if not isinstance(name, str):
@@ -230,6 +247,25 @@ def N(c, name):
                         return o
                 except Exception:
                     pass
+    if IN_GAME:      # an ARE actor name (IWD2 cutscenes: CutSceneId("05_Ghotrag")) -> the converted ident
+        idt = _actor_ident(c, name)
+        if idt:
+            for k, (ident, area) in _bound.items():
+                if ident == idt:
+                    try:
+                        o = game.get_obj_by_id(k)
+                        if o:
+                            return o
+                    except Exception:
+                        pass
+    if IN_GAME:
+        try:   # a door/wall by its ARE name (OpenDoor(N("AR1200_Door4_WallNE")))
+            import ie_doors
+            for d, p, last in ie_doors._doors:
+                if d['name'].lower() == name.lower():
+                    return p
+        except Exception:
+            pass
     log_once('objname:' + name.lower(), 'IE_OBJ_NOT_FOUND "%s"' % name)
     return None
 
@@ -425,6 +461,12 @@ class _Triggers(object):
             return False
         # IE range is in search-map units (~16 px); a ToEE tile is ~28 px along its axes -> about rng/2 tiles
         return (lx - u) ** 2 + (ly - v) ** 2 <= (2 + rng / 2.0) ** 2
+    def CreatureHidden(self, c, obj=None):
+        o = obj or c.me
+        return IN_GAME and o is not None and (o.object_flags_get() & OF_OFF) != 0
+    def IsScriptName(self, c, name, obj=None):
+        o = obj or c.me
+        return o is not None and _bound.get(_key(o), ('',))[0].lower() in (name.lower(),) 
     def NearSavedLocation(self, c, *args):
         return True    # the saved location is the spawn point; ToEE NPCs return to their standpoint themselves
 
@@ -906,6 +948,50 @@ class _Actions(object):
     def FadeFromColor(self, c, pt, n=0): return max(1, (pt[0] if isinstance(pt, tuple) else 0) // 15)
     def SaveGame(self, c, strref): log('SAVEGAME %s (skipped)' % strref)
     def ResetJoinRequests(self, c): return None
+    # cutscene staging (AR1200 goblin attack): saved locations, jumps, waits, doors
+    def SetSavedLocation(self, c):
+        if IN_GAME and c.me is not None:
+            _saved[c.ident] = c.me.location
+    def SetSavedLocationPoint(self, c, pt, *args):
+        u, v = ie_to_tile(c.area, pt[0], pt[1]); _saved[c.ident] = location_from_axis(u, v)
+    def JumpToSavedLocation(self, c):
+        loc = _saved.get(c.ident)
+        if IN_GAME and c.me is not None and loc:
+            c.me.move(loc, 0.0, 0.0)
+    def FaceSavedLocation(self, c, obj=None):
+        return None
+    def JumpToPoint(self, c, pt):
+        u, v = ie_to_tile(c.area, pt[0], pt[1])
+        log('JUMP %s -> tile(%d,%d)' % (c.ident, u, v))
+        if IN_GAME and c.me is not None:
+            c.me.move(location_from_axis(u, v), 0.0, 0.0)
+    def MoveViewPointUntilDone(self, c, pt, speed=0):
+        self.MoveViewPoint(c, pt, speed)
+        return 2
+    def SmallWaitRandom(self, c, lo, hi): return max(1, random.randint(lo, max(lo, hi)) // 15)
+    def WaitRandom(self, c, lo, hi): return random.randint(lo, max(lo, hi))
+    def WaitAnimation(self, c, *args): return 1
+    def PlaySoundPoint(self, c, res, pt):
+        log_once('snd:' + res, 'IE_SOUND %s (IE sounds are not converted)' % res)
+    def OpenDoor(self, c, door):
+        if IN_GAME and door is not None:
+            try:
+                if not (door.portal_flags_get() & OPF_OPEN):
+                    door.portal_flag_unset(OPF_LOCKED); door.portal_toggle_open()
+                log('DOOR open %s' % door)
+            except Exception as e:
+                log('IE_ERR OpenDoor: %s' % e)
+    def Unlock(self, c, door):
+        if IN_GAME and door is not None:
+            try:
+                door.portal_flag_unset(OPF_LOCKED)
+            except Exception:
+                pass
+    def RandomWalk(self, c):
+        if IN_GAME and c.me is not None:
+            x, y = location_to_axis(c.me.location)
+            _walk(c.me, x + random.randint(-3, 3), y + random.randint(-3, 3))
+        return 2
     def HideCreature(self, c, obj=None, flag=1):
         o = obj or c.me
         if IN_GAME and o is not None:
@@ -936,6 +1022,8 @@ class _Actions(object):
             else:
                 r.plan_spell(res, tgt, m)
             return None
+        if pt is not None and obj is None and _cutscene_on():
+            return _cutscene_spell_fx(c, spell, pt)     # IWD2 12cSpn1a: Caballus' fireball blows the palisade wall
         try:
             import ie_spellrt
             ie_spellrt.LOG[0] = LOG_PATH
@@ -961,6 +1049,29 @@ class _Actions(object):
     SpellPointRES, ForceSpellPointRES, ReallyForceSpellPointRES = SpellPoint, ForceSpellPoint, ReallyForceSpellPoint
 
 A = _Actions()
+
+def _cutscene_spell_fx(c, spell, pt):
+    """A spell cast at a point inside a cutscene is staging (a fireball at the wall that the next action opens): the
+    caster's cast animation + the Temple+ spell's hit particles at the point, no real spell (a real Fireball there
+    hit the still hidden goblin wave around the caster and stalled the cutscene)."""
+    try:
+        import ie_spellrt
+        e = ie_spellrt.entry(ie_spellrt.resref(spell)) or {}
+        name = (e.get('n') or '').replace(' ', '-')
+        x, y = ie_to_tile(c.area, pt[0], pt[1])
+        loc = location_from_axis(x, y)
+        if c.me is not None:
+            try:
+                c.me.turn_towards_loc(loc)
+            except Exception:
+                pass
+            play_sequence(c.me, 3, c)      # CONJURE
+        if name:
+            game.particles('sp-%s-Hit' % name, loc)
+        log('CUTSCENE_SPELL_FX %s (%s) at tile(%d,%d)' % (spell, name, x, y))
+    except Exception as ex:
+        log('IE_ERR cutscene spell fx %s: %s' % (spell, ex))
+    return 6
 
 def speech_bubble(o, strref, txt):
     """Floating text as a ToEE speech bubble (objhndl.float_line on the shared ie_barks dialog file: line id = strref;

@@ -174,6 +174,8 @@ class Baker(object):
         flags = CRITTER_OF | self.proto_flags(s['proto'], 20, OF, 'OF_')
         if s.get('invulnerable'):
             flags |= OF['INVULNERABLE']
+        if (s.get('actor') or '').lower() in getattr(self, 'hidden', ()):
+            flags |= OF['OFF']       # IE hidden until a cutscene/script shows it (HideCreature(Myself, FALSE))
         o.set('flags', flags)
         if s.get('orient') is not None:
             o.set('rotation', ie_rotation(s['orient']))
@@ -336,8 +338,72 @@ class Baker(object):
         return {(r['cre'], r['x'], r['y']): r['route'] for r in rows if r['bucket'] == 'fixed_loop'}
 
     # ---------------------------------------------------------------- output
+    def start_hidden(self):
+        """ARE actor names that start hidden: a cutscene block brings them in (CutSceneId(X) .. HideCreature(Myself,
+        FALSE) before any hide), or their own script waits hidden (CreatureHidden(Myself) -> HideCreature(Myself,
+        FALSE), never hiding itself), e.g. AR1200's goblin waves behind the palisade walls."""
+        if not self.a.ie:
+            return set()
+        import iefs, iescript as S
+        g = iefs.IEGame(self.a.ie); ids = S.IdsSet(g, None)
+        scr = {}       # actor name -> its BCS list (AR*_creatures.json next to the specs)
+        try:
+            def walk(o):
+                if isinstance(o, dict):
+                    if 'actor' in o and isinstance(o.get('scripts'), list):
+                        scr[(o['actor'] or '').lower()] = [x.lower() for x in o['scripts'] if x]
+                    for v in o.values(): walk(v)
+                elif isinstance(o, list):
+                    for v in o: walk(v)
+            walk(json.load(open(os.path.join(os.path.dirname(self.a.specs), '%s_creatures.json' % self.area))))
+        except Exception:
+            pass
+        seen = {}; todo = [x for v in scr.values() for x in v]
+        def load(r):
+            if r not in seen:
+                try:
+                    seen[r] = S.Bcs(g.read(r, 'bcs'), ids, r)
+                except Exception:
+                    seen[r] = None
+                if seen[r]:
+                    for t, resp in seen[r].blocks:
+                        for w, acts in resp:
+                            for c in S.walk_calls(acts):
+                                if c.name == 'StartCutScene' and c.args:
+                                    todo.append(str(c.args[0]).strip('"').lower())
+            return seen[r]
+        while todo:
+            load(todo.pop())
+        def me(o):
+            return str(o) in ('Myself', 'Nothing', '')
+        hidden = set(); self_unhide = set()
+        for r, b in seen.items():
+            if not b:
+                continue
+            hides = [c for t, resp in b.blocks for w, acts in resp for c in S.walk_calls(acts) if c.name == 'HideCreature']
+            for t, resp in b.blocks:
+                for w, acts in resp:
+                    who = None; done = False
+                    for c in acts:
+                        if c.name == 'CutSceneId' and c.args:
+                            who = str(c.args[0]).strip('"')
+                        if c.name == 'HideCreature' and who and not done and len(c.args) > 1 and me(c.args[0]):
+                            done = True
+                            if str(c.args[1]) in ('0', 'FALSE'):
+                                hidden.add(who.lower())
+            if hides and all(len(c.args) > 1 and me(c.args[0]) and str(c.args[1]) in ('0', 'FALSE') for c in hides) and \
+                    any(c.name == 'CreatureHidden' for t, resp in b.blocks for c in t):
+                self_unhide.add(r)
+        for a_, v in scr.items():
+            if any(x in self_unhide for x in v):
+                hidden.add(a_)
+        return hidden
+
     def run(self):
         routes = self.patrol_routes()
+        self.hidden = self.start_hidden()
+        if self.hidden:
+            print('%s: %d actors start hidden' % (self.area, len(self.hidden)))
         for i, s in enumerate(self.specs):
             self.critter(i, s, routes.get(((s.get('resref') or '').lower(), s['x'], s['y'])))
         for i, c in enumerate(self.containers):

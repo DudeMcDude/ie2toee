@@ -977,7 +977,7 @@ def convert_spawnables(game, toee_root, out, areas, scr_dirs=(), name_base=20300
             d_ = game.read(ar, 'are')
             if d_[4:8] == b'V9.1':        # ARE V9.1 0x54: average party level for area difficulty 2 / 3
                 ini['diff'] = (d_[0x54], d_[0x55])
-            refs.update(c['cre'] for k in ini for g in ini[k] for c in g['critters'])
+            refs.update(c['cre'] for k in ('enter', 'events') for g in ini[k] for c in g['critters'])
         r_ = a.rest
         if r_ and r_['creatures'] and r_['enabled']:
             rest[ar.upper()] = dict(r_, creatures=[c.lower() for c in r_['creatures']])

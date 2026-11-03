@@ -97,6 +97,9 @@ def finalize_item(o, d, F):
 def area_pass(area):
     """Finalize every baked object of the area that is still in the world, attach the doors."""
     m = _data(area)
+    if m is None and _data('I2' + area) is not None:
+        area = 'I2' + area            # IWD2 scripts name the area AR1200, the baked data/doors are I2AR1200
+        m = _data(area)
     if m is None:
         return 0
     F = m.FIELDS
@@ -155,6 +158,8 @@ def first_heartbeat(o, area):
         return
     _members[a] = {g: 1}
     _last[a] = now
+    _hidden_gen[0] += 1
+    game.timeevent_add(hidden_tick, (_hidden_gen[0], o.map), 1000, 1)
     try:      # the area's own IE script (ARE header) and the new-game IE globals
         import ie_cutscene
         ie_cutscene.area_start(area)      # (not in area_pass: IWD2 areas have no ie_bake_<area> module)
@@ -165,3 +170,75 @@ def first_heartbeat(o, area):
     except Exception, e:
         import traceback
         _log('IE_BAKE pass failed: %s %s' % (e, traceback.format_exc()))
+
+
+# IE creatures that start hidden (baked OF_OFF, ie_bake.start_hidden) still run their scripts in IE (12caba05 waits
+# hidden for the goblin teams and then starts its cutscene), but Temple+ gives an OF_OFF critter no heartbeat. This
+# loop runs their converted heartbeat script for them while the map is loaded (bind on the first pass).
+_hidden_gen = [0]
+_hb_mods = {}
+
+def _hb_module(sid, ident):
+    """the critter's generated script module py<sid>ie_<ident> (the scr dir may live in a .dat or an overlay)"""
+    if sid not in _hb_mods:
+        m = None
+        try:
+            m = __import__('py%05die_%s' % (sid, ident.lower()))
+        except ImportError:
+            pass
+        except Exception, e:
+            _log('IE_BAKE hidden script %d: %s' % (sid, e))
+        _hb_mods[sid] = m
+    return _hb_mods[sid]
+
+def _names(f, out):
+    co = getattr(f, 'func_code', f)
+    out.update(getattr(co, 'co_names', ()))
+    for k in getattr(co, 'co_consts', ()) or ():
+        if hasattr(k, 'co_names'):
+            _names(k, out)
+
+def _wants_hidden(m):
+    """Only scripts written for the hidden state run while hidden (12caba05: wait hidden, then StartCutScene;
+    12atkuhp: CreatureHidden(Myself) -> unhide). The ordinary combat scripts of a hidden goblin wave would see the
+    party and attack from hiding."""
+    k = 'wants_' + m.__name__
+    if k not in _hb_mods:
+        ns = set()
+        for sm in getattr(m, 'SCRIPTS', []):
+            for cond, resps in getattr(sm, 'BLOCKS', []):
+                _names(cond, ns)
+                for r in resps:
+                    for a in r[1]:
+                        _names(a, ns)
+        _hb_mods[k] = 'CreatureHidden' in ns or 'StartCutScene' in ns
+    return _hb_mods[k]
+
+def hidden_tick(gen, mapid):
+    if gen != _hidden_gen[0]:
+        return 0
+    try:
+        l = game.leader
+        if l == OBJ_HANDLE_NULL or l.map != mapid:
+            return 0
+        n = 0
+        import ie_runtime as rt
+        for k in list(rt._bound.keys()):      # (obj_list_range skips OF_OFF objects; area_pass binds every baked npc)
+            try:
+                o = game.get_obj_by_id(k)
+            except Exception:
+                continue
+            if o is None or o == OBJ_HANDLE_NULL or o.map != mapid:
+                continue
+            if not (o.object_flags_get() & OF_OFF) or (o.object_flags_get() & OF_DESTROYED):
+                continue
+            m = _hb_module(o.scripts[san_heartbeat], rt._bound[k][0])
+            if m is None or not hasattr(m, 'IDENT') or not _wants_hidden(m):
+                continue
+            m.san_heartbeat(o, o); n += 1
+        if n and not _hb_mods.get('logged%d' % gen):
+            _hb_mods['logged%d' % gen] = 1; _log('IE_BAKE hidden tick: %d hidden critters run their scripts' % n)
+    except Exception, e:
+        _log('IE_BAKE hidden tick: %s' % e)
+    game.timeevent_add(hidden_tick, (gen, mapid), 1000, 1)
+    return 0
