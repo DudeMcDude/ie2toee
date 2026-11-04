@@ -731,9 +731,9 @@ PORTRAITS.update({
     '10kidboy': 10160, 'egirl1': 10170, '10kidgrl': 10170, 'egirl2': 10180, '50childf': 10180,
 })
 PORTRAITS.update({'51hhrma': 10420, '50abomin': 10640})   # batch 6 bosses (own art, no flip)
-# batch 8 part A: IWD1 Easthaven (replace the vanilla stand-ins; Hildreth/Quimby keep theirs until redelivered)
+# batch 8 part A: IWD1 Easthaven (replace the vanilla stand-ins; Quimby keeps his until redelivered)
 PORTRAITS.update({
-    'pomab': 11250, 'accalia': 11260, 'erevain': 11280, 'erevdead': 11280, 'elisia': 11290, 'jhonen': 11300,
+    'hildreth': 11270, 'pomab': 11250, 'accalia': 11260, 'erevain': 11280, 'erevdead': 11280, 'elisia': 11290, 'jhonen': 11300,
     'gaspar': 11310, 'barkeep': 11320, 'apsel': 11340, 'oldjed': 11350, 'eeoldjed': 11350, 'churin': 11360,
     'eepomab': 11370, 'pomimg': 11370, 'cyclops': 11380, 'eecyc1': 11380, 'mcyc': 11380, 'sentry': 11390,
     'mcapvil': 11410, 'mcapvilh': 11410, 'cmcapvil': 11410, 'fmcapvil': 11410,

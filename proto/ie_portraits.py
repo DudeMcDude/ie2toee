@@ -87,6 +87,8 @@ ART_IDS = {
     'pool_dockworker_f': (11510, 'DockhandF'),
     'pool_tempus_priest': (11520, 'TempusPriest'),
     'pool_tempus_priestess': (11530, 'TempusPriestess'),
+    'hildreth': (11270, 'Hildreth'),
+    'eh_mercenary_veteran': (12800, 'MercenaryVeteran'),   # generic sellsword (2nd sellsword variant), for later pools
 }
 # Generic monsters also get a left/right mirrored copy (own id) for per-instance variety. Named NPCs don't.
 FLIPS = {
@@ -127,6 +129,7 @@ FLIPS = {
     'pool_dockworker_f': 12240,
     'pool_tempus_priest': 12250,
     'pool_tempus_priestess': 12260,
+    'eh_mercenary_veteran': 12810,
 }
 # Face boxes on the 1200x1384 master, set by eye: (centre x, top of head/hair/crown, bottom of chin/beard).
 # _m/_s are recropped from these (whole head + margin under the chin, like vanilla NPC_6001_m_Terjon);
@@ -199,6 +202,8 @@ FACE = {
     'pool_dockworker_f': (585, 120, 700),
     'pool_tempus_priest': (585, 90, 760),
     'pool_tempus_priestess': (585, 90, 690),
+    'hildreth': (630, 100, 900),   # chin box includes the braided beard
+    'eh_mercenary_veteran': (600, 90, 760),
 }
 TOP_PAD, CHIN_PAD = 0.06, 0.14   # fraction of head height above the top / below the chin
 SIZES = {'b': (130, 150), 'm': (42, 37), 's': (53, 47)}
