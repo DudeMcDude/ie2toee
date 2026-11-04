@@ -798,6 +798,11 @@ PORTRAITS.update({
     '10kidboy': 10160, 'egirl1': 10170, '10kidgrl': 10170, 'egirl2': 10180, '50childf': 10180,
 })
 PORTRAITS.update({'51hhrma': 10420, '50abomin': 10640})   # batch 6 bosses (own art, no flip)
+PORTRAITS.update({   # batch 7: IWD2 Targos named NPCs / goblin leaders
+    '12caball': 11000, '12ghotra': 11010, '12vghota': 11020, '10black': 11030, '12black': 11030,
+    '10blanc': 11040, '12blanc': 11040, '12olap': 11050, '10jorun': 11060, '12swift': 11070, '12swifth': 11070,
+    '12illigm': 11080, '10gohar': 11090, '10magdr': 11100, '11lumbar': 11110,
+})
 # Generic monsters (batch 5): resref -> art family. Each instance picks a portrait from the family's normal pool
 # (art + mirrored flip, ie_portraits.FLIPS) by a hash of area/position, so a pack doesn't share one face;
 # resrefs in MONSTER_UPGRADED (elite, chief, high-level random-spawn entries) use the family's upgraded pool.

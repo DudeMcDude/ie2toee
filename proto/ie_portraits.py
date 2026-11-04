@@ -1,6 +1,6 @@
 """Commissioned (AI-generated, owner's own) NPC portraits -> ToEE portrait TGAs + portraits.mes entries.
 
-Ids are 9900+ in steps of 10 (batches 2-5 run past 9999: 10000-10394, flips 10310+; batch 6 10400-10694, flips 10700-10974; batch 6 10400-10694, flips 10700-10974) (Co8 uses 9000-9754). Per id: +0 _b 130x150, +1 _m 42x37, +2 _s 53x47, +3 _s_grey, +4 _m_grey,
+Ids are 9900+ in steps of 10 (batches 2-5 run past 9999: 10000-10394, flips 10310+; batch 6 10400-10694, flips 10700-10974; batch 7 11000-11244) (Co8 uses 9000-9754). Per id: +0 _b 130x150, +1 _m 42x37, +2 _s 53x47, +3 _s_grey, +4 _m_grey,
 the vanilla NPC layout (vanilla leaves +0 empty for NPCs; we put the big portrait there like the PC entries do).
 Sources: art/portraits/<key>/ie_<key>_{big,m,s}.png (see /workspace/portrait-commission specs).
 """
@@ -61,6 +61,19 @@ ART_IDS = {
     'orc_elite': (10670, 'OrcElite'),
     'goblin_elite': (10680, 'GoblinElite'),
     'wyvern': (10690, 'Wyvern'),
+    # batch 7: IWD2 Targos named NPCs and goblin leaders (12 of 25 delivered)
+    'caballus': (11000, 'Caballus'),
+    'ghotrag': (11010, 'Ghotrag'),
+    'vghotan': (11020, 'Vghotan'),
+    'black_geoffrey': (11030, 'BlackGeoffrey'),
+    'blanchard_pike': (11040, 'BlanchardPike'),
+    'olap': (11050, 'Olap'),
+    'jorun': (11060, 'Jorun'),
+    'swift_thomas': (11070, 'SwiftThomas'),
+    'illigmar': (11080, 'Illigmar'),
+    'gohar': (11090, 'Gohar'),
+    'magdar': (11100, 'Magdar'),
+    'lumbar': (11110, 'Lumbar'),
 }
 # Generic monsters also get a left/right mirrored copy (own id) for per-instance variety. Named NPCs don't.
 FLIPS = {
@@ -141,6 +154,18 @@ FACE = {
     'orc_elite': (610, 130, 830),
     'goblin_elite': (600, 130, 880),
     'wyvern': (520, 250, 750),
+    'caballus': (530, 210, 770),
+    'ghotrag': (600, 250, 880),
+    'vghotan': (560, 150, 800),
+    'black_geoffrey': (560, 125, 740),
+    'blanchard_pike': (670, 175, 840),
+    'olap': (560, 140, 720),
+    'jorun': (530, 125, 770),
+    'swift_thomas': (490, 210, 740),
+    'illigmar': (490, 155, 800),
+    'gohar': (560, 210, 800),
+    'magdar': (530, 140, 700),
+    'lumbar': (490, 105, 740),
 }
 TOP_PAD, CHIN_PAD = 0.06, 0.14   # fraction of head height above the top / below the chin
 SIZES = {'b': (130, 150), 'm': (42, 37), 's': (53, 47)}
