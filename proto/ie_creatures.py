@@ -731,6 +731,16 @@ PORTRAITS.update({
     '10kidboy': 10160, 'egirl1': 10170, '10kidgrl': 10170, 'egirl2': 10180, '50childf': 10180,
 })
 PORTRAITS.update({'51hhrma': 10420, '50abomin': 10640})   # batch 6 bosses (own art, no flip)
+# batch 8 part A: IWD1 Easthaven (replace the vanilla stand-ins; Hildreth/Quimby keep theirs until redelivered)
+PORTRAITS.update({
+    'pomab': 11250, 'accalia': 11260, 'erevain': 11280, 'erevdead': 11280, 'elisia': 11290, 'jhonen': 11300,
+    'gaspar': 11310, 'barkeep': 11320, 'apsel': 11340, 'oldjed': 11350, 'eeoldjed': 11350, 'churin': 11360,
+    'eepomab': 11370, 'pomimg': 11370, 'cyclops': 11380, 'eecyc1': 11380, 'mcyc': 11380, 'sentry': 11390,
+    'mcapvil': 11410, 'mcapvilh': 11410, 'cmcapvil': 11410, 'fmcapvil': 11410,
+    'fcapvil': 11420, 'fcapvilh': 11420, 'cfcapvil': 11420, 'ffcapvil': 11420,
+})
+TOWNSMEN = TOWNSMEN + (11460, 12200, 11470, 12210, 11490, 12230, 11430)   # batch 8 fishermen, dockworker, Cradle regular
+TOWNSWOMEN = TOWNSWOMEN + (11480, 12220, 11510, 12240)                     # batch 8 fishwife, dock hand
 # Generic monsters (batch 5): resref -> art family. Each instance picks a portrait from the family's normal pool
 # (art + mirrored flip, ie_portraits.FLIPS) by a hash of area/position, so a pack doesn't share one face;
 # resrefs in MONSTER_UPGRADED (elite, chief, high-level random-spawn entries) use the family's upgraded pool.
@@ -791,6 +801,9 @@ for _fam, _rs in {
     'malarite': '20malara 20malarh 20malarp 20rndmal',
 }.items():
     MONSTER_FAMILY.update(dict.fromkeys(_rs.split(), _fam))
+# batch 8: Easthaven temple acolytes share the Tempus acolyte/priest art (+ priest flip)
+MONSTER_POOLS['tempus'] = ((11440, 11520, 12250), ())
+MONSTER_FAMILY.update(dict.fromkeys(('acolyte', 'acolyted', 'acoldead', 'acolpois'), 'tempus'))
 MONSTER_UPGRADED = set('vscyeti wtcyeti wtyeti 52yetgh 52yettg 52yettgr 00sdyet 00sshyet 00ssyet 41sdyet '
                        'giantfg 00sdfgnt 00sfrgnt 00sshfgt 41sdfgnt 41sfrgnt 41sshfgt 00sbtl13 '
                        '50wfwgh 50wlfwg 50wlfwgr'.split())   # greater winter wolves (batch 6 art)
