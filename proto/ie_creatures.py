@@ -802,6 +802,9 @@ PORTRAITS.update({   # batch 7: IWD2 Targos named NPCs / goblin leaders
     '12caball': 11000, '12ghotra': 11010, '12vghota': 11020, '10black': 11030, '12black': 11030,
     '10blanc': 11040, '12blanc': 11040, '12olap': 11050, '10jorun': 11060, '12swift': 11070, '12swifth': 11070,
     '12illigm': 11080, '10gohar': 11090, '10magdr': 11100, '11lumbar': 11110,
+    '12nolan': 11120, '10firth': 11130, '10firthh': 11130, '10brogan': 11140, '10screed': 11150, '12tarran': 11160,
+    '12anson': 11170, '12isher': 11180, '12isherd': 11180, '12gable': 11190, '12kadenc': 11200, '12niles': 11210,
+    '10jon': 11220, '12jon': 11220, '12tabard': 11230,
 })
 # Generic monsters (batch 5): resref -> art family. Each instance picks a portrait from the family's normal pool
 # (art + mirrored flip, ie_portraits.FLIPS) by a hash of area/position, so a pack doesn't share one face;
@@ -863,6 +866,9 @@ for _fam, _rs in {
     'malarite': '20malara 20malarh 20malarp 20rndmal',
 }.items():
     MONSTER_FAMILY.update(dict.fromkeys(_rs.split(), _fam))
+# batch 7: the two Palisade drill sergeants share a generic role portrait (art + our flip)
+MONSTER_POOLS['drill_sergeant'] = ((11240, 11500), ())
+MONSTER_FAMILY.update(dict.fromkeys(('12drill', '12drilld'), 'drill_sergeant'))
 MONSTER_UPGRADED = set('vscyeti wtcyeti wtyeti 52yetgh 52yettg 52yettgr 00sdyet 00sshyet 00ssyet 41sdyet '
                        'giantfg 00sdfgnt 00sfrgnt 00sshfgt 41sdfgnt 41sfrgnt 41sshfgt 00sbtl13 '
                        '50wfwgh 50wlfwg 50wlfwgr'.split())   # greater winter wolves (batch 6 art)

@@ -1,6 +1,6 @@
 """Commissioned (AI-generated, owner's own) NPC portraits -> ToEE portrait TGAs + portraits.mes entries.
 
-Ids are 9900+ in steps of 10 (batches 2-5 run past 9999: 10000-10394, flips 10310+; batch 6 10400-10694, flips 10700-10974; batch 7 11000-11244) (Co8 uses 9000-9754). Per id: +0 _b 130x150, +1 _m 42x37, +2 _s 53x47, +3 _s_grey, +4 _m_grey,
+Ids are 9900+ in steps of 10 (batches 2-5 run past 9999: 10000-10394, flips 10310+; batch 6 10400-10694, flips 10700-10974; batch 7 11000-11244, flip 11500-11504) (Co8 uses 9000-9754). Per id: +0 _b 130x150, +1 _m 42x37, +2 _s 53x47, +3 _s_grey, +4 _m_grey,
 the vanilla NPC layout (vanilla leaves +0 empty for NPCs; we put the big portrait there like the PC entries do).
 Sources: art/portraits/<key>/ie_<key>_{big,m,s}.png (see /workspace/portrait-commission specs).
 """
@@ -74,6 +74,19 @@ ART_IDS = {
     'gohar': (11090, 'Gohar'),
     'magdar': (11100, 'Magdar'),
     'lumbar': (11110, 'Lumbar'),
+    'nolan': (11120, 'Nolan'),
+    'firtha': (11130, 'Firtha'),
+    'brogan': (11140, 'Brogan'),
+    'screed': (11150, 'Screed'),
+    'tarran': (11160, 'Tarran'),
+    'anson': (11170, 'Anson'),
+    'isherwood': (11180, 'Isherwood'),
+    'gable': (11190, 'Gable'),
+    'kadence': (11200, 'Kadence'),
+    'niles': (11210, 'Niles'),
+    'honest_jon': (11220, 'HonestJon'),
+    'tabard_mooncalf': (11230, 'TabardMooncalf'),
+    'drill_sergeant': (11240, 'DrillSergeant'),
 }
 # Generic monsters also get a left/right mirrored copy (own id) for per-instance variety. Named NPCs don't.
 FLIPS = {
@@ -107,6 +120,7 @@ FLIPS = {
     'orc_elite': 10950,
     'goblin_elite': 10960,
     'wyvern': 10970,
+    'drill_sergeant': 11500,   # batch 7 generic role
 }
 # Face boxes on the 1200x1384 master, set by eye: (centre x, top of head/hair/crown, bottom of chin/beard).
 # _m/_s are recropped from these (whole head + margin under the chin, like vanilla NPC_6001_m_Terjon);
@@ -166,6 +180,19 @@ FACE = {
     'gohar': (560, 210, 800),
     'magdar': (530, 140, 700),
     'lumbar': (490, 105, 740),
+    'nolan': (615, 90, 650),
+    'firtha': (585, 150, 660),
+    'brogan': (585, 90, 710),
+    'screed': (560, 90, 660),
+    'tarran': (615, 90, 650),
+    'anson': (640, 120, 650),
+    'isherwood': (640, 120, 650),
+    'gable': (610, 120, 620),
+    'kadence': (615, 150, 680),
+    'niles': (615, 90, 650),
+    'honest_jon': (590, 180, 700),
+    'tabard_mooncalf': (560, 120, 650),
+    'drill_sergeant': (615, 150, 720),
 }
 TOP_PAD, CHIN_PAD = 0.06, 0.14   # fraction of head height above the top / below the chin
 SIZES = {'b': (130, 150), 'm': (42, 37), 's': (53, 47)}
