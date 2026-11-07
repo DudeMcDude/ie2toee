@@ -53,6 +53,8 @@ PORTAL_OF = OF['PROVIDES_COVER']                                                
 QTY_FIELD = {'ammo': 'ammo_quantity', 'money': 'money_quantity'}
 
 
+IE_ENEMY_FACTION = 101   # unused by vanilla ToEE/Co8 protos
+
 def _flags(cell, table, prefix):
     v = 0
     for n in (cell or '').replace(',', ' ').replace('|', ' ').split():
@@ -184,6 +186,9 @@ class Baker(object):
         npc_flags = self.proto_flags(s['proto'], 152, ONF, 'ONF_')
         if s.get('hostility') == 'hostile':
             npc_flags |= ONF['KOS']
+            # one shared faction for every IE enemy (EA >= EVILCUTOFF): the template protos' own factions (ogre vs orc,
+            # wolf...) differ or are empty, and Temple+ KOS critters of different factions fight each other
+            o.set('npc_faction', T.int_array([IE_ENEMY_FACTION]))
         else:
             npc_flags &= ~ONF['KOS']
         if patrol:

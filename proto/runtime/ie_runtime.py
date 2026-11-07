@@ -76,7 +76,7 @@ def _now():
     return gt + int(_real() - _clk[1])
 
 def var_key(c, name, scope):
-    s = (scope or 'GLOBAL').upper(); n = name.lower()
+    s = (scope or 'GLOBAL').upper(); n = re.sub(r'\s+', '', name.lower())   # IE ignores spaces in variable names ("Apsel _Quest")
     if s == 'GLOBAL':
         return 'global:' + n
     if s == 'LOCALS':
@@ -1413,6 +1413,15 @@ def combat_round(obj, ident, area, scripts):
 def event(ident, name, other=None):
     """Hook helper for san_* handlers: record an IE event trigger (AttackedBy, HitBy, Die, Entered...)."""
     _events.setdefault(ident, {})[name] = other
+    if name == 'Die' and ident:
+        # IWD engine: a dying creature sets GLOBAL "<script name>_DEAD" (e.g. EHWolf_Dead for Apsel's quest)
+        k = 'global:%s_dead' % re.sub(r'\s+', '', str(ident).lower())
+        i = SLOTS.get(k)
+        if i is not None and IN_GAME:
+            game.global_vars[i] = 1
+        else:
+            _mem[k] = 1
+        log('SET %s = 1 (death)' % k)
 
 def loop(obj, ident, area, mods, period_ms=1000):
     """Drive tick() from a time event (used for area scripts and in tests; creatures use san_heartbeat)."""

@@ -5,6 +5,7 @@ numbers at convert time with the player's IDS files when possible; unknown symbo
 runtime logs them. Variable names seen in Global/SetGlobal-style calls are collected so the converter can
 allocate persistent game.global_vars slots for them.
 """
+import re
 import keyword
 import iescript as S
 
@@ -137,7 +138,7 @@ class Gen(object):
         self.jvars.setdefault(strref, set()).update(self.vars_in(calls))
 
     def var_key(self, name, scope):
-        s = scope.upper(); n = name.lower()
+        s = scope.upper(); n = re.sub(r'\s+', '', name.lower())   # IE ignores spaces in variable names ("Apsel _Quest")
         if s == 'GLOBAL':
             return 'global:' + n
         if s == 'LOCALS':
