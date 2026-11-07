@@ -89,6 +89,11 @@ ART_IDS = {
     'pool_tempus_priestess': (11530, 'TempusPriestess'),
     'hildreth': (11270, 'Hildreth'),
     'eh_mercenary_veteran': (12800, 'MercenaryVeteran'),   # generic sellsword (2nd sellsword variant), for later pools
+    'mon_lizardman_varB': (12820, 'LizardmanB'),   # batch 8 extra variant
+    'mon_mummy_varB': (12840, 'MummyB'),   # batch 8 extra variant
+    'mon_shadow_varB': (12860, 'ShadowB'),   # batch 8 extra variant
+    'mon_yuanti_varB': (12880, 'YuantiB'),   # batch 8 extra variant
+    'pool_kul_elder_m': (12900, 'KulElderM'),   # batch 8 extra variant
     # batch 8 rest (Gemini game-ready 130x150 only, no hi-res master)
     'boss_black_ice_knight': (12130, 'BlackIceKnight'),
     'boss_goblin_marshal': (12030, 'GoblinMarshal'),
@@ -196,6 +201,11 @@ FLIPS = {
     'pool_tempus_priest': 12250,
     'pool_tempus_priestess': 12260,
     'eh_mercenary_veteran': 12810,
+    'mon_lizardman_varB': 12830,
+    'mon_mummy_varB': 12850,
+    'mon_shadow_varB': 12870,
+    'mon_yuanti_varB': 12890,
+    'pool_kul_elder_m': 12910,
     'mon_beetle_cellar': 12480,
     'mon_bombardier_beetle': 12490,
     'mon_cornugon': 12750,
