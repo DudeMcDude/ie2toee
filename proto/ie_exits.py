@@ -21,7 +21,7 @@ def collect(workdir, areas, text=None):
         for e in o['entrances']:
             au, av = e.get('arrival') or [int(e['toee'][0]), int(e['toee'][1])]
             ents[e['name'].upper()] = [au, av, e.get('orient', 0)]
-        regs, infos = [], []
+        regs, infos, trigs = [], [], []
         for r in o['regions']:
             if r['type'] == 'info' and text and r.get('info') not in (None, 0, 0xFFFFFFFF):
                 t = text(r['info'])
@@ -29,6 +29,9 @@ def collect(workdir, areas, text=None):
                     infos.append(dict(name=r['name'], poly=[[round(float(x), 2), round(float(y), 2)] for x, y in r['poly']],
                                       text=t))
                 continue
+            if r['type'] != 'travel' and r.get('script'):   # trigger region: its BCS runs when the party enters
+                trigs.append(dict(name=r['name'], poly=[[round(float(x), 2), round(float(y), 2)] for x, y in r['poly']],
+                                  module='ie_bcs_%s_area' % r['script'].lower()))
             if r['type'] != 'travel' or not r.get('dest_area'):
                 continue
             dest = r['dest_area'].upper()
@@ -36,7 +39,7 @@ def collect(workdir, areas, text=None):
             extra = dict((k, r[k]) for k in ('anchor',) if r.get(k))
             regs.append(dict(extra, name=r['name'], poly=[[round(float(x), 2), round(float(y), 2)] for x, y in r['poly']],
                              dest_area=dest, dest_entrance=r_ent))
-        data[area] = dict(map=mid, entrances=ents, regions=regs, infos=infos)
+        data[area] = dict(map=mid, entrances=ents, regions=regs, infos=infos, triggers=trigs)
     for area, d in sorted(data.items()):
         for r in d['regions']:
             dst = data.get(r['dest_area'])

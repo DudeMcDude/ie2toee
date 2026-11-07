@@ -167,6 +167,10 @@ def main():
         sum((['--area-map', '%s:%d:%d,%d' % ((ar, mid) + tuple(json.load(open(os.path.join(w, ar + '_objects.json')))
                                                               ['placement']['canvas_offset']))]      # (merges the interiors into ie_areas.py)
              for ar, mid in sorted(interiors.items())), []))
+    for ar in [AREA] + sorted(interiors):     # ARE trigger regions with a script (e.g. AR1200 CARATRG1 -> Caravan_Quest)
+        for r in json.load(open(os.path.join(w, ar + '_objects.json')))['regions']:
+            if r['type'] != 'travel' and r.get('script'):
+                dlg_cmd += ['--region-script', '%s:%s' % (ar, r['script'].lower())]
     run('dialogue', dlg_cmd)
     spw = os.path.join(w, 'spawnables')   # CreateCreature / ARE spawn-point CREs of the converted areas (ie_spawn.py)
     run_soft('spawnables', ['ie_creatures.py', 'spawnables', ie, toee, spw, '--scr', os.path.join(cre, 'dialogue'),

@@ -193,8 +193,36 @@ def tick(gen):
     if not area:
         return 1
     pts = [_pos(p) for p in party]
+    _triggers(area, d.AREAS[area].get('triggers') or (), party, pts)
     # (travel itself is no longer polled: the converter places clickable ToEE exit icons, ie_exiticons.py)
     return 1
+
+
+_inside = {}   # (area, region name) -> party member inside last poll
+
+
+def _triggers(area, trigs, party, pts):
+    """ARE trigger regions: when a party member steps in, run the region's script once with Entered = that member
+    (IE fires Entered on entry; the scripts gate themselves on globals, e.g. CARATRG1/2 for Caravan_Quest)"""
+    for r in trigs:
+        k = (area, r['name'])
+        who = None
+        for p, (px, py) in zip(party, pts):
+            if near_region(px, py, r['poly']):
+                who = p
+                break
+        was = _inside.get(k)
+        _inside[k] = who
+        if who is None or was is not None:
+            continue
+        try:
+            import ie_runtime as rt
+            mod = __import__(r['module'])
+            ident = 'area_' + area.upper()
+            rt.run_script(rt.Ctx(None, who, ident, area.upper(), {'Entered': who}), mod.BLOCKS)
+            _log('%s: %s entered (%s)' % (area, r['name'], r['module']))
+        except Exception as e:
+            _log('trigger %s %s failed: %s' % (area, r['name'], e))
 
 
 def poll(gen=0):

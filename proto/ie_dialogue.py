@@ -297,6 +297,7 @@ def main():
     ap.add_argument('game'); ap.add_argument('out')
     ap.add_argument('--actor', action='append', default=[], help='IDENT:AREA:SCRIPT_ID[:DLG][:BCS,BCS]')
     ap.add_argument('--area-script', action='append', default=[], help='AREA:BCS')
+    ap.add_argument('--region-script', action='append', default=[], help='AREA:BCS of an ARE trigger region (run by ie_travel on Entered)')
     ap.add_argument('--tlk'); ap.add_argument('--lang', help='EE locale, e.g. en_US'); ap.add_argument('--fallback'); ap.add_argument('--slot-base', type=int, default=1000)
     ap.add_argument('--area-map', action='append', default=[], help='AREA:TOEE_MAP[:canvas_x,canvas_y]')
     ap.add_argument('--slot-max', type=int, default=1999)
@@ -354,6 +355,10 @@ def main():
         area, res = spec.split(':')
         m, nb, unk = bcs(res.lower(), 'area_' + area.upper(), area.upper())
         rep['area_scripts'].append({'area': area.upper(), 'module': m, 'blocks': nb})
+    for spec in a.region_script:      # trigger-region scripts: generated only; runtime/ie_travel.py runs them on Entered
+        area, res = spec.split(':')
+        m, nb, unk = bcs(res.lower(), 'area_' + area.upper(), area.upper())
+        rep.setdefault('region_scripts', []).append({'area': area.upper(), 'module': m, 'blocks': nb})
     # cutscene scripts started by StartCutScene("res") in any converted dialog / script (recursively) -> ie_bcs_<res>_area
     cs_done = set(); asc = {}
     for x in rep['area_scripts']:
