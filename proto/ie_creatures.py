@@ -742,8 +742,8 @@ PORTRAITS.update({
 TOWNSMEN = TOWNSMEN + (11460, 12200, 11470, 12210, 11490, 12230, 11430)   # batch 8 fishermen, dockworker, Cradle regular
 TOWNSWOMEN = TOWNSWOMEN + (11480, 12220, 11510, 12240)                     # batch 8 fishwife, dock hand
 PORTRAITS.update({'innkpr': 11330})   # batch 8 Quimby redo
-TOWNSMEN = TOWNSMEN + (11540, 12270, 11560, 12290, 11600, 12330, 11630, 12360, 11650, 12380, 11660, 12390, 11680, 12410)   # batch 8 rest
-TOWNSWOMEN = TOWNSWOMEN + (11580, 12310, 11590, 12320, 11610, 12340, 11640, 12370)
+TOWNSMEN = TOWNSMEN + (11540, 12270, 11560, 12290, 11570, 12300, 11600, 12330, 11630, 12360, 11650, 12380, 11660, 12390, 11680, 12410)   # batch 8 rest (+ merchant_far)
+TOWNSWOMEN = TOWNSWOMEN + (11550, 12280, 11580, 12310, 11590, 12320, 11610, 12340, 11640, 12370)   # + militia_f
 # Generic monsters (batch 5): resref -> art family. Each instance picks a portrait from the family's normal pool
 # (art + mirrored flip, ie_portraits.FLIPS) by a hash of area/position, so a pack doesn't share one face;
 # resrefs in MONSTER_UPGRADED (elite, chief, high-level random-spawn entries) use the family's upgraded pool.
