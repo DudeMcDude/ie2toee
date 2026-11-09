@@ -910,9 +910,9 @@ MONSTER_POOLS['b8_minotaur'] = ((11990, 12720), ())
 MONSTER_FAMILY.update(dict.fromkeys('00smin 53minoth'.split(), 'b8_minotaur'))
 MONSTER_POOLS['b8_hunter'] = ((11650, 12380), ())
 MONSTER_FAMILY.update(dict.fromkeys('50hnt 50hnt2 50hnt3'.split(), 'b8_hunter'))
-MONSTER_POOLS['b8_towns_f'] = ((11580, 12310, 11610, 12340, 11590, 12320, 11640, 12370), ())
+MONSTER_POOLS['b8_towns_f'] = ((11550, 12280, 11580, 12310, 11610, 12340, 11590, 12320, 11640, 12370), ())  # + militia_f
 MONSTER_FAMILY.update(dict.fromkeys('10fem1 10fem2 10fem3 20dedvf'.split(), 'b8_towns_f'))
-MONSTER_POOLS['b8_towns_m'] = ((11540, 12270, 11560, 12290, 11600, 12330, 11660, 12390, 11680, 12410, 12900, 12910), ())
+MONSTER_POOLS['b8_towns_m'] = ((11540, 12270, 11560, 12290, 11570, 12300, 11600, 12330, 11660, 12390, 11680, 12410, 12900, 12910), ())  # + merchant_far
 MONSTER_FAMILY.update(dict.fromkeys('10male1 10male2 10male3 10maled 20dedvm 50vil 50vil2 50vil3'.split(), 'b8_towns_m'))
 MONSTER_UPGRADED |= set('00senoro 00sgmum 00smumk 00szmbl2 00szmblo 21spdqn 30gobwr2 30gobwr4 30gobwr6 30gobwrc 30ogrch 30oroca 30spiwoq 31hobch 31hobe 31oroch 31oroco 41senoro 41sgmum 41smumk 41szmbl2 41szmblo 60neoorg 62eoro 62eoro2 62eoro3 62neoorg 66eoro 66eoro1 66eoro2 67eneoo 67eneoo2 67eneoo3 67eneoon 67oroc 67orogco 67orogcp 67stub'.split())
 # IWD1-only named characters: their resrefs do not exist in IWD2 (main maps them)
