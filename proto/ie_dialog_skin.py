@@ -232,12 +232,18 @@ class Exporter:
                 best = (score, w)
         return best[1] if best else None
 
-    def scrollbar_art(self, skin, ref):
+    def scrollbar_art(self, skin, ref, cycle=0, frames=None):
+        """Arrows, knob and trough of a scrollbar BAM. A CHU scrollbar control names its frames (IWD's GUIWSBR:
+        trough 6 = a 6x30 bar, slider 7 = a 9x9 knob; frames 4/5 are the 22x22 history-button art, which the old
+        fixed 0..5 order tiled down the trough); without a CHU control (EE menus) the order is up, up pressed,
+        down, down pressed, knob, trough."""
         b = self.bam(ref)
-        names = ['up', 'up_pressed', 'down', 'down_pressed', 'knob', 'trough']
+        f_ = frames or {}
+        order = [('up', f_.get('up', 0)), ('up_pressed', f_.get('up_pressed', 1)), ('down', f_.get('down', 2)),
+                 ('down_pressed', f_.get('down_pressed', 3)), ('knob', f_.get('slider', 4)), ('trough', f_.get('trough', 5))]
         out = {}
-        for k, n in enumerate(names):
-            f = b.frame(0, k)
+        for n, k in order:
+            f = b.frame(cycle, k)
             if f is not None:
                 out[n] = self.tga(crop_alpha(f), skin, 'scroll_%s.tga' % n)
         return out
@@ -259,11 +265,14 @@ class Exporter:
             'panel': {'image': self.tga(panel, skin, 'panel.tga'), 'w': int(panel.shape[1]), 'h': int(panel.shape[0]),
                       'bottom': 58},
             'text': {'rect': [ta['x'], ta['y'], ta['w'], ta['h']]},
+            # the classic IWD log has no portrait slot; show the NPC's ToEE portrait (130x150) just above the panel's
+            # top-left corner so the dialogue never hides it
+            'portrait': {'rect': [ta['x'], -156, 130, 150]},
             'font': dict(font_face, point=font_point, fallback='Junicode'),
             'colors': colors,
         }
         if sb:
-            js['scrollbar'] = {'rect': [sb['x'], sb['y'], sb['w'], sb['h']], 'art': self.scrollbar_art(skin, sb['bam'])}
+            js['scrollbar'] = {'rect': [sb['x'], sb['y'], sb['w'], sb['h']], 'art': self.scrollbar_art(skin, sb['bam'], sb.get('cycle', 0), sb.get('frames'))}
         if btn:
             js['history_button'] = {'rect': [btn['x'], btn['y'], btn['w'], btn['h']],
                                     'frames': self.bam_frames(skin, btn['bam'], btn['cycle'],
@@ -416,7 +425,7 @@ class Exporter:
         d = self.g.read(cre, 'cre')
         if d[:8] != b'CRE V1.0':
             return None
-        for off in (0x34, 0x3C):                             # small, large portrait resrefs
+        for off in (0x3C,):                                  # large portrait resref only (a small one scaled up looks blurry)
             ref = cstr(d[off:off + 8]).lower()
             if ref and ref != 'none' and self.g.exists(ref, 'bmp'):
                 import io
