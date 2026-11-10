@@ -238,7 +238,13 @@ def slides(game, out, flavour):
             src = wav
             if open(wav, 'rb').read(4) == b'WAVC':   # IE WAVC = 28-byte header + Interplay ACM
                 src = os.path.join(tmp, 'n.acm'); open(src, 'wb').write(open(wav, 'rb').read()[28:])
-            subprocess.check_call(['ffmpeg', '-v', 'quiet', '-y', '-i', src, '-ac', '1', '-b:a', '96k',
+            # temple.dll's movies.mes parser only accepts .mp3 in the sound field (anything else is
+            # dropped). Miles/ToEE needs MPEG-1 Layer III (vanilla ES01a.mp3: 44100 Hz mono 64k).
+            # A 22050 Hz encode is MPEG-2 and fails PlayOnce. After a Bink (BinkOpenMiles) an MP3
+            # can still fail under Wine; Temple+ 0.2.91 ends the slide after 3 s and logs the Miles reason.
+            subprocess.check_call(['ffmpeg', '-v', 'quiet', '-y', '-i', src,
+                                   '-map_metadata', '-1', '-ac', '1', '-ar', '44100',
+                                   '-c:a', 'libmp3lame', '-b:a', '64k', '-id3v2_version', '3',
                                    os.path.join(M, 'sound', 'speech', 'slide', base + '.mp3')])
             ttl = tlk(title)[1].strip() if title is not None else ''
             lines = ([ttl] if ttl else []) + _subtitle_lines(text)
