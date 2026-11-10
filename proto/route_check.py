@@ -7,7 +7,12 @@ import os, json
 from utilities import location_from_axis, location_to_axis
 LOG = os.environ.get('IE2TOEE_PROBE_LOG', 'ie2toee_probe.log')
 PAIRS = json.load(open(os.environ['ROUTECHECK_PAIRS']))
-MAP = int(os.environ.get('ROUTECHECK_MAP', '5900'))
+try:      # default: the converted town's map id (ie_travel_data.py, written by ie_exits.py)
+    import ie_travel_data
+    _TOWN = ie_travel_data.AREAS['AR1000']['map']
+except Exception:
+    _TOWN = 5012
+MAP = int(os.environ.get('ROUTECHECK_MAP', str(_TOWN)))
 OX, OY = [int(x) for x in os.environ.get('ROUTECHECK_ORIGIN', '128,88').split(',')]
 def log(s):
     f = open(LOG, 'a'); f.write(s + '\n'); f.close()

@@ -51,7 +51,7 @@ turned into ToEE objects yet. See [docs/design.md](docs/design.md).
 Requires Python 3.9+ with `numpy` and `pillow`.
 
     cd proto
-    python3 ie2toee.py --game "<IE install>" --area AR1000 --out ../out --map-id 5900 --ground-id 900 \
+    python3 ie2toee.py --game "<IE install>" --area AR1000 --out ../out --map-id 5012 --ground-id 900 \
         [--guidance guidance/<game>.json] [--closed-doors] [--preview]
     python3 verify_toee_output.py --out ../out --area AR1000      # paints the .sec blocking over the ground art
     python3 door_debug.py --game "<IE install>" --out ../out --area AR1000   # closed/open patch + impeded cells per door

@@ -2,7 +2,7 @@
 # For each area: teleport there (the engine loads its pathnode.pnd from ie_pathnodes.py), then
 # debug.genclearance(dir) / recalc_neighbours / flush_nodes(dir) recalculate every node's links with the real pathfinder and write
 # pathnodenew.pnd + pathnodedist.pnd + clearance.bin into <IE2TOEE_PNBAKE_OUT>\<area>.
-#   IE2TOEE_PNBAKE="AR1000:5900:482,424;AR1001:5901:x,y;..."  IE2TOEE_PNBAKE_OUT=Z:\...\maps  [IE2TOEE_PNBAKE_MAXDIST=24]
+#   IE2TOEE_PNBAKE="AR1000:5012:482,424;AR1001:5013:x,y;..." (map ids: ie2toee_preview.MAP_ID + n)  IE2TOEE_PNBAKE_OUT=Z:\...\maps  [IE2TOEE_PNBAKE_MAXDIST=24]
 from toee import *
 import os, debug
 LOG = os.environ.get('IE2TOEE_PROBE_LOG', 'ie2toee_probe.log')

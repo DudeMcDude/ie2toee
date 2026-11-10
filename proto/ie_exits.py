@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Collect the travel regions and entrances of the converted areas into ie_travel_data.py (runtime/ie_travel.py reads it).
 
-  python ie_exits.py <workdir> --area AR1000:5900 --area AR1001:5901 ... --out <dir>/ie_travel_data.py
+  python ie_exits.py <workdir> --area AR1000:5012 --area AR1001:5013 ... --out <dir>/ie_travel_data.py
 
 <workdir> holds the <AREA>_objects.json files written by ie2toee.py. For every converted area the data holds the
 map id, its travel regions (polygon in ToEE tile coordinates, destination area + entrance) and its entrances (the

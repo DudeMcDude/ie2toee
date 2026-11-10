@@ -10,7 +10,7 @@ GUIDs are uuid5 of flavour / area / object key, so a re-bake keeps the same ids 
 The few things a .mob cannot express offline are finalized once in game by runtime/ie_bakert.py.
 
   ie_bake.py bake --area AR1000 --specs out/cre/ie_creatures_ar1000.py --items out/items/ie_itemmap.py \
-      --doors out/ie_doors_ar1000.py --maps out/maps/AR1000 --map-id 5900 --placement 6528,7648 \
+      --doors out/ie_doors_ar1000.py --maps out/maps/AR1000 --map-id 5012 --placement 6528,7648 \
       --toee <ToEE> --ie <IE install> --out out/bake/IWD --flavour IWD
 
 The runtime spawner (runtime/ie_critters.spawn_area + ie_doors.start) stays the fallback: install the plain

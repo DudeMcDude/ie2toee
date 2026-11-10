@@ -143,7 +143,7 @@ to the proto.
 
 ```
 ie_bake.py bake --area AR1000 --flavour IWD --specs <ie_creatures_ar1000.py> --items <ie_itemmap.py> \
-   --doors <ie_doors_ar1000.py> --maps <converted map dir> --map-id 5900 --placement <cx,cy> \
+   --doors <ie_doors_ar1000.py> --maps <converted map dir> --map-id 5012 --placement <cx,cy> \
    --toee <ToEE> --ie <IE install> --out <dir>
 ```
 

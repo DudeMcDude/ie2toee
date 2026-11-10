@@ -71,7 +71,7 @@ def step(s, run):
         elif s == 'take':
             take()
         elif s == 'town':
-            game.fade_and_teleport(0, 0, 0, 5900, 482, 424)
+            game.fade_and_teleport(0, 0, 0, D.AREAS['AR1000']['map'], 482, 424)
         elif s == 'back':
             game.fade_and_teleport(0, 0, 0, INT['map'], ex, ey)
         elif s == 'save':

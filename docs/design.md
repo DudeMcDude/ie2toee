@@ -16,7 +16,7 @@ TC ships code + per-area guidance JSON; player runs the converter on their IWD/I
    into .mob / protos / scripts is TC work (next milestone).
 
 ## Real-data results (IWD1, 2026-10-17)
-- All 128 IWD areas resolve and parse; AR1000, AR2100, AR1001 converted and loaded in Temple+ (maps 5900-5902).
+- All 128 IWD areas resolve and parse; AR1000, AR2100, AR1001 converted and loaded in Temple+ (maps 5900-5902 then; the preview now uses 5012.., see `MAP_ID` in ie2toee_preview.py).
 - Calibration against an independent hand-made World Builder conversion of the same area: 89.1 % subtile walk/non-walk agreement, 80.2 % of tiles
   agree on all 9 subtiles, after a (+7, +124) px art offset (that map's art placement vs our centred placement).
 - In game: background, blocking and pathing work (party paths around the lake over the bridge, refuses lake targets);

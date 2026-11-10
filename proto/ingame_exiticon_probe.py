@@ -102,7 +102,7 @@ except Exception, e:
 if COUNT_ONLY:
     at(5000, count, ('after load',))
     b = BLD[0]; r = region(b, 'AR1000'); u, v = D.AREAS['AR1000']['entrances'][r['dest_entrance']][:2]
-    at(500, lambda: (game.fade_and_teleport(0, 0, 0, 5900, u, v), 0)[1])
+    at(500, lambda: (game.fade_and_teleport(0, 0, 0, D.AREAS['AR1000']['map'], u, v), 0)[1])
     at(5000, count, ('town again',))
     at(500, done)
 else:

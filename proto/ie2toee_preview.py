@@ -19,16 +19,28 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import toeedata
 
-AREA, MAP_ID, GROUND_ID, START = 'AR1000', 5900, 900, (482, 424)
+AREA, MAP_ID, GROUND_ID, START = 'AR1000', 5012, 900, (482, 424)
+# Map ids (the IWD module replaces vanilla's maps, so their ids are reused) must stay <= 5198: temple.dll's town map UI
+# keeps 200 per-map slots (map id - 4999) and, the first time it opens, fills one per id up to the highest MapList id,
+# so ids >= ~5200 overrun them and crash it (the old 5900.. ids did); its place list reads mes/map_names.mes by LINE
+# index (map id - 5000), so that file is written gap-free from 5000 (map_names()). 5012..5030: vanilla's area 1
+# (Hommlet = the logbook's Easthaven, ie_dialogue LOGBOOK_AREAS) and clear of the ids the engine special-cases
+# (ENGINE_MAP_IDS). Vanilla data keyed by map id that still loads from modules/IWD.dat (= ToEE.dat) is overridden:
+# rules/MapLimits.mes (scroll limits; our ids dropped) and rules/daynight.nxd (vanilla NPC day/night moves; emptied).
+ENGINE_MAP_IDS = ({5000, 5001, 5067, 5107, 5117, 5118, 5119, 5135, 5189, 5199} | set(range(5070, 5079)) |
+                  set(range(5096, 5105)) | {5005, 5011, 5050, 5066, 5078, 5080})
+# 5000 no terrain/scroll limits; 5001 Hommlet (worldmap, editor start); 5067 ray spell scripts; 5070-5078 random
+# encounters; 5096-5104 vignettes (no town map); 5107 quickstart; 5117/5118 tutorial; 5119 arena; 5135 Temple+ debug
+# limit; 5189/5199 Co8 day/night fix; 5005 5011 5050 5066 5078 5080 vanilla town map flags
 MODULE = 'IWD'          # Temple+ module: modules\IWD.dat (link to your ToEE.dat) + modules\IWD (maps, art, rules, mes) +
                         # modules\IWD_core (dlg, scr, quest texts); chosen in TemplePlusConfig (defaultModule=IWD)
 QUEST_BASE = 1          # IE journal entries -> ToEE quests 1.. (vanilla quests are not kept in the IWD module)
 SCRIPT_BASE = 1100      # town actors 1100.., interior n: 1120+10n.. (n <= 14: <= 1269); side rooms n >= 15: 1300+10(n-15)..
 GENERIC_BASE = 1280    # interior n's baked-object script (the town's is 1099)
-# Easthaven's 14 building interiors + 2 side rooms (AR1015 off AR1006, AR1016 off AR1007): map ids 5901..5916,
+# Easthaven's 14 building interiors + 2 side rooms (AR1015 off AR1006, AR1016 off AR1007): map ids MAP_ID+1..+16,
 # ground ids 901..916 (map, doors, baked actors + containers)
 INTERIORS = ['AR10%02d' % i for i in range(1, 17)]
-# the Orc Cave chain off AR1000's south-east road exit (To1200): AR1200 hill road, AR1201 Orc Cave (map ids 5917/5918,
+# the Orc Cave chain off AR1000's south-east road exit (To1200): AR1200 hill road, AR1201 Orc Cave (map ids MAP_ID+17/+18,
 # ground ids 917/918); converted like the interiors (map, exits, actors, containers)
 INTERIORS += ['AR1200', 'AR1201']
 
@@ -112,6 +124,100 @@ def mes_with(td, rel, lines, dest):
         f.write('\n'.join(keep).rstrip('\n') + '\n' + '\n'.join(lines) + '\n')
 
 
+def area_names(ie, w, specs, shops):
+    """Town map place list / map description per converted area, from the IE data: the worldmap's area name
+    (WORLDMAP.WMP, e.g. AR1000 'Easthaven'), else the name of the store a resident runs (STO, e.g. 'The Snowdrift
+    Inn'), else '<town> - <named resident>' (an NPC with a commissioned portrait), else by the ARE's type and the
+    area it is entered from: '<town> - Outskirts' (outdoor), '<town> - Cave' (0x20), '<parent> - Side Room' (off
+    an interior), '<town> - House (<resref>)'."""
+    import struct, iefs, iescript, iecre, ie_creatures
+    from ieformats import Are
+    tv = {}
+    try:
+        exec(open(os.path.join(w, 'ie_travel_data.py'), encoding='latin-1').read(), tv)
+    except Exception:
+        pass
+    parent = {}       # area -> the converted area whose exit leads into it (the town wins)
+    for src, a in sorted(tv.get('AREAS', {}).items(), key=lambda kv: kv[0] != AREA):
+        for r in a.get('regions', []):
+            parent.setdefault(r.get('dest_area'), src)
+    g = iefs.IEGame(ie); t = iescript.Tlk.load(iescript.find_tlk(ie))
+    wmp = {}
+    try:
+        b = g.read('worldmap', 'wmp'); off = struct.unpack_from('<I', b, 12)[0]
+        cnt, ao = struct.unpack_from('<II', b, off + 0x20)
+        for i in range(cnt):
+            o = ao + i * 0xf0
+            wmp[b[o:o + 8].split(b'\0')[0].decode('latin-1').upper()] = t.get(struct.unpack_from('<i', b, o + 0x40)[0])
+    except Exception as ex:
+        print('warning: worldmap names: %s' % ex)
+    town = wmp.get(AREA) or AREA
+    out = {}
+    for ar, spec in specs.items():
+        name = wmp.get(ar)
+        for st in sorted(set(shops.get(ar, {}).values())) if not name else ():
+            try:
+                name = t.get(struct.unpack_from('<I', g.read(st, 'sto'), 0x0c)[0]).strip() or None
+            except Exception:
+                pass
+            if name:
+                break
+        if not name and spec and os.path.isfile(spec):
+            gl = {}; exec(open(spec, encoding='latin-1').read(), gl)
+            for c in gl.get('CREATURES', []):
+                if c.get('resref') in ie_creatures.PORTRAITS:
+                    try:
+                        name = '%s - %s' % (town, t.get(iecre.Cre(g.read(c['resref'], 'cre'), c['resref']).as_dict()['name_strref']))
+                        break
+                    except Exception:
+                        pass
+        out[ar] = name
+    for ar in sorted(out, key=lambda a: parent.get(a) not in (None, AREA)):   # parents named first
+        if out[ar]:
+            continue
+        try:
+            at = Are(g.read(ar, 'are')).area_type
+        except Exception:
+            at = 0
+        pa = parent.get(ar)
+        out[ar] = ('%s - Outskirts' % town if at & 1 else '%s - Cave' % town if at & 0x20 else
+                   '%s - Side Room' % out[pa] if pa not in (None, AREA) and out.get(pa) else '%s - House (%s)' % (town, ar))
+    return {ar: n.replace('{', '(').replace('}', ')') for ar, n in out.items()}
+
+
+
+# Read before modules\<module> is mounted: Temple+ builds the UI (town map place list: mes/map_names.mes, read once at
+# UI startup) and the legacy game systems (scroll limits: rules/MapLimits.mes) with only modules\<module>_core and the
+# base archives on the path (temple_main.cpp: UiSystems before gameSystems.LoadModule), so a module-folder copy of these
+# is ignored and vanilla's names/limits for the reused ids show through (the town map listed "Church of St. Cuthbert -
+# Main Floor" for 5012). Copy the overrides to <module>_core as well.
+CORE_EARLY = ('mes/map_names.mes', 'rules/MapLimits.mes', 'rules/daynight.nxd')
+
+
+def copy_early_to_core(M, C):
+    for rel in CORE_EARLY:
+        src = os.path.join(M, rel)
+        if os.path.isfile(src):
+            os.makedirs(os.path.dirname(os.path.join(C, rel)), exist_ok=True)
+            shutil.copyfile(src, os.path.join(C, rel))
+
+
+def map_names(td, names, maplist, dest):
+    """mes/map_names.mes, every id from 5000 to the highest map id in key order with a non-empty text: the town
+    map's place list takes the line at index (map id - 5000), so a gap or an empty line shifts or blanks the names."""
+    try:
+        txt = td.read('mes/map_names.mes').decode('latin-1')
+    except FileNotFoundError:
+        txt = ''
+    d = {int(k): v.strip() for k, v in re.findall(r'^\s*\{(\d+)\}\s*\{([^}]*)\}', txt, re.M)}
+    ml = {int(k): v.strip() for k, v in re.findall(r'^\{(\d+)\}\{([^,}]*)', maplist, re.M)}
+    d.update(names)
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    with open(dest, 'w', encoding='latin-1', newline='\r\n') as f:
+        for k in range(5000, max(list(d) + list(ml)) + 1):
+            f.write('{%d}{%s}\n' % (k, d.get(k) or ml.get(k) or 'Map %d' % k))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--iwd', required=True, help='your Icewind Dale or Icewind Dale: Enhanced Edition folder')
@@ -128,6 +234,8 @@ def main():
                          'debug.recalc_neighbours/flush_nodes/genclearance with the optional args, DudeMcDude/TemplePlus '
                          'feature/pathnode-bake, given as --tp)')
     a = ap.parse_args()
+    assert MAP_ID + len(INTERIORS) <= 5198, 'map ids above 5198 crash the town map (see MAP_ID)'
+    assert not ENGINE_MAP_IDS & set(range(MAP_ID, MAP_ID + len(INTERIORS) + 1)), 'map ids hit engine special cases'
     ie, toee = os.path.abspath(a.iwd), os.path.abspath(a.toee)
     out = os.path.abspath(a.out)
     tp = a.tp or next((p for p in (os.path.join(HERE, '..', '..', 'TemplePlus'), os.path.join(HERE, '..', 'TemplePlus'))
@@ -189,12 +297,14 @@ def main():
                 if found:
                     shop_of[int(m_.group(1))] = found[0].lower()      # script id -> the store its dialogue opens
     stores = sorted(stores)
+    area_shops = {}   # area -> {actor ident: store} (shops(); also names the area: area_names())
 
     def shops(specs_py, ar):      # bake input: actor ident -> store, for the area's merchants
         g = {}
         if specs_py and os.path.isfile(specs_py):
             exec(open(specs_py, encoding='latin-1').read(), g)
         d = {c['ident']: shop_of[c['script_id']] for c in g.get('CREATURES', []) if c.get('script_id') in shop_of}
+        area_shops[ar] = d
         p_ = os.path.join(w, 'shops_%s.json' % ar.lower()); json.dump(d, open(p_, 'w'), indent=1)
         return ['--shops', p_]
     run('items', ['ie_items.py', 'convert', ie, os.path.join(w, 'items'), '--toee', toee] +
@@ -242,6 +352,8 @@ def main():
             copytree(os.path.join(w, 'art', 'ground', g), os.path.join(M, 'art', 'ground', g))
         copytree(os.path.join(w, 'art', 'clip', ar), os.path.join(M, 'art', 'clip', ar))
     copytree(os.path.join(w, 'skin', 'modules', 'ToEE'), M)
+    for mid in [MAP_ID] + list(interiors.values()):    # town map tiles (ie2toee.py write_townmap)
+        copytree(os.path.join(w, 'townmap', str(mid)), os.path.join(M, 'townmap', str(mid)))
     shutil.copy(os.path.join(bake, 'rules', 'jumppoint.tab'), os.path.join(M, 'rules', 'jumppoint.tab'))   # exit icons
     copytree(os.path.join(bake, 'rules', 'info_regions'), os.path.join(M, 'rules', 'info_regions'))     # clickable info points
     copytree(os.path.join(cre, 'dialogue', 'modules', 'ToEE', 'dlg'), os.path.join(C, 'dlg'))
@@ -291,6 +403,25 @@ def main():
             if l.strip() and cur:
                 sn.setdefault(cur, []).append(l)
     td = toeedata.ToEEData(toee)
+    specs = {AREA: os.path.join(cre, 'ie_creatures_%s.py' % a1)}
+    specs.update({ar: os.path.join(icre[ar], 'ie_creatures_%s.py' % ar.lower()) if ar in icre else None for ar in interiors})
+    ids = dict(interiors, **{AREA: MAP_ID})
+    names = area_names(ie, w, specs, area_shops)
+    # vanilla town map files of the reused ids (ToEE*.dat stay loaded) would show through between ours: black them out
+    from PIL import Image
+    black = None
+    for src in td.sources:
+        for f in src.files:
+            m_ = re.match(r'townmap[\\/](\d+)[\\/](z[48]\d{6}\.jpg)$', f, re.I)
+            if m_ and int(m_.group(1)) in ids.values():
+                dst = os.path.join(M, 'townmap', m_.group(1), m_.group(2).lower())
+                if not os.path.exists(dst):
+                    os.makedirs(os.path.dirname(dst), exist_ok=True)
+                    black = black or Image.new('RGB', (256, 256))
+                    black.save(dst, quality=90)
+    for ar in sorted(names, key=lambda a: ids[a]):
+        print('map %d %s: %s' % (ids[ar], ar, names[ar]))
+    sn.pop('mes/map_names.mes', None)     # (ie2toee.py's lines carry the resref; map_names() below writes the file)
     for rel, lines in sn.items():
         # the quest texts are only read from <module>_core (a copy in the module folder is ignored: verified in game)
         dst = C if os.path.basename(rel) in ('gamequestlog.mes', 'gamequest.mes', 'gamearea.mes', 'logbook_ui_quests_text.mes') else M
@@ -311,6 +442,15 @@ def main():
     if not found:
         raise SystemExit('MapList.mes: no entry for map %d' % smap)
     open(ml, 'w', encoding='latin-1', newline='').write('\n'.join(t))
+    map_names(td, {ids[ar]: n for ar, n in names.items()}, '\n'.join(t), os.path.join(M, 'mes', 'map_names.mes'))
+    try:      # vanilla scroll limits of the reused ids would clip our maps (no entry = no limit)
+        lim = td.read('rules/MapLimits.mes').decode('latin-1').splitlines()
+    except FileNotFoundError:
+        lim = []
+    open(os.path.join(M, 'rules', 'MapLimits.mes'), 'w', encoding='latin-1', newline='\r\n').write(
+        '\n'.join(l for l in lim if not (re.match(r'\s*\{(\d+)\}', l) and int(re.match(r'\s*\{(\d+)\}', l).group(1)) in ids.values())) + '\n')
+    open(os.path.join(M, 'rules', 'daynight.nxd'), 'wb').close()   # no vanilla NPC day/night moves (they name map ids)
+    copy_early_to_core(M, C)   # town map names / scroll limits are read before modules\IWD is mounted
     print('module overlay: %s  (%d areas: %s + %d interiors)' % (inst, 1 + len(interiors), AREA, len(interiors)))
     if a.install:
         copytree(inst, toee)

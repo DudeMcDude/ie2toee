@@ -34,15 +34,17 @@ class Time(object):
     @staticmethod
     def time(): return clock[0]
 
-# ---- test data: exterior 5900 with exits to interior 5901 and to an unconverted area ---------------------------
+# ---- test data: exterior TOWN with exits to interior ROOM and to an unconverted area (the preview's map ids) -------
+from ie2toee_preview import MAP_ID as TOWN
+ROOM = TOWN + 1
 data = types.ModuleType('ie_travel_data')
 data.AREAS = {
- 'AR1000': dict(map=5900, entrances={'FR1001': [100, 100, 0]}, regions=[
-    dict(name='To1001', poly=[[110, 90], [114, 90], [114, 94], [110, 94]], dest_area='AR1001', dest_entrance='FR1000', dest_map=5901),
-    dict(name='To1003', poly=[[300, 300], [302, 300], [302, 302], [300, 302]], anchor=[305, 300], dest_area='AR1001', dest_entrance='FR1000', dest_map=5901),
+ 'AR1000': dict(map=TOWN, entrances={'FR1001': [100, 100, 0]}, regions=[
+    dict(name='To1001', poly=[[110, 90], [114, 90], [114, 94], [110, 94]], dest_area='AR1001', dest_entrance='FR1000', dest_map=ROOM),
+    dict(name='To1003', poly=[[300, 300], [302, 300], [302, 302], [300, 302]], anchor=[305, 300], dest_area='AR1001', dest_entrance='FR1000', dest_map=ROOM),
     dict(name='To1200', poly=[[50, 50], [54, 50]], dest_area='AR1200', dest_entrance='FR1000', dest_map=0)]),
- 'AR1001': dict(map=5901, entrances={'FR1000': [200, 200, 0]}, regions=[
-    dict(name='To1000', poly=[[200, 205], [204, 205], [204, 207], [200, 207]], dest_area='AR1000', dest_entrance='FR1001', dest_map=5900)])}
+ 'AR1001': dict(map=ROOM, entrances={'FR1000': [200, 200, 0]}, regions=[
+    dict(name='To1000', poly=[[200, 205], [204, 205], [204, 207], [200, 207]], dest_area='AR1000', dest_entrance='FR1001', dest_map=TOWN)])}
 data.BY_MAP = dict((a['map'], n) for n, a in data.AREAS.items())
 sys.modules['ie_travel_data'] = data
 attached = []
@@ -77,14 +79,14 @@ check('within 0.8 of polygon edge', T.near_region(4.7, 2, sq) and not T.near_reg
 check('2-point region is a segment', T.near_region(52, 50.5, [[50, 50], [54, 50]]) and not T.near_region(52, 52, [[50, 50], [54, 50]]))
 
 # 2. polling never moves the party (exit icons do the travel now), interiors still get their doors on arrival
-game.party[:] = [Obj('pc%d' % i, 0, 0, 5900) for i in range(3)]
-put_party(5900, 112, 92)
+game.party[:] = [Obj('pc%d' % i, 0, 0, TOWN) for i in range(3)]
+put_party(TOWN, 112, 92)
 check('start() starts one poll', T.start() == 1 and len(game.events) == 1)
 check('start() twice does not double-start', T.start() == 0 and len(game.events) == 1)
-run_events(3); put_party(5900, 100, 100); run_events(2); put_party(5900, 111, 92); run_events(3)
-put_party(5900, 305, 300); run_events(2); put_party(5900, 52, 50); run_events(2)
+run_events(3); put_party(TOWN, 100, 100); run_events(2); put_party(TOWN, 111, 92); run_events(3)
+put_party(TOWN, 305, 300); run_events(2); put_party(TOWN, 52, 50); run_events(2)
 check('standing in / next to travel regions never teleports', not game.teleports and not game.leader.floats)
-put_party(5901, 201, 206); run_events(2)
+put_party(ROOM, 201, 206); run_events(2)
 check('doors attached on arrival in the unbaked interior', attached == ['AR1001'])
 
 # 3. exit icons (ie_exiticons): icon tile inside the polygon, jump point = destination arrival tile
@@ -93,19 +95,19 @@ check('icon at the centroid when it is inside', X.icon_tile([[0, 0], [4, 0], [4,
 L = [[0, 0], [6, 0], [6, 1], [1, 1], [1, 6], [0, 6]]          # L shape: centroid outside
 u, v = X.icon_tile(L)
 check('icon falls back to the nearest inside tile', X.inside(u + .5, v + .5, L))
-ar = {'AR1000': dict(map=5900, entrances={'FR1001': [100, 100, 0]}, regions=[dict(name='To1001', poly=[[0, 0], [4, 0], [4, 4], [0, 4]], dest_area='AR1001', dest_entrance='FR1000', dest_map=5901),
+ar = {'AR1000': dict(map=TOWN, entrances={'FR1001': [100, 100, 0]}, regions=[dict(name='To1001', poly=[[0, 0], [4, 0], [4, 4], [0, 4]], dest_area='AR1001', dest_entrance='FR1000', dest_map=ROOM),
                                                                                 dict(name='To9', poly=[[0, 0], [1, 1]], dest_area='AR1200', dest_entrance='X', dest_map=0)]),
-      'AR1001': dict(map=5901, entrances={'FR1000': [200, 200, 0]}, regions=[dict(name='To1000', poly=[[0, 0], [2, 0], [2, 2], [0, 2]], dest_area='AR1000', dest_entrance='FR1001', dest_map=5900)])}
+      'AR1001': dict(map=ROOM, entrances={'FR1000': [200, 200, 0]}, regions=[dict(name='To1000', poly=[[0, 0], [2, 0], [2, 2], [0, 2]], dest_area='AR1000', dest_entrance='FR1001', dest_map=TOWN)])}
 icons, rows, skipped = X.build(ar)
-check('jump points go to the destination arrival tiles, stable ids', rows == [(2000, 'AR1000-To1001-to-AR1001', 5901, 200, 200), (2001, 'AR1001-To1000-to-AR1000', 5900, 100, 100)])
+check('jump points go to the destination arrival tiles, stable ids', rows == [(2000, 'AR1000-To1001-to-AR1001', ROOM, 200, 200), (2001, 'AR1001-To1000-to-AR1000', TOWN, 100, 100)])
 ar['AR1001']['regions'][0]['anchor'] = [5, 6]
 check('icon on the anchor tile when the region has one', X.build(ar)[0]['AR1001'] == [(5, 6, 2001)])
 check('unconverted exit gets no icon', icons['AR1000'] == [(2, 2, 2000)] and len(skipped) == 1)
 
 # 4. save/load: restored poll adopts a fresh module state; a stale second poll stops
 game.events[:] = []
-T._last_poll = 0.0; T._gen = 0; T._armed = True; T._map = 5900; T._noted.clear()
-put_party(5900, 112, 92)                          # loaded right in a region
+T._last_poll = 0.0; T._gen = 0; T._armed = True; T._map = TOWN; T._noted.clear()
+put_party(TOWN, 112, 92)                          # loaded right in a region
 game.events.append((T.poll, (7,)))                # the event restored from the save (gen 7)
 run_events(3)
 check('restored poll adopted (gen 7), no travel', T._gen == 7 and not game.teleports)
@@ -125,13 +127,13 @@ def objs(entr, regs):
 json.dump(objs([('FR1001', 5, 6, 2)], [('To1001', 'travel', 'AR1001', 'FR1000'), ('To9', 'travel', 'AR1200', 'FR1000'), ('i', 'info', '', '')]),
           open(os.path.join(d, 'AR1000_objects.json'), 'w'))
 json.dump(objs([('FR1000', 7, 8, 0)], [('To1000', 'travel', 'AR1000', 'FR1001')]), open(os.path.join(d, 'AR1001_objects.json'), 'w'))
-got, problems = ie_exits.collect(d, {'AR1000': 5900, 'AR1001': 5901})
+got, problems = ie_exits.collect(d, {'AR1000': TOWN, 'AR1001': ROOM})
 check('ie_exits: regions + entrances collected, info regions skipped', len(got['AR1000']['regions']) == 2 and got['AR1001']['entrances']['FR1000'] == [7, 8, 0])
 check('ie_exits: reports the unconverted destination, flags dest_map 0',
-      problems == ['AR1000 To9 -> AR1200: destination area not converted'] and got['AR1000']['regions'][1]['dest_map'] == 0 and got['AR1000']['regions'][0]['dest_map'] == 5901)
+      problems == ['AR1000 To9 -> AR1200: destination area not converted'] and got['AR1000']['regions'][1]['dest_map'] == 0 and got['AR1000']['regions'][0]['dest_map'] == ROOM)
 out = os.path.join(d, 'ie_travel_data.py'); ie_exits.write(got, out)
 ns = {}; exec(open(out).read(), ns)
-check('ie_exits: written module imports', ns['BY_MAP'] == {5900: 'AR1000', 5901: 'AR1001'})
+check('ie_exits: written module imports', ns['BY_MAP'] == {TOWN: 'AR1000', ROOM: 'AR1001'})
 
 import ie2toee
 # 5b. region_anchors

@@ -7,15 +7,16 @@ and jumps to a `jumppoint.tab` row), so the preview turns every travel region in
 ## Areas
 | IE area | role | map id | ground id |
 |---|---|---|---|
-| AR1000 | Easthaven town (baked: NPCs, items, doors) | 5900 | 900 |
-| AR1001-AR1014 | the 14 building interiors (map + doors only) | 5901-5914 | 901-914 |
-| AR1015 (off AR1006), AR1016 (off AR1007) | side rooms (map, exits, actors, containers) | 5915-5916 | 915-916 |
-| AR1200 (hill road off the town's map edge; exits To1000, To1201) | road (map, exits, actors) | 5917 | 917 |
-| AR1201 (Orc Cave, dead end) | cave (map, exit, actors, 3 containers) | 5918 | 918 |
+| AR1000 | Easthaven town (baked: NPCs, items, doors) | MAP_ID (5012) | 900 |
+| AR1001-AR1014 | the 14 building interiors (map + doors only) | MAP_ID+1..+14 (5013-5026) | 901-914 |
+| AR1015 (off AR1006), AR1016 (off AR1007) | side rooms (map, exits, actors, containers) | MAP_ID+15..+16 (5027-5028) | 915-916 |
+| AR1200 (hill road off the town's map edge; exits To1000, To1201) | road (map, exits, actors) | MAP_ID+17 (5029) | 917 |
+| AR1201 (Orc Cave, dead end) | cave (map, exit, actors, 3 containers) | MAP_ID+18 (5030) | 918 |
 
-`ie2toee_preview.py` converts the interiors after the town, with `ie2toee.py` per interior (map id = 5900 + n, ground
+`ie2toee_preview.py` converts the interiors after the town, with `ie2toee.py` per interior (map id = MAP_ID + n, ground
 id = 900 + n; the night ground id is +1000 as for the town). An interior that fails is skipped with a message and its
-door stays a dead end. Snippets (`ground.mes`, `MapList.mes`, `map_names.mes`) of all converted areas are merged and
+door stays a dead end. (`MAP_ID` in `ie2toee_preview.py`: 5012 since 2026-11-10, 5900 before; ids above 5198
+crash the town map, see the comment there.) Snippets (`ground.mes`, `MapList.mes`, `map_names.mes`) of all converted areas are merged and
 each interior's `ie_doors_<area>.py` is copied next to the town's.
 
 ## Convert time
@@ -23,7 +24,7 @@ each interior's `ie_doors_<area>.py` is copied next to the town's.
   entrance's tile if all its 9 subtiles are walkable, else the nearest fully walkable tile within 5 tiles, else the
   nearest tile whose centre and at least 5 of 9 subtiles are walkable; if there is none the tile is kept and a warning
   is printed.
-* `ie_exits.py <workdir> --area AR1000:5900 ... --out ie_travel_data.py` collects, per converted area, the map id, the
+* `ie_exits.py <workdir> --area AR1000:5012 ... --out ie_travel_data.py` collects, per converted area, the map id, the
   entrances (arrival tile + orientation) and the travel regions (polygon in ToEE tile coordinates, destination area
   and entrance). Exits whose destination area or entrance is not converted are listed and get `dest_map: 0`.
   Easthaven: 15 areas, 31 travel regions, 3 unusable (AR1000 -> AR1200, AR1006 -> AR1015, AR1007 -> AR1016).
@@ -90,7 +91,7 @@ each interior's `ie_doors_<area>.py` is copied next to the town's.
 
 ## In-game result (Temple+ under wine, 2026-10-24)
 All 14 Easthaven buildings (AR1001-AR1014): town entrance -> door region -> interior (map 59xx, no bounce) -> exit
-region -> town (map 5900), PASS. Two findings along the way: (1) with only the 0.8-tile outline test 9 of 14 doors could
+region -> town (map 5900, the ids of the time), PASS. Two findings along the way: (1) with only the 0.8-tile outline test 9 of 14 doors could
 not be entered (the party stops 1.3-2.5 tiles from the region) - hence the anchors; (2) a click on a blocked tile
 (a door frame) does not move the party at all, so the anchor avoids door frames.
 Proof (derived from the IE/ToEE data, local only): screenshots `town_before_door`, `interior_arrival`, `town_after_exit`
