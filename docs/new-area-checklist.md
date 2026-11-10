@@ -4,7 +4,7 @@ Template for adding a game (IWD, IWD2, later BG) or a single area to ie2toee.
 Every item is something that bit us during the IWD/IWD2 conversions.
 
 ## 0. Setup
-- [ ] Guidance file `proto/guidance/<game>.json` and map-id/prefix block in `ie_areas.py` (IWD 59xx, IWD2 `I2` 5950+). Why: per-game map names and ids must not collide.
+- [ ] Guidance file `proto/guidance/<game>.json` and map-id/prefix block in `ie_areas.py` (IWD 5012+, IWD2 `I2` 5031+ (must stay <= 5198)). Why: per-game map names and ids must not collide.
 - [ ] Reader handles the game's file versions (CRE V1/V2.2, ITM V2.0 ability stride 0x38, BCS object layout). Why: wrong strides silently corrupt items/scripts.
 - [ ] Keep the game's native rules where they exist (IWD2 3e stats); preserve difficulty flags/gates in creature data.
 

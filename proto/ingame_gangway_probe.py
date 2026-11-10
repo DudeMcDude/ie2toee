@@ -6,7 +6,7 @@ import os, __main__
 LOG = os.environ.get('IE2TOEE_PROBE_LOG', 'ie2toee_probe.log')
 def log(s):
     f = open(LOG, 'a'); f.write(s + '\n'); f.close()
-MAP = int(os.environ.get('IE2TOEE_MAP', '5950'))
+MAP = int(os.environ.get('IE2TOEE_MAP', '5031'))
 WAY = [tuple(int(n) for n in p.split(',')) for p in os.environ.get('IE2TOEE_WAY', '464,486;472,468;489,425').split(';')]
 def start():
     game.fade_and_teleport(0, 0, 0, MAP, 450, 490); game.timevent_add(arrived, (), 6000, 1)

@@ -15,7 +15,7 @@ def start():
         __main__.cheats.kos = 0
     except Exception:
         pass
-    game.fade_and_teleport(0, 0, 0, 5958, 513, 536)     # (travel AR1100 <-> AR1200 <-> AR1201: ingame_exiticon_probe)
+    game.fade_and_teleport(0, 0, 0, 5039, 513, 536)     # (travel AR1100 <-> AR1200 <-> AR1201: ingame_exiticon_probe)
     game.timeevent_add(step2, (), 9000, 1)
 def step0():
     import ie_travel_data as td
@@ -34,8 +34,8 @@ def step0():
     game.timeevent_add(step1, (), 8000, 1)
 def step1():
     log('after exit walk: map %d tile %s' % (game.leader.map, location_to_axis(game.leader.location)))
-    if game.leader.map != 5958:
-        log('TRAVEL_FALLBACK teleport'); game.fade_and_teleport(0, 0, 0, 5958, 513, 536)
+    if game.leader.map != 5039:
+        log('TRAVEL_FALLBACK teleport'); game.fade_and_teleport(0, 0, 0, 5039, 513, 536)
     game.timeevent_add(step2, (), 8000, 1)
 def step2():
     import ie_runtime as rt

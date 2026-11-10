@@ -86,6 +86,140 @@ def mes_with(td, rel, lines, dest):
         f.write('\n'.join(keep).rstrip('\n') + '\n' + '\n'.join(lines) + '\n')
 
 
+# Map ids must stay <= 5198: temple.dll's town map UI keeps 200 per-map slots (map id - 4999) and, the first time it
+# opens, fills one per id up to the highest MapList id, so ids >= ~5200 overrun them and crash it (the old 5900.. /
+# 5950.. ids did). The place list reads mes/map_names.mes by LINE index (map id - 5000), so that file is written
+# gap-free from 5000 (map_names()). These ids are special-cased by the engine and must not be reused.
+ENGINE_MAP_IDS = ({5000, 5001, 5067, 5107, 5117, 5118, 5119, 5135, 5189, 5199} | set(range(5070, 5079)) |
+                  set(range(5096, 5105)) | {5005, 5011, 5050, 5066, 5078, 5080})
+# 5000 no terrain/scroll limits; 5001 Hommlet (worldmap, editor start); 5067 ray spell scripts; 5070-5078 random
+# encounters; 5096-5104 vignettes (no town map); 5107 quickstart; 5117/5118 tutorial; 5119 arena; 5135 Temple+ debug
+# limit; 5189/5199 Co8 day/night fix; 5005 5011 5050 5066 5078 5080 vanilla town map flags
+TOWNMAP_ID_MAX = 5198
+
+
+def _bare_area(ar, prefix=''):
+    ar = (ar or '').upper()
+    pfx = (prefix or '').upper()
+    if pfx and ar.startswith(pfx):
+        return ar[len(pfx):]
+    return ar
+
+
+def area_names(ie, w, specs, shops, start_area='AR1000', prefix=''):
+    """Town map place list / map description per converted area, from the IE data: the worldmap's area name
+    (WORLDMAP.WMP), else the name of the store a resident runs (STO), else '<town> - <named resident>' (an NPC
+    with a commissioned portrait), else by the ARE's type and the area it is entered from: '<town> - Outskirts'
+    (outdoor), '<town> - Cave' (0x20), '<parent> - Side Room' (off an interior), '<town> - House (<resref>)'.
+    `prefix` (e.g. I2) is stripped from travel-data keys so they match unprefixed IE resrefs and `specs` keys."""
+    import struct, iefs, iescript, iecre, ie_creatures
+    from ieformats import Are
+    start_area = _bare_area(start_area, prefix)
+    tv = {}
+    try:
+        exec(open(os.path.join(w, 'ie_travel_data.py'), encoding='latin-1').read(), tv)
+    except Exception:
+        pass
+    parent = {}       # bare area -> the converted area whose exit leads into it (the town wins)
+    for src, a in sorted(tv.get('AREAS', {}).items(), key=lambda kv: _bare_area(kv[0], prefix) != start_area):
+        for r in a.get('regions', []):
+            parent.setdefault(_bare_area(r.get('dest_area'), prefix), _bare_area(src, prefix))
+    g = iefs.IEGame(ie); t = iescript.Tlk.load(iescript.find_tlk(ie))
+    wmp = {}
+    try:
+        b = g.read('worldmap', 'wmp'); off = struct.unpack_from('<I', b, 12)[0]
+        cnt, ao = struct.unpack_from('<II', b, off + 0x20)
+        for i in range(cnt):
+            o = ao + i * 0xf0
+            wmp[b[o:o + 8].split(b'\0')[0].decode('latin-1').upper()] = t.get(struct.unpack_from('<i', b, o + 0x40)[0])
+    except Exception as ex:
+        print('warning: worldmap names: %s' % ex)
+    town = wmp.get(start_area) or start_area
+    out = {}
+    for ar, spec in specs.items():
+        key = _bare_area(ar, prefix)
+        name = wmp.get(key)
+        for st in sorted(set(shops.get(ar, shops.get(key, {})).values())) if not name else ():
+            try:
+                name = t.get(struct.unpack_from('<I', g.read(st, 'sto'), 0x0c)[0]).strip() or None
+            except Exception:
+                pass
+            if name:
+                break
+        if not name and spec and os.path.isfile(spec):
+            gl = {}; exec(open(spec, encoding='latin-1').read(), gl)
+            for c in gl.get('CREATURES', []):
+                if (c.get('resref') or '').lower() in ie_creatures.PORTRAITS:
+                    try:
+                        name = '%s - %s' % (town, t.get(iecre.Cre(g.read(c['resref'], 'cre'), c['resref']).as_dict()['name_strref']))
+                        break
+                    except Exception:
+                        pass
+        out[ar] = name
+    def _out_name(ar):
+        return out.get(ar) or out.get(_bare_area(ar, prefix))
+    for ar in sorted(out, key=lambda a: parent.get(_bare_area(a, prefix)) not in (None, start_area)):
+        if out[ar]:
+            continue
+        key = _bare_area(ar, prefix)
+        try:
+            at = Are(g.read(key, 'are')).area_type
+        except Exception:
+            at = 0
+        pa = parent.get(key)
+        # look up the parent's display name under either the prefixed or bare key
+        pname = next((out[k] for k in out if _bare_area(k, prefix) == pa and out[k]), None)
+        out[ar] = ('%s - Outskirts' % town if at & 1 else '%s - Cave' % town if at & 0x20 else
+                   '%s - Side Room' % pname if pa not in (None, start_area) and pname else '%s - House (%s)' % (town, key))
+    return {ar: n.replace('{', '(').replace('}', ')') for ar, n in out.items()}
+
+
+
+# Read before modules\<module> is mounted: Temple+ builds the UI (town map place list: mes/map_names.mes, read once at
+# UI startup) and the legacy game systems (scroll limits: rules/MapLimits.mes) with only modules\<module>_core and the
+# base archives on the path (temple_main.cpp: UiSystems before gameSystems.LoadModule), so a module-folder copy of these
+# is ignored and vanilla's names/limits for the reused ids show through (the town map listed "Church of St. Cuthbert -
+# Main Floor" for 5012). Copy the overrides to <module>_core as well.
+CORE_EARLY = ('mes/map_names.mes', 'rules/MapLimits.mes', 'rules/daynight.nxd')
+
+
+def copy_early_to_core(M, C):
+    for rel in CORE_EARLY:
+        src = os.path.join(M, rel)
+        if os.path.isfile(src):
+            os.makedirs(os.path.dirname(os.path.join(C, rel)), exist_ok=True)
+            shutil.copyfile(src, os.path.join(C, rel))
+
+
+def map_names(td, names, maplist, dest, max_id=TOWNMAP_ID_MAX):
+    """mes/map_names.mes, every id from 5000 to the highest map id in key order with a non-empty text: the town
+    map's place list takes the line at index (map id - 5000), so a gap or an empty line shifts or blanks the names.
+    Entries above max_id (default 5198) are dropped so a stale 59xx source cannot overflow the 200-slot array."""
+    try:
+        txt = td.read('mes/map_names.mes').decode('latin-1')
+    except FileNotFoundError:
+        txt = ''
+    d = {int(k): v.strip() for k, v in re.findall(r'^\s*\{(\d+)\}\s*\{([^}]*)\}', txt, re.M) if int(k) <= max_id}
+    ml = {int(k): v.strip() for k, v in re.findall(r'^\{(\d+)\}\{([^,}]*)', maplist, re.M) if int(k) <= max_id}
+    d.update({int(k): v for k, v in names.items() if int(k) <= max_id})
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    hi = max(list(d) + list(ml) + [5000])
+    with open(dest, 'w', encoding='latin-1', newline='\r\n') as f:
+        for k in range(5000, hi + 1):
+            f.write('{%d}{%s}\n' % (k, d.get(k) or ml.get(k) or 'Map %d' % k))
+
+
+def drop_high_maplist_ids(lines, max_id=TOWNMAP_ID_MAX):
+    """Drop MapList/mes entries whose id is above the town-map table (stale 59xx leftovers)."""
+    out = []
+    for l in lines:
+        m = re.match(r'\s*\{(\d+)\}', l)
+        if m and int(m.group(1)) > max_id:
+            continue
+        out.append(l)
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--iwd', required=True, help='your Icewind Dale or Icewind Dale: Enhanced Edition folder')
@@ -276,6 +410,7 @@ def main():
     else:
         raise SystemExit('MapList.mes: no entry for map %d' % MAP_ID)
     open(ml, 'w', encoding='latin-1', newline='').write('\n'.join(t))
+    copy_early_to_core(M, C)   # town map names / scroll limits are read before modules\IWD is mounted
     print('module overlay: %s  (%d areas: %s + %d interiors)' % (inst, 1 + len(interiors), AREA, len(interiors)))
     if a.install:
         copytree(inst, toee)

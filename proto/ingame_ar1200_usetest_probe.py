@@ -5,7 +5,7 @@ import os
 LOG = os.environ.get('IE2TOEE_PROBE_LOG', 'probe.log')
 def log(s):
     f = open(LOG, 'a'); f.write(s + '\n'); f.close()
-T = [(5959, 484, 479, 488, 480, 5958), (5957, 451, 461, 448, 459, 5958)]
+T = [(5040, 484, 479, 488, 480, 5039), (5038, 451, 461, 448, 459, 5039)]
 def go(i):
     if i >= len(T):
         log('DONE'); return 0

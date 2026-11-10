@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Prototype: convert one IE area (BG/IWD/IWD2) into a ToEE/Temple+ map folder.
 
-  python3 ie2toee.py --game <IE install> --area AR1000 --out <outdir> [--map-id 5900] [--ground-id 900]
+  python3 ie2toee.py --game <IE install> --area AR1000 --out <outdir> [--map-id 5012] [--ground-id 900]
                      [--guidance guidance/iwd.json] [--closed-doors] [--preview]
 
 Writes (all derived from the player's own files, on the player's machine):
@@ -135,6 +135,39 @@ def write_ground(img, pl, outdir, quality):
             tile[sy0 - y0:sy1 - y0, sx0 - x0:sx1 - x0] = rgb[sy0:sy1, sx0:sx1]
             Image.fromarray(tile).save(os.path.join(outdir, f'{ty:04x}{tx:04x}.jpg'), quality=quality)
             n += 1
+    return n
+
+
+def write_townmap(img, pl, outdir, quality):
+    """Town map (M key) for the area, from its own background: townmap/<map id>/ in the module. Engine layout (temple.dll
+    townmap UI; OpenTemple TownMapData): z4<row><col>.jpg 256px tiles of 1024 townmap units (17x18 grid), z8<row><col>.jpg
+    of 2048 units (9x9), map.dat = int32 x, y, w, h of the shown world rect. Townmap units are ground-canvas pixels,
+    u = X + 20, v = Y - 1634 (fitted on vanilla Hommlet 5001's tiles vs its ground art, r = 0.998). Tiles outside the
+    area are left out, like vanilla's (missing ones only log 'Cannot register texture')."""
+    os.makedirs(outdir, exist_ok=True)
+    if pl.scale != 1.0:
+        img = np.asarray(Image.fromarray(img).resize((pl.w, pl.h), Image.LANCZOS))
+    rgb = Image.fromarray(np.ascontiguousarray(img[..., :3]))
+    u0, v0 = int(pl.cx - (pl.calx - CAL_X0) + 20), int(pl.cy - (pl.caly - CAL_Y0) - 1634)
+    u1, v1 = u0 + pl.w, v0 + pl.h
+    if u0 < 0 or v0 < 0 or u1 > 17 * 1024 or v1 > 18 * 1024:
+        print(f'warning: area outside the town map grid ({u0},{v0})-({u1},{v1}); no town map written')
+        return 0
+    n = 0
+    for z, cols, rows in ((4, 17, 18), (8, 9, 9)):
+        span = 256 * z
+        for ty in range(v0 // span, (v1 - 1) // span + 1):
+            for tx in range(u0 // span, (u1 - 1) // span + 1):
+                if tx >= cols or ty >= rows:
+                    continue
+                tile = Image.new('RGB', (span, span))
+                tile.paste(rgb, (u0 - tx * span, v0 - ty * span))
+                tile.resize((256, 256), Image.BOX).save(os.path.join(outdir, f'z{z}{ty:03d}{tx:03d}.jpg'), quality=quality)
+                n += 1
+    a0, b0 = u0 // 1024 * 1024, v0 // 1024 * 1024    # tile-aligned, like vanilla's map.dat
+    a1, b1 = -(-u1 // 1024) * 1024, -(-v1 // 1024) * 1024
+    with open(os.path.join(outdir, 'map.dat'), 'wb') as f:
+        f.write(struct.pack('<4i', a0 - 8448, b0 + 6000, a1 - a0, b1 - b0))
     return n
 
 
@@ -614,6 +647,7 @@ def convert(game, area, outdir, map_id, ground_id, guidance, preview=False, clos
     os.makedirs(mapdir, exist_ok=True)
     report = dict(area=name, are_version=are.version, size_px=[W, H], canvas_offset=[pl.cx, pl.cy])
     report['ground_tiles'] = write_ground(img, pl, os.path.join(outdir, 'art', 'ground', name), guidance['jpeg_quality'])
+    report['townmap_tiles'] = write_townmap(img, pl, os.path.join(outdir, 'townmap', str(map_id)), guidance['jpeg_quality'])
     if are.has_night and g.exists(are.wed + 'N', 'wed'):
         wn = Wed(g.read(are.wed + 'N', 'wed'))
         report['night_tiles'] = write_ground(render_background(wn, tis_for(wn.overlays[0]['tis']), None, doors_closed), pl,
@@ -719,7 +753,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--game', required=True); ap.add_argument('--area', required=True)
     ap.add_argument('--out', required=True)
-    ap.add_argument('--map-id', type=int, default=5900); ap.add_argument('--ground-id', type=int, default=900)
+    ap.add_argument('--map-id', type=int, default=5012); ap.add_argument('--ground-id', type=int, default=900)
     ap.add_argument('--guidance'); ap.add_argument('--preview', action='store_true')
     ap.add_argument('--closed-doors', action='store_true')
     a = ap.parse_args()

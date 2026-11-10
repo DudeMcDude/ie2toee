@@ -1,5 +1,5 @@
 # IWD2 keg check (Temple+ Python 2.7): kegs are critters with the barrel mesh (spec "mesh" 11013). On the first visit
-# of map 5951 (I2AR1001) find them, log mesh/flags/HP, screenshot, kill one with damage, screenshot; on 5953 log
+# of map 5032 (I2AR1001) find them, log mesh/flags/HP, screenshot, kill one with damage, screenshot; on 5034 log
 # Guthewulfe's feats/skills. Runs beside ingame_exiticon_probe (same log).
 from toee import *
 import os
@@ -15,11 +15,11 @@ def poll():
         m = game.leader.map
         if m not in st['done']:
             st['done'].add(m); game.timeevent_add(survey, (m,), 3000, 1)
-        if m == 5952 and 'keg' not in st['done']:
+        if m == 5033 and 'keg' not in st['done']:
             st['done'].add('keg'); game.timeevent_add(kegs, (), 2500, 1)
     except Exception, e:
         log('KEG poll error %s' % e)
-    if 'keg' not in st['done'] or 'k' in st and 'clicked' not in st['done'] or 5950 not in st['done']: game.timeevent_add(poll, (), 1000, 1)
+    if 'keg' not in st['done'] or 'k' in st and 'clicked' not in st['done'] or 5031 not in st['done']: game.timeevent_add(poll, (), 1000, 1)
     return 0
 def kegs():
     try:
@@ -41,7 +41,7 @@ def survey(m):
     try:
         c = crit(); ic = [o for o in c if o.has_feat(feat_improved_critical_gauntlet)]
         log('SURVEY map %d critters %d improved_critical %d %s' % (m, len(c), len(ic), [str(o) for o in ic][:5]))
-        if m == 5950:
+        if m == 5031:
             ps = [o for o in game.obj_list_vicinity(game.leader.location, OLC_PORTAL)][:3]
             for i, o in enumerate(ps):
                 game.timeevent_add(doorshot, (o, i), 1500 * (i + 1), 1)

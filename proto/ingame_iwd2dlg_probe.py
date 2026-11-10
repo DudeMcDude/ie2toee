@@ -6,7 +6,7 @@ import os, __main__
 LOG = os.environ.get('IE2TOEE_PROBE_LOG', 'ie2toee_probe.log')
 def log(s):
     f = open(LOG, 'a'); f.write(s + '\n'); f.close()
-MAP = int(os.environ.get('IE2TOEE_MAP', '5950')); SX, SY = [int(v) for v in os.environ.get('IE2TOEE_START', '450,490').split(',')]
+MAP = int(os.environ.get('IE2TOEE_MAP', '5031')); SX, SY = [int(v) for v in os.environ.get('IE2TOEE_START', '450,490').split(',')]
 TALK = [int(v.split(':')[0]) for v in os.environ.get('IE2TOEE_TALK', '1500:py01500ie_10hedron').split(',')]
 MODS = [v.split(':')[1] for v in os.environ.get('IE2TOEE_TALK', '1500:py01500ie_10hedron').split(',')]
 POS = dict((int(k), tuple(int(n) for n in xy.split(','))) for k, xy in [p.split('@') for p in os.environ.get('IE2TOEE_POS', '').split(';') if p])

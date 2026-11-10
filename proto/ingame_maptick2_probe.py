@@ -35,7 +35,7 @@ def s7(*a):
     _log('AFTERLOAD map %s ticks %d' % (game.leader.map, T['n'])); _log('SHOT afterload')
     import ie_runtime as rt
     u, v = rt.ie_to_tile('AR1000', 2400, 1000)
-    game.fade_and_teleport(0, 0, 0, 5950, u, v); _at(s8, 12000)
+    game.fade_and_teleport(0, 0, 0, 5031, u, v); _at(s8, 12000)
 def s8(*a):
     _log('AR1000 map %s ticks %d' % (game.leader.map, T['n'])); _log('SHOT ar1000'); _log('DONE')
 def s0(*a):
@@ -43,7 +43,7 @@ def s0(*a):
     import ie_runtime as rt
     _log('START map %s ticks %d' % (game.leader.map, T['n']))
     u, v = rt.ie_to_tile('AR1100', 2000, 1500)
-    game.fade_and_teleport(0, 0, 0, 5957, u, v); _at(s9, 15000)
+    game.fade_and_teleport(0, 0, 0, 5038, u, v); _at(s9, 15000)
 def s9(*a):
     _log('AR1100 map %s ticks %d' % (game.leader.map, T['n'])); _log('SHOT ar1100'); _log('DONE')
 _at(s0, 4000)

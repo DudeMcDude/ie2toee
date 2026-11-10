@@ -12,7 +12,7 @@ def start():
     except Exception, e:
         log('nomovie %s' % e)
     log("start map %d" % game.leader.map); log("KEY Escape"); log("KEY Escape")
-    game.fade_and_teleport(0, 0, 0, 5950, 450, 490)
+    game.fade_and_teleport(0, 0, 0, 5031, 450, 490)
     game.timeevent_add(step1, (), 6000, 1)
 def step1():
     try:

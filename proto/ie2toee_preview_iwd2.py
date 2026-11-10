@@ -4,7 +4,7 @@
   python ie2toee_preview_iwd2.py --iwd2 "C:\\GOG Games\\Icewind Dale 2" --toee "C:\\GOG Games\\ToEE-IWD2" [--out iwd2_out] [--install]
 
 Same converter steps as ie2toee_preview.py (map, spells, creatures, items, bake, travel exits, exit icons, path nodes),
-plus dialogue for the Targos NPCs (ie_dialogue.py; journal/quests not yet). Maps are named I2AR1000.. (map ids 5950-5959, guidance/iwd2.json) so they never clash with IWD's.
+plus dialogue for the Targos NPCs (ie_dialogue.py; journal/quests not yet). Maps are named I2AR1000.. (map ids from map_id_base in guidance/iwd2.json, currently 5031-5040, immediately after IWD's 5012-5030) so they stay <= 5198 (temple.dll town map) and do not collide with IWD or ENGINE_MAP_IDS.
 Install target (use a COPY of ToEE): maps, ground art, rules -> modules\\ToEE; scripts and description .mes ->
 modules\\ToEE_core (Temple+ discovers scripts before modules\\ToEE is mounted); item icons -> data\\.
 Nothing of IWD2 is shipped: everything is read from the install you point it at.
@@ -15,7 +15,9 @@ import iefs
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import toeedata
-from ie2toee_preview import run, run_soft, copytree, mes_with, RUNTIME
+from ie2toee_preview import (run, run_soft, copytree, mes_with, RUNTIME,
+                             ENGINE_MAP_IDS, TOWNMAP_ID_MAX, area_names, map_names, drop_high_maplist_ids,
+                             copy_early_to_core)
 
 GUIDE = os.path.join(HERE, 'guidance', 'iwd2.json')
 AREAS = ['AR1000', 'AR1001', 'AR1002', 'AR1003', 'AR1004', 'AR1005', 'AR1006', 'AR1100', 'AR1200', 'AR1201']
@@ -64,7 +66,18 @@ def main():
     tp = a.tp or next((p for p in (os.path.join(HERE, '..', '..', 'TemplePlus'), os.path.join(HERE, '..', 'TemplePlus'))
                        if os.path.isfile(os.path.join(p, 'TemplePlus.exe'))), None)
     tpa = ['--tp', os.path.abspath(tp)] if tp else []
-    G = json.load(open(GUIDE))['areas']
+    guide = json.load(open(GUIDE))
+    G = guide['areas']
+    prefix = guide.get('map_name_prefix', 'I2')
+    base = int(guide['map_id_base'])
+    gbase = int(guide.get('ground_id_base', 950))
+    for i, ar in enumerate(AREAS):
+        G.setdefault(ar, {})
+        G[ar]['map'] = base + i
+        G[ar].setdefault('ground', gbase + i)
+    ids_used = [G[ar]['map'] for ar in AREAS]
+    assert max(ids_used) <= TOWNMAP_ID_MAX, 'map ids above %d crash the town map (see map_id_base)' % TOWNMAP_ID_MAX
+    assert not ENGINE_MAP_IDS & set(ids_used), 'map ids hit engine special cases: %s' % sorted(ENGINE_MAP_IDS & set(ids_used))
     w = os.path.join(out, 'work'); os.makedirs(w, exist_ok=True)
     ok = []
     for ar in AREAS:
@@ -151,6 +164,8 @@ def main():
         if os.path.isfile(f): shutil.copy(f, scr)
         f = os.path.join(bake, 'ie_bake_%s.py' % md.lower())
         if os.path.isfile(f): shutil.copy(f, scr)
+    for ar in ok:    # town map tiles (ie2toee.py write_townmap)
+        copytree(os.path.join(w, 'townmap', str(G[ar]['map'])), os.path.join(M, 'townmap', str(G[ar]['map'])))
     shutil.copy(os.path.join(bake, 'rules', 'jumppoint.tab'), os.path.join(M, 'rules', 'jumppoint.tab'))
     copytree(os.path.join(bake, 'rules', 'info_regions'), os.path.join(M, 'rules', 'info_regions'))
     copytree(os.path.join(bake, 'modules', 'ToEE', 'scr'), scr)
@@ -190,12 +205,48 @@ def main():
             if l.startswith('# '): cur = l[2:].strip(); continue
             if l.strip() and cur: sn.setdefault(cur, []).append(l)
     td = toeedata.ToEEData(toee)
+    # vanilla town map files of the reused ids (ToEE*.dat stay loaded) would show through between ours: black them out
+    from PIL import Image
+    black = None
+    our_ids = {G[ar]['map'] for ar in ok}
+    for src in td.sources:
+        for f in src.files:
+            m_ = re.match(r'townmap[\\/](\d+)[\\/](z[48]\d{6}\.jpg)$', f, re.I)
+            if m_ and int(m_.group(1)) in our_ids:
+                dst = os.path.join(M, 'townmap', m_.group(1), m_.group(2).lower())
+                if not os.path.exists(dst):
+                    os.makedirs(os.path.dirname(dst), exist_ok=True)
+                    black = black or Image.new('RGB', (256, 256))
+                    black.save(dst, quality=90)
+    # shops from converted dialogues, for area_names() store fallbacks
+    shop_of, area_shops = {}, {}
+    dlg_dir = os.path.join(w, 'dialogue')
+    if os.path.isdir(dlg_dir):
+        for root, _, fs in os.walk(dlg_dir):
+            for fn in fs:
+                m_ = re.match(r'py(\d{5})ie_\w+\.py$', fn)
+                if not m_:
+                    continue
+                found = re.findall(r'StartStore\(c, "(\w+)"', open(os.path.join(root, fn), encoding='latin-1').read())
+                if found:
+                    shop_of[int(m_.group(1))] = found[0].lower()
+    specs = {ar: (os.path.join(cre[ar], 'ie_creatures_%s.py' % ar.lower()) if ar in cre else None) for ar in ok}
+    for ar, spec in specs.items():
+        gl = {}
+        if spec and os.path.isfile(spec):
+            exec(open(spec, encoding='latin-1').read(), gl)
+        area_shops[ar] = {c['ident']: shop_of[c['script_id']] for c in gl.get('CREATURES', []) if c.get('script_id') in shop_of}
+    names = area_names(ie, w, specs, area_shops, start_area='AR1000', prefix=prefix)
+    for ar in sorted(names, key=lambda a: G[a]['map']):
+        print('map %d %s: %s' % (G[ar]['map'], ar, names[ar]))
+    sn.pop('mes/map_names.mes', None)     # (ie2toee.py's lines carry the resref; map_names() below writes the file)
     for rel, lines in sn.items():
         mes_with(td, rel, lines, os.path.join(M, rel))
     st = start_tile(ie, w); print('new game start: I2AR1000 tile %s' % (st,))
     ml = os.path.join(M, 'rules', 'MapList.mes')
     if os.path.isfile(ml):   # new game -> Targos docks (Temple+ MapList flag, module-support build)
         t = open(ml, encoding='latin-1').read().split('\n')
+        t = drop_high_maplist_ids(t)   # strip leftover 59xx (and any other id > 5198) from the generated file
         for i, l in enumerate(t):
             if 'NEW_GAME_START' in l:   # one start map only
                 t[i] = l = re.sub(r',\s*Flag:\s*NEW_GAME_START(,\s*NewGame[XY]:\s*\d+)*', '', l)
@@ -203,6 +254,18 @@ def main():
                 l = re.sub(r',\s*Flag:\s*NEW_GAME_START.*?(?=,\s*\w+:|}\s*$)', '', l.rstrip('\r'))
                 t[i] = l[:l.rindex('}')] + ', Flag: NEW_GAME_START, NewGameX: %d, NewGameY: %d}' % st
         open(ml, 'w', encoding='latin-1', newline='').write('\n'.join(t))
+        map_names(td, {G[ar]['map']: n for ar, n in names.items()}, '\n'.join(t), os.path.join(M, 'mes', 'map_names.mes'))
+    else:
+        t = []
+        map_names(td, {G[ar]['map']: n for ar, n in names.items()}, '', os.path.join(M, 'mes', 'map_names.mes'))
+    try:      # vanilla scroll limits of the reused ids would clip our maps (no entry = no limit)
+        lim = td.read('rules/MapLimits.mes').decode('latin-1').splitlines()
+    except FileNotFoundError:
+        lim = []
+    open(os.path.join(M, 'rules', 'MapLimits.mes'), 'w', encoding='latin-1', newline='\r\n').write(
+        '\n'.join(l for l in lim if not (re.match(r'\s*\{(\d+)\}', l) and int(re.match(r'\s*\{(\d+)\}', l).group(1)) in our_ids)) + '\n')
+    open(os.path.join(M, 'rules', 'daynight.nxd'), 'wb').close()   # no vanilla NPC day/night moves (they name map ids)
+    copy_early_to_core(M, C)   # town map names / scroll limits are read before modules\ToEE is mounted
     print('overlay: %s  (%d areas: %s)' % (inst, len(ok), ' '.join('I2' + x for x in ok)))
     if a.install:
         # scripts/dialogs of an earlier install in our id range (1500-2999) that this build no longer has (ids moved):
