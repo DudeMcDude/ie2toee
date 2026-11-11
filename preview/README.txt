@@ -105,6 +105,8 @@ KNOWN ISSUES
   * Fights work but use simplified IE combat scripts; there's no IE-style target selection.
   * Patrols: walkers pause a fixed 3 s at each waypoint, and one patroller stays at its first waypoint.
   * Potions can stack into another potion of the same ToEE type.
+  * Already-converted inventories may show a green background on equipped icons (IE's transparent
+    colour). New converts fix this; for an existing ToEE copy, run fix_inventory_icons.bat on that folder.
   * Wands and other charged items show no charges.
   * Converted NPCs may carry a few extra default ToEE items.
   * IWD:EE: one NPC of the classic town isn't in the EE version of the area.

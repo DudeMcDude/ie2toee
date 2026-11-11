@@ -723,6 +723,11 @@ ICON_PREFIX = 'ie2toee_'   # art/interface/inventory/ie2toee_<res>.tga (flat: th
 def _tga64(rgba):
     """64x64 32-bit TGA (bottom-left origin, 8 alpha bits), the format of ToEE's inventory icons."""
     import numpy as np
+    rgba = np.array(rgba, copy=True)
+    # IE uses (0,255,0) as the transparent colour. Those pixels already have alpha 0, but leaving
+    # the green in the RGB channels shows through on ToEE's equipped-slot widgets, which do not
+    # honour alpha (the inventory bag does, so it looked fine). Vanilla ToEE icons use (0,0,0,0).
+    rgba[rgba[:, :, 3] == 0, :3] = 0
     h, w = rgba.shape[:2]
     k = max(1, min(60 // max(w, 1), 60 // max(h, 1)))
     if k > 1:
@@ -734,6 +739,7 @@ def _tga64(rgba):
     can = np.zeros((64, 64, 4), np.uint8)
     y0, x0 = (64 - h) // 2, (64 - w) // 2
     can[y0:y0 + h, x0:x0 + w] = rgba
+    can[can[:, :, 3] == 0, :3] = 0
     bgra = can[:, :, [2, 1, 0, 3]][::-1]
     return struct.pack('<BBBHHBHHHHBB', 0, 0, 2, 0, 0, 0, 0, 0, 64, 64, 32, 8) + bgra.tobytes()
 
