@@ -291,6 +291,9 @@ class Exporter:
             'panel': {'image': self.tga(panel, skin, 'panel.tga'), 'w': int(panel.shape[1]), 'h': int(panel.shape[0]),
                       'bottom': 58},
             'text': {'rect': [ta['x'], ta['y'], ta['w'], ta['h']]},
+            # the classic IWD / IWD2 log has no large portrait slot (IWD2's window only has a 42x42 button);
+            # show the NPC's ToEE portrait (130x150) just above the panel's text-left so the dialogue never hides it
+            'portrait': {'rect': [ta['x'], -156, 130, 150]},
             'font': dict(font_face, point=font_point, fallback='Junicode'),
             'colors': colors,
         }

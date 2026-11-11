@@ -46,6 +46,8 @@ Output:
 
 * the classic message log panel: the conversation history scrolls up, the NPC line and the replies sit at the
   bottom of the text area;
+* a 130x150 portrait slot just above the panel (the classic log has no large portrait control; IWD2 only has a
+  42x42 button). Temple+ draws the NPC's ToEE big portrait there when one exists, and leaves the slot empty otherwise;
 * the classic scrollbar art (decorative; the mouse wheel scrolls) and the history/"expand" button.
 
 Icewind Dale II (GOG 2.01 / retail) also gets the **iwd** skin, from its own GUI: IWD2 has no 640x480 art for
