@@ -1,4 +1,4 @@
-ICEWIND DALE II (TARGOS) IN THE TEMPLE OF ELEMENTAL EVIL ENGINE - EARLY PREVIEW (2026-11-10)
+ICEWIND DALE II (TARGOS) IN THE TEMPLE OF ELEMENTAL EVIL ENGINE - EARLY PREVIEW (2026-11-11)
 ==========================================================================================
 
 An early-preview, AI-assisted experiment. It converts the opening of Icewind Dale II - Targos (the docks
@@ -6,16 +6,27 @@ I2AR1000, its interiors AR1001-AR1006, AR1100, the palisade AR1200 and AR1201) -
 The Temple of Elemental Evil running on the bundled Temple+ build. No Icewind Dale II data is included in this
 download: the converter reads it from your install, on your PC. This is not a playable conversion of IWD2.
 
-NEXT PREVIEW (not in the 2026-11-10 zip; on the iwd2-targos branch)
+NEW IN THIS PREVIEW (2026-11-11)
 --------------------------------
-  * IE dialogue window for IWD2: convert_iwd2.bat now builds it from YOUR Icewind Dale II's own GUI (the
-    GUIW08.CHU message panel, its scrollbar and NORMAL font) and installs it into modules\ToEE
-    (art\interface\dialog_ie). The 2026-11-10 converter never installed it, so conversations used the stock
-    ToEE window. Re-run convert_iwd2.bat (no new flag) to get it.
-  * An Enhanced Edition folder without ui.menu/bgee.lua stops the convert with a message to update it.
-  * Equipped inventory icons: leftover IE green on transparent pixels is cleared (the bag already looked
-    fine; paper-doll slots ignore alpha). New converts fix this; for an existing ToEE copy, run
-    fix_inventory_icons.bat on that folder (no full reconvert needed for the icons alone).
+  Still an early-preview, AI-assisted experiment: not a playable or polished conversion.
+  * The IE dialogue window is now actually installed. The 2026-11-10 converter never built it, so
+    conversations used the stock ToEE window. convert_iwd2.bat now builds it from YOUR Icewind Dale II's own GUI
+    (classic IWD2: the GUIW08.CHU message panel, GUWBTP38, designed for 800x600, since IWD2 has no 640x480
+    GUIW.CHU art) and installs it into modules\ToEE\art\interface\dialog_ie. Re-run convert_iwd2.bat (no new
+    flag) to get it; a reconvert is required for the window. Not tested in game on Windows yet.
+  * Editions: classic IWD2 (GOG 2.01 / retail, no lang folder) uses the classic IWD skin. IWD2:EE with ui.menu
+    and bgee.lua uses the IWD:EE skin. A folder that looks like an Enhanced Edition (lang folder) but lacks
+    those files stops the convert with a message to update it and run convert_iwd2.bat again (no special flag).
+  * Equipped inventory icons: the IE transparent colour (green) no longer shows behind items in the paper-doll
+    slots. The bag view was already fine; the equipped slots ignore alpha. New converts write clean icons. For an
+    existing ToEE copy, run  fix_inventory_icons.bat "C:\GOG Games\ToEE-IWD2"  instead of a full reconvert.
+  * Bundled Temple+ 0.2.96 (see TemplePlus\IE-PREVIEW-SOURCE.txt). New in it: the DM Sector Tiles editor has
+    "Save Tile Edits". Only the tiles you painted by hand are saved, as JSON in
+    %USERPROFILE%\Saved Games\TemplePlus\dm_tile_edits\<module>\map<id>.json, and they are re-applied when a
+    sector loads. Door cells set by scripts are protected from painting and saving.
+  * Saves: the map ids are unchanged since 2026-11-10 (5031-5040), so 2026-11-10 saves should still load. Saves
+    from before 2026-11-10 (old 59xx ids) don't work; start a NEW game. Temple+ 0.2.96 can be dropped in without
+    a reconvert; the dialogue window needs a reconvert.
 
 EARLIER (2026-11-10)
 --------------------------------
@@ -24,14 +35,14 @@ EARLIER (2026-11-10)
   * Prologue narration: the chapter slide's narration plays again (it was silent and the slide could stall).
     Movies and slides can be skipped with Space, Enter, Esc or a mouse click; a slide whose sound fails to play
     ends after 3 seconds and a small in-game notice asks you to report it.
-  * IE dialogue window (only once convert_iwd2.bat installs it - see NEXT PREVIEW above): the side portrait
+  * IE dialogue window (only once convert_iwd2.bat installs it, i.e. from 2026-11-11): the side portrait
     is shown only when a real big portrait exists (no blurry upscaled small portrait or placeholder head); the
     dialogue scrollbar art is fixed.
   * Commissioned portraits, batch 8 (art generated via Gemini): generic monster and townsfolk art for about 310
     IWD2 creatures in 20 families (goblins, orcs, orogs, spiders, shadows, zombies, ogres, harpies, trolls,
     wolves, townspeople and more); elites and chiefs get the stronger-looking art.
-  * Bundled Temple+ 0.2.92 (see TemplePlus\IE-PREVIEW-SOURCE.txt).
-  * OLD SAVES DON'T WORK: the converted maps have new map ids (5031-5040). Start a NEW game after converting.
+  * Bundled Temple+ 0.2.92.
+  * The converted maps got new map ids (5031-5040); saves from before 2026-11-10 don't work.
 
 EARLIER (2026-11-04)
 --------------------------------
@@ -78,7 +89,8 @@ EARLIER (2026-11-01)
 REQUIREMENTS
 ------------
   * The Temple of Elemental Evil (GOG or Steam), a COPY used only for this preview (not your IWD1 preview copy).
-  * Icewind Dale II (GOG 2.01 or retail), installed.
+  * Icewind Dale II (GOG 2.01 or retail), installed. An Enhanced Edition folder must be up to date (with
+    ui.menu and bgee.lua), or convert_iwd2.bat stops with a message.
   * Windows, and Python 3.9+ from https://www.python.org/downloads/ (tick "Add python.exe to PATH").
   * The Temple+ build in the TemplePlus folder of this download (official Temple+ lacks the preview features,
     including the area-script map tick). The converter also reads its spell tables, so always run it through
@@ -93,10 +105,12 @@ INSTALL
 4. Start TemplePlus\TemplePlus.exe and start a NEW game: it begins at the Targos docks.
    Conversations use the IE dialogue window that step 2 built from your IWD2 GUI. After updating the converter,
    run convert_iwd2.bat again to rebuild and reinstall it.
+5. Optional, for a copy converted with an older preview: fix_inventory_icons.bat "C:\GOG Games\ToEE-IWD2"
+   clears the green behind equipped icons without a full reconvert (the dialogue window still needs step 2).
 
 KNOWN ISSUES
 ------------
-  * Already-converted inventories may show a green background on equipped icons (IE's transparent
+  * Copies converted before 2026-11-11 may show a green background on equipped icons (IE's transparent
     colour). New converts fix this; for an existing ToEE copy, run fix_inventory_icons.bat on that folder.
   * The cutscene input lock blocks mouse clicks only; keyboard shortcuts still work. Some PlaySequence animations
     are a best guess at the matching ToEE animation.
@@ -107,6 +121,9 @@ KNOWN ISSUES
   * IWD2 journal text isn't shown yet; some feats/spells have no ToEE equivalent.
   * AR1201 -> AR1200: use the exit with the party close to it. The battle after the palisade cutscene is not
     tuned yet, and summons don't check that the caster has the spell memorised.
+  * Swift Thomas can appear in the opening west area of Targos, where goblins may attack him; he should start
+    hidden until the palisade-attack cutscene. Reig may attack the party when that fight starts. Not fixed yet.
+  * The IWD2 dialogue window was not tested in game on Windows yet.
   * Not yet tested on a clean Windows install. Feedback welcome.
 
 FEEDBACK / CREDITS
@@ -114,6 +131,6 @@ FEEDBACK / CREDITS
 Feedback in the ie2toee thread on co8.org, with %USERPROFILE%\Saved Games\TemplePlus\TemplePlus.log.
 Converter: ie2toee (https://github.com/DudeMcDude/ie2toee), see converter\LICENSE.txt.
 Engine: Temple+ (MIT, https://github.com/GrognardsFromHell/TemplePlus); preview changes listed in
-TemplePlus\IE-PREVIEW-SOURCE.txt, source https://github.com/DudeMcDude/TemplePlus/tree/feature/dlg-log-portrait
+TemplePlus\IE-PREVIEW-SOURCE.txt, source https://github.com/DudeMcDude/TemplePlus/tree/feature/dm-tile-edits-save
 Portrait art (art\portraits) was commissioned for this project (AI-assisted, via Gemini).
 Icewind Dale II and The Temple of Elemental Evil are (c) their publishers; nothing from them is redistributed.
