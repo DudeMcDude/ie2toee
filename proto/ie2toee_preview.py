@@ -243,6 +243,10 @@ def main():
     if not os.path.isfile(os.path.join(toee, 'temple.dll')):
         sys.exit('%s does not look like a ToEE folder (no temple.dll)' % toee)
     F = flavour(ie); skin = 'iwdee' if F == 'IWDEE' else 'iwd'
+    if F == 'IWDEE':
+        import iefs
+        if not iefs.has_ee_ui(ie):
+            sys.exit(iefs.old_iwdee_error(ie))
     print('IE install: %s (%s)\nToEE: %s\nTemple+: %s\nout: %s' % (ie, F, toee, tp, out))
     w = os.path.join(out, 'work'); os.makedirs(w, exist_ok=True)
     tpa = ['--tp', os.path.abspath(tp)] if tp else []

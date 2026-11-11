@@ -27,7 +27,7 @@ import numpy as np
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from iefs import IEGame
+from iefs import IEGame, has_ee_ui, old_iwdee_error
 from iegui import Chu, Bam, decode_mos, pvrz_loader_for
 from ieformats import cstr
 
@@ -175,8 +175,8 @@ class Exporter:
         self.g = IEGame(root)
         self.pvrz = pvrz_loader_for(self.g)
         self.out = out
-        # EE 'gamelog' skin needs both ui.menu and bgee.lua; older EE 2.x installs lack them
-        self.ee = self.g.exists('ui', 'menu') and self.g.exists('bgee', 'lua')
+        # EE 'gamelog' skin needs both ui.menu and bgee.lua (IWD:EE 2.5+; older installs lack them)
+        self.ee = has_ee_ui(self.g)
         self.lang = lang
         self.written = []
 
@@ -371,11 +371,7 @@ class Exporter:
     def run(self, which, dialogs, default, portraits):
         skins = {}
         if which == 'iwdee' and not self.ee:
-            print('WARNING: this install has no ui.menu/bgee.lua (older IWD:EE); using the classic "iwd" dialogue skin instead.')
-            which = 'iwd'
-            if default == 'iwdee':
-                default = 'iwd'
-            dialogs = [d.replace(':iwdee', ':iwd') for d in dialogs]
+            sys.exit(old_iwdee_error(self.g.root))
         if self.ee:
             fontcolors, styles = lua_tables(self.g.read('bgee', 'lua').decode('latin-1'))
             menu_src = self.g.read('ui', 'menu').decode('latin-1')

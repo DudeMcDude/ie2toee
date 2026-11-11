@@ -157,3 +157,26 @@ class IEGame:
         if self.override:
             out |= {n.rsplit('.', 1)[0].lower() for n in os.listdir(self.override) if n.lower().endswith('.' + ext)}
         return sorted(out)
+
+
+def has_ee_ui(root):
+    """True if the install has the Enhanced Edition UI files (ui.menu and bgee.lua).
+
+    Looks them up the way the engine does: override/ first, then the chitin.key archives,
+    not only as loose files in the game folder. IWD:EE 1.4 and other pre-2.5 builds lack both.
+    `root` may be a folder path or an IEGame.
+    """
+    g = root if isinstance(root, IEGame) else IEGame(root)
+    return g.exists('ui', 'menu') and g.exists('bgee', 'lua')
+
+
+def old_iwdee_error(root):
+    """User-facing abort text for an IWD:EE install too old to convert."""
+    path = root if isinstance(root, str) else getattr(root, 'root', root)
+    return (
+        '%s looks like Icewind Dale: Enhanced Edition, but it is too old.\n'
+        'IWD:EE 1.4 and other pre-2.5 builds lack the Enhanced Edition UI files (ui.menu and bgee.lua).\n'
+        'Please update IWD:EE to a current patch (2.5 or later) and run convert.bat again. '
+        'Older IWD:EE versions are not supported.\n'
+        'convert.bat needs no special flag — just point it at the updated IWD:EE folder.'
+    ) % path

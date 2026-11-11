@@ -13,6 +13,12 @@ extracted on the player's machine. Temple+ only ships the code that draws a skin
 * `--skin auto` (default) exports the skin matching the install: `iwdee` for Enhanced Edition, `iwd` for
   classic. `all` exports every skin the install can provide (an EE install can also provide the classic
   layout, from its `GUIW.CHU`).
+* `--skin iwdee` needs the Enhanced Edition UI files (`ui.menu` and `bgee.lua`, looked up in `override/`
+  and the `chitin.key` archives). IWD:EE 1.4 and other pre-2.5 builds lack them, and the exporter stops
+  with an error rather than falling back to the classic skin; update IWD:EE to 2.5 or later and run
+  `convert.bat` again (no special flag — just point it at the updated EE folder). Classic IWD is
+  unchanged. The preview converter (`ie2toee_preview.py`) does the same check right after it detects an
+  EE install, before converting anything.
 * `--default` picks the skin used for every dialogue (omit it to keep the stock window except for the
   dialogues named with `--dialog`).
 * `--dialog 993:iwdee` uses a skin for one ToEE dialogue file id only (e.g. the converted IWD NPCs).

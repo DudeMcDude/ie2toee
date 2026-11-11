@@ -46,6 +46,9 @@ REQUIREMENTS
 ------------
   * The Temple of Elemental Evil (GOG or Steam).
   * Icewind Dale (classic, GOG/CD) or Icewind Dale: Enhanced Edition (GOG/Steam/Beamdog), installed.
+    IWD:EE must be patch 2.5 or later. 2016-era 1.4 installs lack the Enhanced Edition UI and are not
+    supported; convert.bat will stop with a message. Update IWD:EE and run convert.bat again (no special flag;
+    just point it at the updated IWD:EE folder). Classic Icewind Dale is unchanged.
   * Windows.
   * Python 3.9 or newer, installed BEFORE you run the converter: https://www.python.org/downloads/
     In the installer, tick "Add python.exe to PATH". The converter then installs its three Python packages
@@ -64,7 +67,8 @@ INSTALL
 
      convert.bat "C:\GOG Games\Icewind Dale" "C:\GOG Games\ToEE-IWD"
 
-   (For the Enhanced Edition, give its folder: the one with chitin.key and the lang folder.) The converter
+   (For the Enhanced Edition, give its folder: the one with chitin.key and the lang folder. It must be
+   IWD:EE 2.5 or later; older 1.4 installs are not supported.) The converter
    writes the module into output\install and copies it into the ToEE copy. If it stops with an error, the
    message names the step that failed.
 4. Run TemplePlus\TemplePlusConfig.exe. Set the ToEE folder to your ToEE COPY, choose windowed or full
