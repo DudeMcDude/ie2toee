@@ -4,7 +4,7 @@
   python ie2toee_preview_iwd2.py --iwd2 "C:\\GOG Games\\Icewind Dale 2" --toee "C:\\GOG Games\\ToEE-IWD2" [--out iwd2_out] [--install]
 
 Same converter steps as ie2toee_preview.py (map, spells, creatures, items, bake, travel exits, exit icons, path nodes),
-plus dialogue for the Targos NPCs (ie_dialogue.py; journal/quests not yet). Maps are named I2AR1000.. (map ids from map_id_base in guidance/iwd2.json, currently 5031-5040, immediately after IWD's 5012-5030) so they stay <= 5198 (temple.dll town map) and do not collide with IWD or ENGINE_MAP_IDS.
+plus dialogue for the Targos NPCs (ie_dialogue.py; journal/quests not yet) and the IE dialogue window (ie_dialog_skin.py, from your install's GUI). Maps are named I2AR1000.. (map ids from map_id_base in guidance/iwd2.json, currently 5031-5040, immediately after IWD's 5012-5030) so they stay <= 5198 (temple.dll town map) and do not collide with IWD or ENGINE_MAP_IDS.
 Install target (use a COPY of ToEE): maps, ground art, rules -> modules\\ToEE; scripts and description .mes ->
 modules\\ToEE_core (Temple+ discovers scripts before modules\\ToEE is mounted); item icons -> data\\.
 Nothing of IWD2 is shipped: everything is read from the install you point it at.
@@ -50,6 +50,23 @@ def start_tile(ie, w):
         return START
 
 
+def dialog_skin_for(ie):
+    """IE dialogue-window skin for this IWD2 install (ie_dialog_skin.py --skin), the same rule as ie_dialog_skin.py:
+    the EE 'iwdee' gamelog skin needs ui.menu and bgee.lua (override/ or chitin.key); an install without them is
+    classic (GOG 2.01 / retail: GUIW.CHU message window -> 'iwd'). An Enhanced Edition folder (lang/) that lacks
+    them is too old to convert: stop rather than fall back to the classic skin."""
+    g = iefs.IEGame(ie)
+    if g.exists('ui', 'menu') and g.exists('bgee', 'lua'):
+        return 'iwdee'
+    if os.path.isdir(os.path.join(ie, 'lang')):
+        sys.exit('%s looks like an Enhanced Edition of Icewind Dale II, but it is too old.\n'
+                 'It lacks the Enhanced Edition UI files (ui.menu and bgee.lua).\n'
+                 'Please update it to a current patch and run convert_iwd2.bat again. Older Enhanced Edition '
+                 'versions are not supported.\n'
+                 'convert_iwd2.bat needs no special flag - just point it at the updated folder.' % ie)
+    return 'iwd'
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--iwd2', required=True, help='your Icewind Dale II folder (GOG or retail)')
@@ -63,6 +80,8 @@ def main():
         sys.exit('%s does not look like an Icewind Dale II install (no chitin.key)' % ie)
     if not os.path.isfile(os.path.join(toee, 'temple.dll')):
         sys.exit('%s does not look like a ToEE folder (no temple.dll)' % toee)
+    skin = dialog_skin_for(ie)   # before any convert: an old IWD2:EE stops here
+    print('IWD2 install: %s (dialogue skin "%s")' % (ie, skin), flush=True)
     tp = a.tp or next((p for p in (os.path.join(HERE, '..', '..', 'TemplePlus'), os.path.join(HERE, '..', 'TemplePlus'))
                        if os.path.isfile(os.path.join(p, 'TemplePlus.exe'))), None)
     tpa = ['--tp', os.path.abspath(tp)] if tp else []
@@ -147,6 +166,10 @@ def main():
                        '--jumppoints', os.path.join(bake, 'rules', 'jumppoint.tab')])
     run('path nodes', ['ie_pathnodes.py', '--travel', tr, '--maps', os.path.join(bake, 'modules', 'ToEE', 'maps')])
 
+    # IE dialogue window (Temple+ uses it only when art\interface\dialog_ie\skins.json exists): built from YOUR
+    # install's GUI (classic: GUIW.CHU message window; EE: ui.menu/bgee.lua gamelog), default for every conversation
+    sk = os.path.join(w, 'skin'); shutil.rmtree(sk, ignore_errors=True)
+    run('dialog skin', ['ie_dialog_skin.py', ie, sk, '--skin', skin, '--default', skin])
     print('== assemble', flush=True)
     mov = os.path.join(w, 'movies')   # IWD2's .mve are Bink 1 already: a plain copy (ie_movies.py)
     run_soft('movies', ['ie_movies.py', 'convert', '--game', ie, '--toee', toee, '--out', mov, '--flavour', 'IWD2'])
@@ -168,6 +191,7 @@ def main():
         copytree(os.path.join(w, 'townmap', str(G[ar]['map'])), os.path.join(M, 'townmap', str(G[ar]['map'])))
     shutil.copy(os.path.join(bake, 'rules', 'jumppoint.tab'), os.path.join(M, 'rules', 'jumppoint.tab'))
     copytree(os.path.join(bake, 'rules', 'info_regions'), os.path.join(M, 'rules', 'info_regions'))
+    copytree(os.path.join(sk, 'modules', 'ToEE'), M)   # art/interface/dialog_ie (+ fonts/ie_*.ttf): IE dialogue window
     copytree(os.path.join(bake, 'modules', 'ToEE', 'scr'), scr)
     for d in cre.values():
         copytree(os.path.join(d, 'modules', 'ToEE', 'mes', 'description'), os.path.join(C, 'mes', 'description'))

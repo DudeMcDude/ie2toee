@@ -218,19 +218,42 @@ class Exporter:
         cont = t.get(9372) if t else ''
         return (cont or 'Continue'), (end or 'End Dialogue')
 
-    def guiw_message_window(self):
-        """Classic expanded message window: the GUIW.CHU window whose background is the big message panel
-        (GUIWBTP3 in IWD) or, failing that, the window with the tallest text area."""
-        chu = Chu(self.g.read('guiw', 'chu'))
+    # GUIW.CHU of the classic games; IWD2 ships no 640x480 art for it and lays the game screen out in
+    # GUIW08.CHU (800x600, *8 MOS such as GUWBTP38) / GUIW10.CHU (1024x768, *0 MOS)
+    GUIW_CHUS = ('guiw', 'guiw08', 'guiw10')
+    MESSAGE_MOS = ('guiwbtp3', 'guwbtp38', 'guwbtp30')
+
+    def guiw_chu(self):
+        """(resref, Chu) of the first GUIW*.CHU whose message window art is present in the install."""
+        if not hasattr(self, '_guiw'):
+            self._guiw = None
+            for ref in self.GUIW_CHUS:
+                if not self.g.exists(ref, 'chu'):
+                    continue
+                chu = Chu(self.g.read(ref, 'chu'))
+                if self._message_window(chu):
+                    self._guiw = (ref, chu)
+                    break
+            if self._guiw is None and self.g.exists('guiw', 'chu'):
+                self._guiw = ('guiw', Chu(self.g.read('guiw', 'chu')))
+        return self._guiw
+
+    def _message_window(self, chu):
         best = None
         for w in chu.windows:
             tas = [c for c in w['controls'] if c['type'] == 'textarea']
-            if not tas or not w['mos']:
+            if not tas or not w['mos'] or not self.g.exists(w['mos'], 'mos'):
                 continue
-            score = (w['mos'].lower() == 'guiwbtp3', max(c['h'] for c in tas))
+            score = (w['mos'].lower() in self.MESSAGE_MOS, max(c['h'] for c in tas))
             if best is None or score > best[0]:
                 best = (score, w)
         return best[1] if best else None
+
+    def guiw_message_window(self):
+        """Classic expanded message window: the GUIW*.CHU window whose background is the big message panel
+        (GUIWBTP3 in IWD, GUWBTP38 in IWD2's GUIW08.CHU) or, failing that, the window with the tallest text area."""
+        hit = self.guiw_chu()
+        return self._message_window(hit[1]) if hit else None
 
     def scrollbar_art(self, skin, ref, cycle=0, frames=None):
         """Arrows, knob and trough of a scrollbar BAM. A CHU scrollbar control names its frames (IWD's GUIWSBR:
@@ -253,14 +276,17 @@ class Exporter:
         skin = 'iwd'
         w = self.guiw_message_window()
         if not w:
-            raise RuntimeError('no message window in GUIW.CHU')
+            raise RuntimeError('no message window in GUIW.CHU / GUIW08.CHU / GUIW10.CHU')
         ta = max((c for c in w['controls'] if c['type'] == 'textarea'), key=lambda c: c['h'])
         sb = next((c for c in w['controls'] if c['type'] == 'scrollbar' and c['id'] == ta.get('scrollbar')), None)
-        btn = next((c for c in w['controls'] if c['type'] == 'button'), None)
+        # history toggle: a small button whose BAM is in the install (IWD2's window 7 names a missing GUIWCTLC
+        # and has a 42x42 portrait button, so it gets none)
+        btn = next((c for c in w['controls'] if c['type'] == 'button' and c.get('bam') and c['w'] <= 32 and c['h'] <= 32
+                    and self.g.exists(c['bam'], 'bam')), None)
         panel = self.mos(w['mos'])
         js = {
             'name': skin, 'layout': 'log',
-            'source': 'GUIW.CHU window %d (%s)' % (w['id'], w['mos']),
+            'source': '%s.CHU window %d (%s)' % (self.guiw_chu()[0].upper(), w['id'], w['mos']),
             'design': self.chu_extent(),
             'panel': {'image': self.tga(panel, skin, 'panel.tga'), 'w': int(panel.shape[1]), 'h': int(panel.shape[0]),
                       'bottom': 58},
@@ -362,7 +388,7 @@ class Exporter:
 
     def chu_extent(self):
         """GUI resolution the classic CHU layout was made for (bottom-right corner of its windows)."""
-        chu = Chu(self.g.read('guiw', 'chu'))
+        chu = self.guiw_chu()[1]
         return [max(w['x'] + w['w'] for w in chu.windows), max(w['y'] + w['h'] for w in chu.windows)]
 
     def run(self, which, dialogs, default, portraits):

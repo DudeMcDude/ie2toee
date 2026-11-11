@@ -48,6 +48,13 @@ Output:
   bottom of the text area;
 * the classic scrollbar art (decorative; the mouse wheel scrolls) and the history/"expand" button.
 
+Icewind Dale II (GOG 2.01 / retail) also gets the **iwd** skin, from its own GUI: IWD2 has no 640x480 art for
+`GUIW.CHU`, so the exporter uses `GUIW08.CHU` window 7 (`GUWBTP38`, the 800x600 message panel; design 800x600)
+and falls back to `GUIW10.CHU` (`GUWBTP30`). IWD2's window names a history button BAM it does not ship, so its
+skin has no history button. `ie2toee_preview_iwd2.py` runs this step itself (`--skin iwd --default iwd`, into
+`modules\ToEE`); an install with `ui.menu` and `bgee.lua` gets `iwdee`, and an Enhanced Edition folder (`lang\`)
+without them stops the convert.
+
 The layout is scaled to the game resolution (the IE design is 1024x768; ToEE often runs smaller).
 
 ## Formats
