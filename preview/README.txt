@@ -1,4 +1,4 @@
-ICEWIND DALE IN THE TEMPLE OF ELEMENTAL EVIL ENGINE - PLAYER PREVIEW (2026-10-26)
+ICEWIND DALE IN THE TEMPLE OF ELEMENTAL EVIL ENGINE - PLAYER PREVIEW (2026-11-11)
 =================================================================================
 
 IMPORTANT: PYTHON 3.9 OR NEWER MUST BE INSTALLED
@@ -6,7 +6,86 @@ IMPORTANT: PYTHON 3.9 OR NEWER MUST BE INSTALLED
   https://www.python.org/downloads/ and, in the installer, tick "Add python.exe to PATH".
   Without it convert.bat stops with a message. You also need your own Icewind Dale or Icewind Dale: EE.
 
-NEW IN THIS PREVIEW (2026-10-26)
+NEW IN THIS PREVIEW (2026-11-11)
+--------------------------------
+  Still an early-preview, AI-assisted experiment: not a playable or polished conversion.
+  * Bundled Temple+ 0.2.96 (see TemplePlus\IE-PREVIEW-SOURCE.txt). New in it: the DM Sector Tiles editor has
+    "Save Tile Edits". Only the tiles you painted by hand are saved, as JSON in
+    %USERPROFILE%\Saved Games\TemplePlus\dm_tile_edits\<module>\map<id>.json, and they are re-applied when a
+    sector loads. Door cells set by scripts are protected from painting and saving.
+  * Equipped inventory icons: the IE transparent colour (green) no longer shows behind items in the paper-doll
+    slots. The bag view was already fine; the equipped slots ignore alpha. New converts write clean icons. For an
+    existing ToEE copy, run  fix_inventory_icons.bat "C:\GOG Games\ToEE-IWD"  instead of a full reconvert.
+  * IWD:EE older than 2.5 (no ui.menu / bgee.lua): the converter now stops with a message asking you to update
+    IWD:EE and run convert.bat again (no special flag). It no longer falls back to the classic dialogue window.
+    Classic Icewind Dale is unchanged.
+  * Saves: the map ids are unchanged since 2026-11-10 (5012-5030), so 2026-11-10 saves should still load. Saves
+    from before 2026-11-10 (old 59xx ids) don't work; start a NEW game. Temple+ 0.2.96 can be dropped in without
+    a reconvert; for the icon fix, reconvert or run fix_inventory_icons.bat.
+
+EARLIER (2026-11-10)
+--------------------------------
+  * Town maps (mini maps): every converted area has a town map built from its own background, and the town map
+    list names the IWD places (Easthaven, the Snowdrift Inn, Pomab's Emporium...) instead of ToEE ones.
+  * IE dialogue window: the speaker's side portrait is shown only when a real big portrait exists (no blurry
+    upscaled small portrait or placeholder head; the slot stays empty otherwise). The IWD dialogue scrollbar
+    is fixed (it showed a column of small button tiles).
+  * Movies and slides can be skipped with Space, Enter, Esc or a mouse click. A slide whose sound fails to play
+    now ends after 3 seconds instead of waiting for a key, and a small in-game notice asks you to report it.
+  * Bundled Temple+ 0.2.92.
+  * The converted maps got new map ids (5012-5030); saves from before 2026-11-10 don't work.
+
+EARLIER (2026-11-07)
+--------------------------------
+  * Commissioned portraits, batch 8 finished (art generated via Gemini): a redone Quimby, the scrimshaw
+    apprentice, Kuldahar, Reghed and Ten Towns townsfolk pools, 16 elite or boss portraits and 34 location-themed
+    monster portraits, with mirrored copies; about 300 IWD monster variants now use them.
+
+EARLIER (2026-11-04)
+--------------------------------
+  * Summon spells: IE summoning spells now conjure their creatures (picked by caster level, as in IE), using
+    vanilla ToEE or Co8 creatures as stand-ins where the IE creature has no ToEE match (e.g. dire rats, efreeti,
+    elementals); the summon hexagram effect plays when they appear.
+  * Spawned creatures run their own IE scripts and dialogue; cutscenes can pan the camera, hide the GUI, and
+    show speech bubbles for floating text. Dialogue-only cutscenes simply start the dialogue.
+  * Commissioned portraits, batch 8 part A (art generated via Gemini): Easthaven NPCs (Pomab, Accalia,
+    Hildreth, Erevain, Elisia, Jhonen, Gaspar, Grisella, Apsel, Old Jed, Churin), Pomab in his tower, the
+    Cyclops, the Cryshal Sentry, siege survivors, a Tempus acolyte and townsfolk pools (fishermen, fishwife,
+    dockworkers, Tempus priest/priestess) with mirrored copies. Quimby keeps a stand-in for now.
+
+EARLIER (2026-11-02)
+--------------------------------
+  * Cutscenes: black letterbox bars and a faint dark wash while a cutscene runs, and mouse clicks are blocked
+    until it ends (or a dialogue opens). PlaySequence now plays ToEE animations (attack, cast, hit, fall...)
+    instead of only being logged; several cutscene steps for one character run one after another.
+  * Creature spawns: script CreateCreature spawns appear (facing and portrait), area spawn .INI files are
+    converted (spawns on entering an area and timed spawns, with their variable conditions and caps), and
+    spawned groups spread out instead of stacking on one tile.
+  * Rest encounters: on converted IE maps, the area's rest table decides whether resting is safe and what
+    interrupts it, through hooks on ToEE/Co8's random_encounter.py (vanilla maps keep Co8's behaviour).
+  * Kegs and other scripted objects spawn as named barrel critters.
+  * Script error fixes: See()/Range() argument errors and .lower errors on object handles are gone.
+  * Portrait batch 6: 30 commissioned monster portraits (hook horror, snow and ice trolls, yuan-ti, lizard men,
+    dire wolves, Malarites, wights, salamanders, armored skeletons, umber hulk, beetles, orcs, goblins, wyvern
+    and two bosses) with "elite" variants for the tougher versions and mirrored copies for variety.
+  * Still an early, AI-assisted experiment: not playable or polished.
+
+EARLIER (2026-11-01)
+--------------------------------
+  * Area scripts now run on a game-time map tick in the bundled Temple+ build: they pause with menus and the
+    inventory and keep running after save/load.
+  * First cutscenes: an IE cutscene sequencer (StartCutScene, fades, floating text), chapter screens as ToEE
+    slides with subtitles.
+  * Movies: the converter converts the intro/cut movies from YOUR OWN install, on your PC (classic IWD MVE from
+    the game's BIFs, or IWD:EE movies with --movies-ee). This needs ffmpeg and RAD Video Tools (binkc) on PATH;
+    without them the movie step is skipped and the rest of the conversion continues.
+  * Commissioned NPC portraits: 50 new portraits (IWD and IWD2 characters, Targos children, townsfolk, and monsters
+    such as yetis, frost giants and winter wolves with an "upgraded" variant and mirrored copies; a monster group
+    picks among them so it doesn't look cloned). They are installed into data\art\interface\portraits.
+  * Known issues: during a cutscene the input may stay locked (load a save); PlaySequence is only logged; some IE
+    script triggers (See(), Range()) log argument errors and don't fire; untested on a clean Windows install.
+
+EARLIER (2026-10-26)
 --------------------------------
   * Exit icons: building doors and the town exits show a clickable travel icon. Click it and the party walks
     there and travels.
@@ -75,6 +154,8 @@ INSTALL
    screen as you like, and save. Decline any offer to update Temple+; an update would replace the preview
    build with official Temple+.
    (If you already use Temple+: the settings are shared, so switch the folder back for your normal game.)
+5. Optional, for a copy converted with an older preview: fix_inventory_icons.bat "C:\GOG Games\ToEE-IWD"
+   clears the green behind equipped icons without a full reconvert.
 
 HOW TO START
 ------------
@@ -86,7 +167,8 @@ if you delete it, copy modules\ToEE.dat to modules\IWD.dat yourself (or run the 
 1. In TemplePlus\TemplePlusConfig.exe, pick the module "IWD" in the module list and save.
 2. Start TemplePlus\TemplePlus.exe and start a NEW game with any party. It begins in Easthaven; no console
    command is needed. (To play normal ToEE again, pick the module "ToEE" in TemplePlusConfig.)
-3. (Old saves from before this version: load one and type  import iwd; iwd.go()  in the Shift+~ console.)
+3. Saves from the 2026-11-10 preview should still load. Saves from older previews don't work (the maps have
+   new ids since 2026-11-10); start a new game.
 4. Click townsfolk to talk to them (IE dialogue window) and click doors to open and close them. Walk into a
    building's doorway to go inside, and into the exit area inside to come out. Save and load as usual.
    To leave Easthaven for good, load a save from before the trip.
@@ -105,7 +187,7 @@ KNOWN ISSUES
   * Fights work but use simplified IE combat scripts; there's no IE-style target selection.
   * Patrols: walkers pause a fixed 3 s at each waypoint, and one patroller stays at its first waypoint.
   * Potions can stack into another potion of the same ToEE type.
-  * Already-converted inventories may show a green background on equipped icons (IE's transparent
+  * Copies converted before 2026-11-11 may show a green background on equipped icons (IE's transparent
     colour). New converts fix this; for an existing ToEE copy, run fix_inventory_icons.bat on that folder.
   * Wands and other charged items show no charges.
   * Converted NPCs may carry a few extra default ToEE items.
@@ -128,7 +210,7 @@ CREDITS / LICENCES
 ------------------
 Converter: ie2toee (https://github.com/DudeMcDude/ie2toee), see converter\LICENSE.txt.
 Engine: Temple+ (https://github.com/GrognardsFromHell/TemplePlus, MIT licence). The preview changes to Temple+
-are in TemplePlus\ie-preview-changes.diff (against Temple+ master 03d72045). Source:
-https://github.com/DudeMcDude/TemplePlus/tree/preview/iwd-module
-commit 15b268bf (https://github.com/DudeMcDude/TemplePlus/commit/15b268bf63ab1dccba92050842d843462f974351). Icewind Dale is (c) its publishers. You need your own legal copy;
+are listed in TemplePlus\IE-PREVIEW-SOURCE.txt. Source: https://github.com/DudeMcDude/TemplePlus/tree/feature/dm-tile-edits-save
+Icewind Dale is (c) its publishers. You need your own legal copy;
 nothing from it is redistributed here. The Temple of Elemental Evil is (c) its publishers.
+The portrait art in art\portraits was commissioned for this project (AI-assisted, via Gemini).

@@ -13,7 +13,7 @@ set SCRIPT=
 if exist "%~dp0converter\fix_inventory_icons.py" set SCRIPT=%~dp0converter\fix_inventory_icons.py
 if exist "%~dp0..\proto\fix_inventory_icons.py" set SCRIPT=%~dp0..\proto\fix_inventory_icons.py
 if "%SCRIPT%"=="" (
-  echo fix_inventory_icons.py not found (expected in converter\ or ..\proto\).
+  echo fix_inventory_icons.py not found in converter\ or ..\proto\
   exit /b 1
 )
 %PY% "%SCRIPT%" "%~1"
