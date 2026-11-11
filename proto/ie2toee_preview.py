@@ -10,6 +10,9 @@ Pipeline (each step is one of the converter scripts in this folder, run in order
   -> travel exits (ie_exits.py) -> exit icons (ie_exiticons.py) -> path node placement (ie_pathnodes.py)
   [-> with --install --engine-pathnodes: Temple+ recalculates the node links with its own pathfinder and writes
       pathnodenew.pnd/pathnodedist.pnd + clearance.bin for every map (pathnode_bake.sh, the standard for new maps)]
+Per-map hand overrides in overrides/iwd/<AREA>/ (overrides/README.md): Temple+ DM tile edits are applied by the map
+step; hand-culled pathnodenew.pnd/pathnodedist.pnd/clearance.bin are copied in after the path node step (and after the
+engine bake), so they win.
 The result is <out>/install: copy its contents into the ToEE folder (or pass --install to do that).
 Nothing of the IE game is shipped with the converter: everything is read from the install you point it at.
 """
@@ -18,6 +21,8 @@ import argparse, os, re, shutil, subprocess, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import toeedata
+import ie_overrides
+OVERRIDES = os.path.join(HERE, 'overrides', 'iwd')   # per-map hand overrides (ie_overrides.py, overrides/README.md)
 
 AREA, MAP_ID, GROUND_ID, START = 'AR1000', 5012, 900, (482, 424)
 # Map ids (the IWD module replaces vanilla's maps, so their ids are reused) must stay <= 5198: temple.dll's town map UI
@@ -252,12 +257,13 @@ def main():
     tpa = ['--tp', os.path.abspath(tp)] if tp else []
     a1 = AREA.lower()
 
-    run('map', ['ie2toee.py', '--game', ie, '--area', AREA, '--out', w, '--map-id', str(MAP_ID), '--ground-id', str(GROUND_ID)])
+    ovr = ['--overrides', OVERRIDES] if os.path.isdir(OVERRIDES) else []
+    run('map', ['ie2toee.py', '--game', ie, '--area', AREA, '--out', w, '--map-id', str(MAP_ID), '--ground-id', str(GROUND_ID)] + ovr)
     import json
     interiors = {}      # area -> map id, for the interiors that converted
     for i, ar in enumerate(INTERIORS, 1):
         if run_soft('interior %s' % ar, ['ie2toee.py', '--game', ie, '--area', ar, '--out', w,
-                                         '--map-id', str(MAP_ID + i), '--ground-id', str(GROUND_ID + i)]):
+                                         '--map-id', str(MAP_ID + i), '--ground-id', str(GROUND_ID + i)] + ovr):
             interiors[ar] = MAP_ID + i
         else:
             print('warning: interior %s failed to convert and is skipped (its door stays a dead end)' % ar, flush=True)
@@ -336,6 +342,13 @@ def main():
     run('exit icons', ['ie_exiticons.py', '--travel', os.path.join(w, 'ie_travel_data.py'), '--maps', os.path.join(bake, 'modules', 'ToEE', 'maps'),
                        '--jumppoints', os.path.join(bake, 'rules', 'jumppoint.tab')])
     run('path nodes', ['ie_pathnodes.py', '--travel', os.path.join(w, 'ie_travel_data.py'), '--maps', os.path.join(bake, 'modules', 'ToEE', 'maps')])
+
+    def path_overrides(maps_dir, label):   # hand-made path node data wins over the generator / engine bake
+        for ar in [AREA] + sorted(interiors):
+            got = ie_overrides.install_pathnodes(OVERRIDES, ar, os.path.join(maps_dir, ar))
+            if got:
+                print('%s override %s: %s' % (label, ar, ' '.join(got)), flush=True)
+    path_overrides(os.path.join(bake, 'modules', 'ToEE', 'maps'), 'path node')
     print('== assemble', flush=True)
     mov = os.path.join(w, 'movies')
     if not a.no_movies:   # intro only for now (long encode); the others: ie_movies.py convert ... without --only
@@ -480,6 +493,8 @@ def main():
             r = subprocess.run(['bash', os.path.join(HERE, 'pathnode_bake.sh'), os.path.join(scr, 'ie_travel_data.py')], cwd=HERE, env=env)
             if r.returncode:
                 sys.exit('step "engine path nodes" failed (exit %d)' % r.returncode)
+            path_overrides(os.path.join(M, 'maps'), 'path node')                       # the bake rewrote both copies
+            path_overrides(os.path.join(toee, 'modules', MODULE, 'maps'), 'installed path node')
     print('done. Run TemplePlusConfig, pick the module "%s", then start a NEW game: it begins in Easthaven.' % MODULE)
 
 

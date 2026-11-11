@@ -1,27 +1,50 @@
-ICEWIND DALE IN THE TEMPLE OF ELEMENTAL EVIL ENGINE - PLAYER PREVIEW (2026-11-11)
-=================================================================================
+ICEWIND DALE IN THE TEMPLE OF ELEMENTAL EVIL ENGINE - PLAYER PREVIEW (2026-11-11b)
+==================================================================================
 
 IMPORTANT: PYTHON 3.9 OR NEWER MUST BE INSTALLED
   The converter is a Python program. Before you start, install Python 3.9+ from
   https://www.python.org/downloads/ and, in the installer, tick "Add python.exe to PATH".
   Without it convert.bat stops with a message. You also need your own Icewind Dale or Icewind Dale: EE.
 
-NEW IN THIS PREVIEW (2026-11-11)
+NEW IN THIS PREVIEW (2026-11-11b)
 --------------------------------
   Still an early-preview, AI-assisted experiment: not a playable or polished conversion.
-  * Bundled Temple+ 0.2.96 (see TemplePlus\IE-PREVIEW-SOURCE.txt). New in it: the DM Sector Tiles editor has
-    "Save Tile Edits". Only the tiles you painted by hand are saved, as JSON in
-    %USERPROFILE%\Saved Games\TemplePlus\dm_tile_edits\<module>\map<id>.json, and they are re-applied when a
-    sector loads. Door cells set by scripts are protected from painting and saving.
+  * Per-map overrides: hand tile edits and culled pathnodes now survive a reconvert. After the generator
+    runs, the override wins. This preview includes AR1000 Easthaven (map 5012): 125 tile edits and a culled
+    path node set (pathnodenew.pnd / pathnodedist.pnd / clearance.bin, 204 nodes), and AR1010 (map 5022):
+    21 tile edits. Door cells are protected so a saved block cannot seal a door. Fresh installs get these
+    from convert (baked into the .sec files, and the path node files are copied into
+    modules\IWD\maps\AR1000). Existing playtest installs already have the files; a reconvert is needed
+    for the exit-icon change below, and to bake the tile edits into .sec for installs that do not have the
+    Saved Games tile-edit overlay.
+  * Exit icon for Churin's house (AR1000 -> AR1011, To1011): the gold ToEE exit icon had been planted on a
+    closed door tile, because the whole-tile walk search never reached the south-west pier (the approach is
+    partly walkable stairs/planks) and fell back to the doorway centre. A sub-tile flood-fill fallback now
+    places it on the pier at (532,496). Needs a reconvert. Not yet re-checked in game after the fix.
+  * Bundled Temple+ 0.2.97 (see TemplePlus\IE-PREVIEW-SOURCE.txt). The magnifier cursor for IE info points
+    (signs and the like) could stay on after leaving the region: the hover flag was only updated on a plain
+    mouse move inside the game view. Leaving via the party bar, scrolling the map under a still mouse,
+    dragging, or opening a radial menu could leave it stuck until you moved again in the game view. Each
+    frame now re-checks that the mouse is over the game view, no radial menu is open, and the region is
+    still under the cursor. Drop-in: no reconvert for the cursor fix. Not yet re-checked in game after
+    the fix.
+  * Saves: the map ids are unchanged (5012-5030), so 2026-11-10 and 2026-11-11 saves should still load. Saves
+    from before 2026-11-10 (old 59xx ids) don't work; start a NEW game. Temple+ 0.2.97 can be dropped in
+    without a reconvert. For the Churin exit icon, and to bake the tile/pathnode overrides into a fresh
+    install, reconvert.
+
+EARLIER (2026-11-11)
+--------------------------------
+  * Bundled Temple+ 0.2.96. The DM Sector Tiles editor has "Save Tile Edits". Only the tiles you painted by
+    hand are saved, as JSON in %USERPROFILE%\Saved Games\TemplePlus\dm_tile_edits\<module>\map<id>.json,
+    and they are re-applied when a sector loads. Door cells set by scripts are protected from painting and
+    saving.
   * Equipped inventory icons: the IE transparent colour (green) no longer shows behind items in the paper-doll
     slots. The bag view was already fine; the equipped slots ignore alpha. New converts write clean icons. For an
     existing ToEE copy, run  fix_inventory_icons.bat "C:\GOG Games\ToEE-IWD"  instead of a full reconvert.
   * IWD:EE older than 2.5 (no ui.menu / bgee.lua): the converter now stops with a message asking you to update
     IWD:EE and run convert.bat again (no special flag). It no longer falls back to the classic dialogue window.
     Classic Icewind Dale is unchanged.
-  * Saves: the map ids are unchanged since 2026-11-10 (5012-5030), so 2026-11-10 saves should still load. Saves
-    from before 2026-11-10 (old 59xx ids) don't work; start a NEW game. Temple+ 0.2.96 can be dropped in without
-    a reconvert; for the icon fix, reconvert or run fix_inventory_icons.bat.
 
 EARLIER (2026-11-10)
 --------------------------------
@@ -167,18 +190,31 @@ if you delete it, copy modules\ToEE.dat to modules\IWD.dat yourself (or run the 
 1. In TemplePlus\TemplePlusConfig.exe, pick the module "IWD" in the module list and save.
 2. Start TemplePlus\TemplePlus.exe and start a NEW game with any party. It begins in Easthaven; no console
    command is needed. (To play normal ToEE again, pick the module "ToEE" in TemplePlusConfig.)
-3. Saves from the 2026-11-10 preview should still load. Saves from older previews don't work (the maps have
-   new ids since 2026-11-10); start a new game.
+3. Saves from the 2026-11-10 and 2026-11-11 previews should still load. Saves from older previews don't work
+   (the maps have new ids since 2026-11-10); start a new game.
 4. Click townsfolk to talk to them (IE dialogue window) and click doors to open and close them. Walk into a
    building's doorway to go inside, and into the exit area inside to come out. Save and load as usual.
    To leave Easthaven for good, load a save from before the trip.
 
 KNOWN ISSUES
 ------------
+  * Pathfinding: generated nodes are dense (6-tile spacing) with some redundant nodes in open areas, and
+    link distances are straight-line / aerial rather than the actual walking route, which can look wrong.
+    A later unify-pass and walk-path linking are planned but are not in this preview. Manual per-map
+    pathnode overrides (as shipped for AR1000) are the current way to ship a culled set.
+  * The converted IWD font can look jaggy.
+  * Two other Easthaven exit icons (To1009 and To1012) may have little room around them for a party member;
+    they passed an earlier in-game check (2026-10-24) but are worth another look if a click seems fussy.
+  * The Churin exit-icon and info-cursor fixes above are in this build but have not been re-tested in game
+    yet (the bugs themselves were found in playtest).
+  * The cutscene lock blocks mouse clicks only; some PlaySequence animations are a best-guess ToEE match.
+  * Some spawn .INI options are ignored; summons don't check that the caster has the spell memorised.
+  * Portraits checked in game only for a few characters and spawned monsters so far.
+  * Not tested on a clean Windows install yet. Feedback is very welcome.
   * Easthaven and its 14 building interiors are converted, but the interiors are empty (no people, shops or
-    scripts yet). The road south (to AR1200) and two interior side doors (AR1015, AR1016) lead to areas that are
-    not in the preview: you get a one-time "This exit (ARxxxx) is not in the preview" note and stay put. The world
-    map doesn't know Easthaven.
+    scripts yet) and are still a technology preview, not a full campaign. The road south (to AR1200) and two
+    interior side doors (AR1015, AR1016) lead to areas that are not in the preview: you get a one-time
+    "This exit (ARxxxx) is not in the preview" note and stay put. The world map doesn't know Easthaven.
   * Travel is a 4-times-a-second check of where your party is, so it works in a loaded save too; after arriving
     (or loading) it only fires once the party has stepped out of every exit area, so it never bounces you back.
   * Rules are approximations: IE stats, THAC0 and saves are mapped to D&D 3.5 equivalents. Some IE spells have no

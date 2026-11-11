@@ -1,6 +1,8 @@
 # Never commit or redistribute IE game data or anything derived from it.
-iwd/
-IWD/
+# /iwd and /IWD are the game-data directories at this tree's root, not a folder
+# named iwd deeper in the repo (proto/overrides/iwd holds ToEE-generated overrides).
+/iwd/
+/IWD/
 sample/
 out/
 out*/
@@ -43,6 +45,9 @@ __pycache__/
 *.mob
 *.prp
 *.pnd
+# ToEE-generated path node overrides (engine data, not IE assets). pathnode.pnd stays ignored.
+!proto/overrides/**/pathnodenew.pnd
+!proto/overrides/**/pathnodedist.pnd
 *.cgf
 *.cif
 

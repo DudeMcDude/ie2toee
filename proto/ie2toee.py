@@ -2,7 +2,7 @@
 """Prototype: convert one IE area (BG/IWD/IWD2) into a ToEE/Temple+ map folder.
 
   python3 ie2toee.py --game <IE install> --area AR1000 --out <outdir> [--map-id 5012] [--ground-id 900]
-                     [--guidance guidance/iwd.json] [--closed-doors] [--preview]
+                     [--guidance guidance/iwd.json] [--closed-doors] [--preview] [--overrides overrides/iwd]
 
 Writes (all derived from the player's own files, on the player's machine):
   art/ground/<AREA>/yyyyxxxx.jpg  256x256 background tiles (+ <AREA>_night if an N variant exists)
@@ -523,6 +523,32 @@ def region_anchors(kind_open, bbox, regions, start, near=0.8, limit=6.0, avoid=N
                         seen[x, y] = True; q.append((x, y))
         return tiles
 
+    # Fallback reachability on the 3x3 subtiles (8-connected), like ToEE pathing. An IE pier, ramp or gangway can join
+    # the rest of the map only through partly walkable tiles, which the whole-tile flood above cannot cross (AR1000
+    # To1011: the Churin pier was an island, the region got no anchor and its exit icon fell back to the polygon
+    # centroid, a tile of the closed double door). Used only for regions the whole-tile search gives no anchor, so
+    # anchors that already work stay where they are. Returns the fully walkable tiles, not in `excl`, whose 9 subtiles
+    # are all reachable from `start`.
+    sub_walk = (kind_open == 0).transpose(0, 2, 1, 3).reshape(kind_open.shape[0] * 3, kind_open.shape[1] * 3)
+
+    def reach_sub(excl=None):
+        if not (0 <= su < walk.shape[0] and 0 <= sv < walk.shape[1]) or not walk[su, sv] or (excl is not None and excl[su, sv]):
+            return []
+        m = sub_walk & ~np.repeat(np.repeat(excl, 3, 0), 3, 1) if excl is not None else sub_walk
+        seen = np.zeros(m.shape, bool); s0 = (su * 3 + 1, sv * 3 + 1); seen[s0] = True
+        q = deque([s0])
+        while q:
+            a, b = q.popleft()
+            for da in (-1, 0, 1):
+                for db in (-1, 0, 1):
+                    x, y = a + da, b + db
+                    if 0 <= x < m.shape[0] and 0 <= y < m.shape[1] and m[x, y] and not seen[x, y]:
+                        seen[x, y] = True; q.append((x, y))
+        full = seen.reshape(walk.shape[0], 3, walk.shape[1], 3).all((1, 3)) & walk
+        if excl is not None:
+            full &= ~excl
+        return [(int(a), int(b)) for a, b in zip(*np.nonzero(full))]
+
     def nearest(tiles, r):
         return min(((_poly_dist(a + bbox[0] + 0.5, b + bbox[2] + 0.5, r['poly']), a + bbox[0], b + bbox[2]) for a, b in tiles),
                    default=None)
@@ -551,7 +577,7 @@ def region_anchors(kind_open, bbox, regions, start, near=0.8, limit=6.0, avoid=N
     clear = reach(walk & ~avoid) if avoid is not None else []
     if doors is not None:   # the icon may stand right in front of the frame: only the door's own tiles are excluded
         clear = reach(walk & ~doors) or clear
-    out = {}
+    out = {}; sub_clear = None
     for k, r in enumerate(regions):
         if r['type'] != 'travel':
             continue
@@ -559,8 +585,18 @@ def region_anchors(kind_open, bbox, regions, start, near=0.8, limit=6.0, avoid=N
         if os.environ.get('IE2TOEE_ANCHOR_DEBUG'):
             print('anchor %s target %.1f,%.1f doors %d -> %s' % (r.get('name'), target(r)[0], target(r)[1],
                   sum(_poly_dist(t[0], t[1], r['poly']) <= 3.0 for t in door_t), best))
+        if not (best and best[0] <= limit):   # whole-tile search found nothing: retry on subtiles (see reach_sub)
+            if sub_clear is None:
+                sub_clear = (reach_sub(doors) if doors is not None else []) or (reach_sub(avoid) if avoid is not None else [])
+            sub_best = nearest_to(sub_clear, r) if sub_clear else None
+            if sub_best and sub_best[0] <= limit:
+                best = sub_best
+                if os.environ.get('IE2TOEE_ANCHOR_DEBUG'):
+                    print('anchor %s: subtile fallback -> %s' % (r.get('name'), best))
         if not (best and best[0] <= limit):
             best = nearest(every, r)
+        if not (best and best[0] <= limit):
+            best = nearest(reach_sub(), r)
         if best and near < best[0] <= limit:   # (near < 0: every region)
             out[k] = [int(best[1]), int(best[2])]
     return out
@@ -656,6 +692,22 @@ def convert(game, area, outdir, map_id, ground_id, guidance, preview=False, clos
                                              os.path.join(outdir, 'art', 'ground', name + '_night'), guidance['jpeg_quality'])
     bbox = pl.tile_bbox()
     U, V, flags, mats, kind = build_tile_grid(sr, pl, guidance, bbox)
+    # per-map hand overrides (ie_overrides.py, overrides/<game>/<AREA>/): Temple+ DM tile edits on top of the baked
+    # search map + "searchmap_fix", minus the door bits the runtime switches (as the in-game tile editor protects them)
+    import ie_overrides
+    ovr = guidance.get('overrides_dir')
+    tile_edits = ie_overrides.load_tile_edits(ovr, name, warn=lambda m: print('warning: ' + m, file=sys.stderr)) if ovr else []
+    door_bits = ie_overrides.door_bits(are.doors, door_cell_masks, pl, sr.shape) if tile_edits else {}
+
+    def edited(grid):   # build_tile_grid() result with the same tile edits applied (flags + subtile kinds)
+        if tile_edits:
+            ie_overrides.apply_tile_edits(tile_edits, bbox, grid[2], grid[4], door_bits)
+        return grid
+    if tile_edits:
+        report['tile_edits'] = ie_overrides.apply_tile_edits(tile_edits, bbox, flags, kind, door_bits)
+        if report['tile_edits']['stale']:
+            print('warning: %s: %d tile edit(s) were painted on a tile that converts differently now (applied anyway)'
+                  % (name, report['tile_edits']['stale']), file=sys.stderr)
     report['tile_bbox'] = bbox
     report['sectors'] = write_sectors(U, V, flags, mats, mapdir)
     report['walkable_subtiles'] = int((kind == 0).sum())
@@ -704,8 +756,8 @@ def convert(game, area, outdir, map_id, ground_id, guidance, preview=False, clos
         for cx, cy in d['open_cells']:
             if 0 <= cy < sr_open.shape[0] and 0 <= cx < sr_open.shape[1]:
                 sr_open[cy, cx] = DOOR_BLOCK_VALUE
-    kind_open = build_tile_grid(sr_open, pl, guidance, bbox)[4]
-    kind_nod = build_tile_grid(are.sr_nodoors, pl, guidance, bbox)[4]
+    kind_open = edited(build_tile_grid(sr_open, pl, guidance, bbox))[4]    # (tile edits too: only doors differ)
+    kind_nod = edited(build_tile_grid(are.sr_nodoors, pl, guidance, bbox))[4]
     dt = ((kind != kind_nod) | (kind_open != kind_nod)).any((-1, -2))          # tiles a door changes
     near_door = dt.copy()
     for da in (-1, 0, 1):
@@ -758,10 +810,14 @@ def main():
     ap.add_argument('--map-id', type=int, default=5012); ap.add_argument('--ground-id', type=int, default=900)
     ap.add_argument('--guidance'); ap.add_argument('--preview', action='store_true')
     ap.add_argument('--closed-doors', action='store_true')
+    ap.add_argument('--overrides', help='per-map override folder (overrides/<game>, holding <AREA>/*.json Temple+ DM tile '
+                    'edits; see overrides/README.md). Off by default: IE games share area names (IWD and IWD2 AR1000)')
     a = ap.parse_args()
     guid = json.loads(json.dumps(DEFAULT_GUIDANCE))
     if a.guidance:
         guid.update(json.load(open(a.guidance)))
+    if a.overrides:
+        guid['overrides_dir'] = os.path.abspath(a.overrides)
     print(json.dumps(convert(a.game, a.area, a.out, a.map_id, a.ground_id, guid, a.preview, a.closed_doors), indent=1))
 
 

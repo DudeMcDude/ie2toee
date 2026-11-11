@@ -20,6 +20,7 @@ Every item is something that bit us during the IWD/IWD2 conversions.
 - [ ] Engine path-node bake: `pathnode_bake.sh` / `--engine-pathnodes`, then `pathnode_stats.py`: no islands, no one-way links, entrances/anchors on roomy tiles.
 - [ ] In game: `ingame_route_check` probe, ALT path-preview screenshots + `debug.pathlen`. Long winding clicks can fail (engine gives up); test a closer click and note it, or add path nodes.
 - [ ] DM sector tile editor edits actually persist/apply on this map (blocking, flyover, subtile brush).
+- [ ] Hand fixes that must survive a reconvert (saved DM tile edits JSON, hand-culled `pathnodenew.pnd`/`pathnodedist.pnd`/`clearance.bin`) go in `proto/overrides/iwd/<AREA>/` (see its README): tile edits are baked by the map step, path node files win after the generator.
 
 ## 3. Exit icons / travel
 - [ ] Icon (proto 2011) sits next to its door; only a small inward nudge (`anchor_fix`). Not on door frames.

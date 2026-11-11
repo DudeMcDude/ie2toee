@@ -1,0 +1,33 @@
+{
+  "format": "templeplus-dm-tile-edits",
+  "version": 1,
+  "module": "IWD",
+  "map_id": 5022,
+  "map_name": "AR1010",
+  "saved_utc": "2026-11-11T12:49:57Z",
+  "templeplus": "0.2.96",
+  "apply": "flags = (flags & ~clear) | set. Bits: block subtile (sx,sy) = 0x200 << (sy*3+sx), flyover = 0x40000 << (sy*3+sx), cover = 0x8000000",
+  "tiles": [
+    {"x": 484, "y": 481, "before": 100663296, "after": 0, "set": 0, "clear": 100663296, "changes": ["-flyover 1,2", "-flyover 2,2"]},
+    {"x": 484, "y": 482, "before": 133955584, "after": 123994112, "set": 0, "clear": 9961472, "changes": ["-flyover 1,0", "-flyover 2,0", "-flyover 2,1"]},
+    {"x": 485, "y": 482, "before": 123994112, "after": 0, "set": 0, "clear": 123994112, "changes": ["-flyover 0,0", "-flyover 0,1", "-flyover 1,1", "-flyover 0,2", "-flyover 1,2", "-flyover 2,2"]},
+    {"x": 481, "y": 483, "before": 116916224, "after": 114819072, "set": 0, "clear": 2097152, "changes": ["-flyover 0,1"]},
+    {"x": 485, "y": 483, "before": 133955584, "after": 19136512, "set": 0, "clear": 114819072, "changes": ["-flyover 1,0", "-flyover 2,0", "-flyover 1,1", "-flyover 2,1", "-flyover 1,2", "-flyover 2,2"]},
+    {"x": 486, "y": 483, "before": 262144, "after": 0, "set": 0, "clear": 262144, "changes": ["-flyover 0,0"]},
+    {"x": 480, "y": 484, "before": 109051904, "after": 0, "set": 0, "clear": 109051904, "changes": ["-flyover 2,1", "-flyover 1,2", "-flyover 2,2"]},
+    {"x": 481, "y": 484, "before": 133955584, "after": 81264640, "set": 0, "clear": 52690944, "changes": ["-flyover 0,0", "-flyover 0,1", "-flyover 0,2", "-flyover 1,2"]},
+    {"x": 485, "y": 484, "before": 133955584, "after": 0, "set": 0, "clear": 133955584, "changes": ["-flyover 0,0", "-flyover 1,0", "-flyover 2,0", "-flyover 0,1", "-flyover 1,1", "-flyover 2,1", "-flyover 0,2", "-flyover 1,2", "-flyover 2,2"]},
+    {"x": 486, "y": 484, "before": 17039360, "after": 0, "set": 0, "clear": 17039360, "changes": ["-flyover 0,0", "-flyover 0,2"]},
+    {"x": 480, "y": 485, "before": 9961472, "after": 0, "set": 0, "clear": 9961472, "changes": ["-flyover 1,0", "-flyover 2,0", "-flyover 2,1"]},
+    {"x": 481, "y": 485, "before": 133955584, "after": 1048576, "set": 0, "clear": 132907008, "changes": ["-flyover 0,0", "-flyover 1,0", "-flyover 0,1", "-flyover 1,1", "-flyover 2,1", "-flyover 0,2", "-flyover 1,2", "-flyover 2,2"]},
+    {"x": 485, "y": 485, "before": 24903680, "after": 0, "set": 0, "clear": 24903680, "changes": ["-flyover 0,0", "-flyover 1,0", "-flyover 2,0", "-flyover 0,1", "-flyover 1,1", "-flyover 0,2"]},
+    {"x": 487, "y": 485, "before": 117178368, "after": 114819072, "set": 0, "clear": 2359296, "changes": ["-flyover 0,0", "-flyover 0,1"]},
+    {"x": 481, "y": 486, "before": 9961472, "after": 0, "set": 0, "clear": 9961472, "changes": ["-flyover 1,0", "-flyover 2,0", "-flyover 2,1"]},
+    {"x": 482, "y": 486, "before": 133955584, "after": 9961472, "set": 0, "clear": 123994112, "changes": ["-flyover 0,0", "-flyover 0,1", "-flyover 1,1", "-flyover 0,2", "-flyover 1,2", "-flyover 2,2"]},
+    {"x": 477, "y": 487, "before": 100663296, "after": 0, "set": 0, "clear": 100663296, "changes": ["-flyover 1,2", "-flyover 2,2"]},
+    {"x": 482, "y": 487, "before": 9961472, "after": 0, "set": 0, "clear": 9961472, "changes": ["-flyover 1,0", "-flyover 2,0", "-flyover 2,1"]},
+    {"x": 483, "y": 487, "before": 6029312, "after": 0, "set": 0, "clear": 6029312, "changes": ["-flyover 0,0", "-flyover 1,0", "-flyover 2,0", "-flyover 1,1"]},
+    {"x": 478, "y": 488, "before": 123994112, "after": 18874368, "set": 0, "clear": 105119744, "changes": ["-flyover 0,0", "-flyover 1,1", "-flyover 1,2", "-flyover 2,2"]},
+    {"x": 486, "y": 490, "before": 132644864, "after": 130023424, "set": 0, "clear": 2621440, "changes": ["-flyover 1,0", "-flyover 0,1"]}
+  ]
+}
