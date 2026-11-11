@@ -1,14 +1,30 @@
-ICEWIND DALE II (TARGOS) IN THE TEMPLE OF ELEMENTAL EVIL ENGINE - EARLY PREVIEW (2026-11-11)
-==========================================================================================
+ICEWIND DALE II (TARGOS) IN THE TEMPLE OF ELEMENTAL EVIL ENGINE - EARLY PREVIEW (2026-11-11b)
+===========================================================================================
 
 An early-preview, AI-assisted experiment. It converts the opening of Icewind Dale II - Targos (the docks
 I2AR1000, its interiors AR1001-AR1006, AR1100, the palisade AR1200 and AR1201) - from YOUR OWN copy of Icewind Dale II into maps for
 The Temple of Elemental Evil running on the bundled Temple+ build. No Icewind Dale II data is included in this
 download: the converter reads it from your install, on your PC. This is not a playable conversion of IWD2.
 
-NEW IN THIS PREVIEW (2026-11-11)
+NEW IN THIS PREVIEW (2026-11-11b)
 --------------------------------
   Still an early-preview, AI-assisted experiment: not a playable or polished conversion.
+  * The IE dialogue window now has the 130x150 side portrait slot (it was missing from the IWD2 skin even
+    though IWD already had it). Talk to Hedron after a reconvert, or by adding the portrait key to skin.json
+    and restarting. A reconvert with this package installs the slot.
+  * Bundled Temple+ 0.2.97 (see TemplePlus\IE-PREVIEW-SOURCE.txt). The magnifier cursor for IE info points
+    (signs and the like) could stay on after leaving the region: the hover flag was only updated on a plain
+    mouse move inside the game view. Leaving via the party bar, scrolling the map under a still mouse,
+    dragging, or opening a radial menu could leave it stuck until you moved again in the game view. Each
+    frame now re-checks that the mouse is over the game view, no radial menu is open, and the region is
+    still under the cursor. Drop-in: no reconvert for the cursor fix. Not yet re-checked in game after
+    the fix.
+  * Saves: the map ids are unchanged (5031-5040), so 2026-11-10 and 2026-11-11 saves should still load. Saves
+    from before 2026-11-10 (old 59xx ids) don't work; start a NEW game. Temple+ 0.2.97 can be dropped in
+    without a reconvert. The side portrait slot needs a reconvert, or a skin.json drop-in and a restart.
+
+EARLIER (2026-11-11)
+--------------------------------
   * The IE dialogue window is now actually installed. The 2026-11-10 converter never built it, so
     conversations used the stock ToEE window. convert_iwd2.bat now builds it from YOUR Icewind Dale II's own GUI
     (classic IWD2: the GUIW08.CHU message panel, GUWBTP38, designed for 800x600, since IWD2 has no 640x480
@@ -20,13 +36,10 @@ NEW IN THIS PREVIEW (2026-11-11)
   * Equipped inventory icons: the IE transparent colour (green) no longer shows behind items in the paper-doll
     slots. The bag view was already fine; the equipped slots ignore alpha. New converts write clean icons. For an
     existing ToEE copy, run  fix_inventory_icons.bat "C:\GOG Games\ToEE-IWD2"  instead of a full reconvert.
-  * Bundled Temple+ 0.2.96 (see TemplePlus\IE-PREVIEW-SOURCE.txt). New in it: the DM Sector Tiles editor has
-    "Save Tile Edits". Only the tiles you painted by hand are saved, as JSON in
-    %USERPROFILE%\Saved Games\TemplePlus\dm_tile_edits\<module>\map<id>.json, and they are re-applied when a
-    sector loads. Door cells set by scripts are protected from painting and saving.
-  * Saves: the map ids are unchanged since 2026-11-10 (5031-5040), so 2026-11-10 saves should still load. Saves
-    from before 2026-11-10 (old 59xx ids) don't work; start a NEW game. Temple+ 0.2.96 can be dropped in without
-    a reconvert; the dialogue window needs a reconvert.
+  * Bundled Temple+ 0.2.96. The DM Sector Tiles editor has "Save Tile Edits". Only the tiles you painted by
+    hand are saved, as JSON in %USERPROFILE%\Saved Games\TemplePlus\dm_tile_edits\<module>\map<id>.json,
+    and they are re-applied when a sector loads. Door cells set by scripts are protected from painting and
+    saving.
 
 EARLIER (2026-11-10)
 --------------------------------
@@ -103,13 +116,25 @@ INSTALL
      convert_iwd2.bat "C:\GOG Games\Icewind Dale 2" "C:\GOG Games\ToEE-IWD2"
 3. Run TemplePlus\TemplePlusConfig.exe, set the ToEE folder to the copy, module "ToEE", save. Decline updates.
 4. Start TemplePlus\TemplePlus.exe and start a NEW game: it begins at the Targos docks.
-   Conversations use the IE dialogue window that step 2 built from your IWD2 GUI. After updating the converter,
-   run convert_iwd2.bat again to rebuild and reinstall it.
+   Conversations use the IE dialogue window that step 2 built from your IWD2 GUI, including the side
+   portrait slot in this preview. After updating the converter, run convert_iwd2.bat again to rebuild
+   and reinstall it (or add the portrait key to skin.json and restart).
+   Saves from the 2026-11-10 and 2026-11-11 previews should still load. Saves from older previews
+   (59xx map ids) don't work; start a new game.
 5. Optional, for a copy converted with an older preview: fix_inventory_icons.bat "C:\GOG Games\ToEE-IWD2"
    clears the green behind equipped icons without a full reconvert (the dialogue window still needs step 2).
 
 KNOWN ISSUES
 ------------
+  * Swift Thomas can appear in the opening west area of Targos, where goblins may attack him; he should start
+    hidden until the palisade-attack cutscene. Reig may attack the party when that fight starts (townsfolk
+    factions inherited from ToEE / a trailing faction 0). Not fixed yet.
+  * Pathfinding: generated nodes are dense (6-tile spacing) with some redundant nodes in open areas, and
+    link distances are straight-line / aerial rather than the actual walking route, which can look wrong
+    (Targos was called out in playtest). A later unify-pass and walk-path linking are planned but are not
+    in this preview.
+  * The Temple+ info-cursor fix is in this build but has not been re-tested in game yet (the bug itself
+    was found in playtest).
   * Copies converted before 2026-11-11 may show a green background on equipped icons (IE's transparent
     colour). New converts fix this; for an existing ToEE copy, run fix_inventory_icons.bat on that folder.
   * The cutscene input lock blocks mouse clicks only; keyboard shortcuts still work. Some PlaySequence animations
@@ -121,9 +146,7 @@ KNOWN ISSUES
   * IWD2 journal text isn't shown yet; some feats/spells have no ToEE equivalent.
   * AR1201 -> AR1200: use the exit with the party close to it. The battle after the palisade cutscene is not
     tuned yet, and summons don't check that the caster has the spell memorised.
-  * Swift Thomas can appear in the opening west area of Targos, where goblins may attack him; he should start
-    hidden until the palisade-attack cutscene. Reig may attack the party when that fight starts. Not fixed yet.
-  * The IWD2 dialogue window was not tested in game on Windows yet.
+  * The IWD2 dialogue window, including the new side portrait slot, should be checked in game on Windows.
   * Not yet tested on a clean Windows install. Feedback welcome.
 
 FEEDBACK / CREDITS
