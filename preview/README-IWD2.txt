@@ -13,6 +13,9 @@ NEXT PREVIEW (not in the 2026-11-10 zip; on the iwd2-targos branch)
     (art\interface\dialog_ie). The 2026-11-10 converter never installed it, so conversations used the stock
     ToEE window. Re-run convert_iwd2.bat (no new flag) to get it.
   * An Enhanced Edition folder without ui.menu/bgee.lua stops the convert with a message to update it.
+  * Equipped inventory icons: leftover IE green on transparent pixels is cleared (the bag already looked
+    fine; paper-doll slots ignore alpha). New converts fix this; for an existing ToEE copy, run
+    fix_inventory_icons.bat on that folder (no full reconvert needed for the icons alone).
 
 EARLIER (2026-11-10)
 --------------------------------
@@ -93,6 +96,8 @@ INSTALL
 
 KNOWN ISSUES
 ------------
+  * Already-converted inventories may show a green background on equipped icons (IE's transparent
+    colour). New converts fix this; for an existing ToEE copy, run fix_inventory_icons.bat on that folder.
   * The cutscene input lock blocks mouse clicks only; keyboard shortcuts still work. Some PlaySequence animations
     are a best guess at the matching ToEE animation.
   * Spawned creatures don't run their own IE scripts or dialogue yet; some spawn .INI options (e.g. per-difficulty
