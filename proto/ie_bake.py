@@ -238,7 +238,8 @@ class Baker(object):
             o.set('description', int(s['name_id'])); o.set('critter_description_unknown', int(s['name_id']))
         sid = s.get('script_id') or self.a.generic_script
         if sid:
-            events = SAN if s.get('script_id') else {'san_first_heartbeat': 10}
+            # (unscripted ones get san_dying too: the IE death variables SPRITE_IS_DEAD<actor name>, ie_bakert.died)
+            events = SAN if s.get('script_id') else {'san_first_heartbeat': 10, 'san_dying': 12}
             o.set('scripts_idx', T.script_array({slot: (0, 0, int(sid)) for slot in events.values()}))
         # gear: worn into its natural slot (200 + slot), the rest in the pack
         inv, used, pack = [], set(), 0
@@ -260,7 +261,7 @@ class Baker(object):
             if box is not None:
                 o.set('npc_substitute_inventory', box.id)
         self.mobs.append(o)
-        keep = ('ident', 'resref', 'hp', 'conditions', 'spells', 'ai_strategy', 'to_hit_bonus', 'difficulty')
+        keep = ('ident', 'actor', 'resref', 'hp', 'conditions', 'spells', 'ai_strategy', 'to_hit_bonus', 'difficulty')
         self.runtime[T.guid_name(o.id)] = {'k': 'npc', 'spec': {k: s[k] for k in keep if s.get(k) not in (None, [], '')}}
         self.report['npcs'] += 1
         return o
@@ -465,6 +466,14 @@ def san_first_heartbeat(attachee, triggerer):
     try:
         import ie_bakert
         ie_bakert.first_heartbeat(attachee, %(area)r)
+    except ImportError:
+        pass
+    return RUN_DEFAULT
+
+def san_dying(attachee, triggerer):
+    try:
+        import ie_bakert
+        ie_bakert.died(attachee, %(area)r)
     except ImportError:
         pass
     return RUN_DEFAULT

@@ -1414,14 +1414,67 @@ def event(ident, name, other=None):
     """Hook helper for san_* handlers: record an IE event trigger (AttackedBy, HitBy, Die, Entered...)."""
     _events.setdefault(ident, {})[name] = other
     if name == 'Die' and ident:
-        # IWD engine: a dying creature sets GLOBAL "<script name>_DEAD" (e.g. EHWolf_Dead for Apsel's quest)
-        k = 'global:%s_dead' % re.sub(r'\s+', '', str(ident).lower())
-        i = SLOTS.get(k)
-        if i is not None and IN_GAME:
-            game.global_vars[i] = 1
-        else:
-            _mem[k] = 1
-        log('SET %s = 1 (death)' % k)
+        death_vars(script_name(ident))
+
+def script_name(ident, area=None):
+    """IE script name of a converted creature: the ARE actor name for an area actor (IWD / IWD2 copy it over the CRE's
+    script name, GemRB IWD2ScriptName), else the ident itself (spawns answer to their CRE / INI script name; further
+    copies are ident#2, ident#3..)."""
+    ident = str(ident)
+    base = re.sub(r'#\d+$', '', ident)
+    if area is None:
+        for k, (idt, ar) in list(_bound.items()):
+            if idt == ident:
+                area = ar
+                break
+    if area:
+        nm = _ident_actor(area, base)
+        if nm:
+            return nm
+    return base
+
+def _ident_actor(area, ident):
+    area = (area or '').upper()
+    if area not in _actor_names:
+        m = {}
+        for a_ in (area, 'I2' + area):
+            try:
+                for s_ in __import__('ie_creatures_' + a_.lower()).CREATURES:
+                    if s_.get('ident') and s_.get('actor'):
+                        m[s_['ident'].lower()] = s_['actor']
+                break
+            except Exception:
+                pass
+        _actor_names[area] = m
+    return _actor_names[area].get(ident.lower())
+
+_actor_names = {}   # area -> {ident (lower): ARE actor name}
+
+def death_vars(name):
+    """What the IE engine does when a creature with script name `name` dies (GemRB Actor::Die): GLOBAL
+    "SPRITE_IS_DEAD<name>" += 1 (IWD, BG; IWD2 "_DEAD<name>"), counted, so 'four beetles dead' checks
+    (GlobalGT("SPRITE_IS_DEADEHBEETLE",3)) work; plus "<name>_DEAD" = 1 (BG2 SetDeathVar style). Dialogue and
+    scripts read these with Global(): Apsel's wolf quest is Global("SPRITE_IS_DEADEHWolf","GLOBAL",1)."""
+    n = re.sub(r'\s+', '', str(name or '').lower())
+    if not n or n == 'none':
+        return
+    inc = ['global:sprite_is_dead' + n, 'global:_dead' + n]
+    if not any(k in SLOTS for k in inc):
+        inc = inc[:1]                    # no converted dialogue/script reads either: keep the IWD one in memory
+    for k in inc:
+        _bump(k, 1)
+    _bump('global:%s_dead' % n, 0)
+
+def _bump(k, inc):
+    """inc 1: += 1; inc 0: = 1"""
+    i = SLOTS.get(k)
+    if i is not None and IN_GAME:
+        v = game.global_vars[i] + 1 if inc else 1
+        game.global_vars[i] = v
+    else:
+        v = _mem.get(k, 0) + 1 if inc else 1
+        _mem[k] = v
+    log('SET %s = %d (death)' % (k, v))
 
 def loop(obj, ident, area, mods, period_ms=1000):
     """Drive tick() from a time event (used for area scripts and in tests; creatures use san_heartbeat)."""

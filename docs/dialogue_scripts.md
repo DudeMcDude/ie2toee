@@ -92,6 +92,13 @@ If the files are in a folder that isn't mounted yet at discovery (e.g. loose `mo
 * Timers keep their expiry time on a script clock. That clock is game time, plus real time while the Temple+ game
   clock stands still (outside combat, rest and travel the ToEE clock is frozen; the IE clock always runs). An unset
   timer counts as expired, as in the IE.
+* Death variables: a dying creature does what the IE engine does (GemRB `Actor::Die`): GLOBAL
+  `SPRITE_IS_DEAD<script name>` += 1 (IWD2: `_DEAD<script name>`, when a converted script reads it) and
+  `<script name>_DEAD` = 1. The script name is the ARE actor name (IWD and IWD2 copy it over the CRE's), so the four
+  `EHBEETLE` actors count up together; a spawn answers to its CRE / INI script name. Scripted creatures set them from
+  their `san_dying` (`ie_runtime.event`), baked creatures without IE scripts from the generic baked script
+  (`ie_bakert.died`). Apsel's wolf quest reads `Global("SPRITE_IS_DEADEHWolf","GLOBAL",1)`. Test:
+  `python3 proto/test_deathvars.py`.
 
 ### Unsupported things
 

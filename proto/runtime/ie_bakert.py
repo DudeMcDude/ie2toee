@@ -132,6 +132,24 @@ def area_pass(area):
     return 1
 
 
+def died(o, area):
+    """san_dying of a baked critter without IE scripts (GENERIC_SCRIPT): the engine's death variables for its ARE
+    actor name (ie_runtime.death_vars: SPRITE_IS_DEAD<name> += 1), which other actors' dialogue / scripts may test."""
+    m = _data(area) or _data('I2' + area)
+    d = m and m.OBJS.get(_guid(o))
+    if m and not d:
+        for g, d_ in m.OBJS.items():
+            if d_['k'] == 'npc' and game.get_obj_by_id(g) == o:
+                d = d_; break
+    if not d or not d.get('spec', {}).get('actor'):
+        return
+    try:
+        import ie_runtime
+        ie_runtime.death_vars(d['spec']['actor'])
+    except Exception, e:
+        _log('IE_BAKE died %s: %s' % (d['spec'].get('actor'), e))
+
+
 def first_heartbeat(o, area):
     """Called from every baked critter's san_first_heartbeat (directly or through ie_runtime.bind). The engine runs
     first heartbeats once per object per map load, so the first call, or a second call for the same critter (= the
