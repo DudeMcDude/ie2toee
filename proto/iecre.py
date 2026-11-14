@@ -174,6 +174,10 @@ class Cre(object):
                         'movement': cstr(data[0x294:0x29c]), 'team': cstr(data[0x1ac:0x1b4]),
                         'special1': cstr(data[0x1b4:0x1bc])}
         self.visible = data[0x29c]
+        # IESDP calls 0x29c 'Visible', but in IWD2's data it is set (1) on the actors that start hidden and wait for a
+        # script's HideCreature(X, FALSE): 12SWIFTH vs 12SWIFT (the only other difference is the death variable),
+        # 10GOBH, the AR1200 goblin waves, the '..H' variants (258 of 1618 CREs). CreatureHidden(Myself) is true for them.
+        self.start_hidden = data[0x29c] == 1
         self.death_var_secondary = cstr(data[0x2aa:0x2ca]); self.death_var_tertiary = cstr(data[0x2ca:0x2ea])
         self.saved_xy = u('<HH', 0x2ec)
         (self.ea, self.general, self.race, self.cls, self.specific, self.gender) = data[0x384:0x38a]
