@@ -286,6 +286,30 @@ def _kos(o):
     except Exception:
         return False
 
+def _party_side(o):
+    """True for a party member or a follower of one (the IE GOODCUTOFF side)."""
+    try:
+        if o in game.party:
+            return True
+        l = o.leader_get()
+        return l is not None and l != OBJ_HANDLE_NULL and l in game.party
+    except Exception:
+        return False
+
+def _who_hit_me_last(me):
+    f = globals().get('obj_f_npc_who_hit_me_last')
+    if f is None:
+        return None
+    try:
+        if me.type != obj_t_npc:
+            return None
+        o = me.obj_get_obj(f)
+        if o is None or o == OBJ_HANDLE_NULL or o == me:
+            return None
+        return o
+    except Exception:
+        return None
+
 def _hostile(me, o):
     """IE-style enmity: an NPC is an enemy of the party once it is ENEMY (KOS in ToEE, set by Enemy())."""
     a, b = me in game.party, o in game.party
@@ -384,8 +408,31 @@ class _Triggers(object):
             return _dead(obj)
         log_once('state:%x' % st, 'IE_UNSUPPORTED StateCheck state 0x%x -> False' % st); return False
     def OnCreation(self, c): return bool(c.events.pop('OnCreation', None))
-    def AttackedBy(self, c, obj=None, style=0): return self._event(c, 'AttackedBy')
-    def HitBy(self, c, obj=None, dmg=0): return self._event(c, 'HitBy')
+    def AttackedBy(self, c, obj=None, style=0): return self._attacked(c, 'AttackedBy', obj)
+    def HitBy(self, c, obj=None, dmg=0): return self._attacked(c, 'HitBy', obj)
+    def _attacked(self, c, ev, obj):
+        """AttackedBy/HitBy with the IE object filter honoured: the attacker has to be on obj's side (party vs not).
+        The recorded event is not the attacker: san_start_combat records the critter itself every turn and
+        san_enter_combat the critter's own target (Temple+ ai.cpp), so a townsman fighting goblins used to match
+        AttackedBy([GOODCUTOFF]) and turn hostile (00T02ET/00TOWNI: TEAM_x = 1 -> Enemy()). obj_f_npc_who_hit_me_last
+        (set by ProvokeHostility) names the real attacker; without one, the critter counts as attacked by obj's side
+        only when that side is its enemy (a KOS goblin vs the party: as before). No filter (obj None): any attack."""
+        if ev not in c.events:
+            return False
+        if obj is None or not IN_GAME or c.me is None:
+            return self._event(c, ev)
+        who = _who_hit_me_last(c.me)
+        if who is None:
+            w = c.events.get(ev)
+            who = w if w is not None and w != c.me else None
+        if who is None:
+            ok = _hostile(c.me, obj)
+        else:
+            ok = who == obj or _party_side(who) == _party_side(obj)
+        if ok:
+            c.events.pop(ev, None)
+            c.last_trigger = who if who is not None else obj
+        return ok
     def Die(self, c): return self._event(c, 'Die')
     def Entered(self, c, obj=None): return self._event(c, 'Entered')
     def Opened(self, c, obj=None): return self._event(c, 'Opened')
@@ -760,6 +807,8 @@ class _Actions(object):
         if IN_GAME and c.me is not None:
             try:
                 c.me.npc_flag_set(ONF_KOS)
+                if c.me.object_flags_get() & OF_OFF:
+                    return            # still hidden (IE: an ENEMY that waits hidden); attacks once shown
                 c.me.attack(game.leader)
             except Exception as e:
                 log('IE_ERR Enemy: %s' % e)

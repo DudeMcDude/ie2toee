@@ -81,6 +81,44 @@ def _hourglass():
         return None
 
 
+def _party_side(o):
+    try:
+        if o in game.party:
+            return True
+        l = o.leader_get()
+        return l is not None and l != OBJ_HANDLE_NULL and l in game.party
+    except Exception:
+        return False
+
+
+def _kos(o):
+    try:
+        return (o.npc_flags_get() & ONF_KOS) != 0
+    except Exception:
+        return False
+
+
+def town_side(npc):
+    """A non-hostile NPC outside the party (an IE NEUTRAL townsman or militia, not yet Enemy()): it may fight the
+    hostile critters but never the party. Temple+ does not know that side: its target pickers (TargetClosest,
+    TargetThreatened...) skip only IsFriendly critters, and an NPC is never friendly to a PC (critter.cpp IsFriendly),
+    so a townsman that joined a goblin fight could pick a party member as the closest target."""
+    return not _kos(npc) and not _party_side(npc)
+
+
+def town_foes(npc):
+    """Hostile (KOS, non-party) critters near a town-side NPC, nearest first."""
+    out = []
+    try:
+        for o in game.obj_list_vicinity(npc.location, OLC_CRITTERS):
+            if o == npc or _dead(o) or _party_side(o) or not _kos(o):
+                continue
+            out.append((npc.distance_to(o), o))
+    except Exception:
+        pass
+    return [o for _, o in sorted(out)]
+
+
 def cannot_act(npc):
     """The turns Anatoliy's start_combat skips with SKIP_DEFAULT (nothing to decide)."""
     hp = _hp(npc)
@@ -160,6 +198,9 @@ class Round(object):
             target = npc
         if _dead(target):
             return TARGET_DEAD, None
+        if target is not npc and (e.get('ai') or '').startswith('ai_action_offensive') and town_side(npc) and \
+                _party_side(target):
+            return NO_TARGET, None
         # Anatoliy also blocks verbal spells when deafened; in 3.5 that is a 20 % failure chance, so only Silence here
         if comps & getattr(toee, 'SCF_VERBAL', 0) and (self._has_cond(npc, 'Silence') or
                                                          self._has_cond(npc, 'Silence Hit')):
@@ -245,6 +286,8 @@ class Round(object):
             return NO_TARGET, None
         if _dead(target) or _hp(target) < 0:
             return TARGET_DEAD, None
+        if town_side(npc) and _party_side(target):
+            return NO_TARGET, None
         ranged = False
         try:
             w = npc.item_worn_at(item_wear_weapon_primary)
@@ -280,7 +323,14 @@ class Round(object):
     def fallback(self, spec_strategy, script_first):
         """No script block committed an action: the converted static strategy, with spell entries whose slot is
         gone removed (SPL-ADJ-18 script_first: no spell entries at all), ending with "stop" so Temple+ does not fall
-        through to its built-in DefaultCast."""
+        through to its built-in DefaultCast. A town-side NPC (town_side) gets no static strategy: Temple+'s
+        target pickers would treat the party as fair game. It attacks the nearest hostile critter, else defends."""
+        if town_side(self.npc):
+            for f in town_foes(self.npc)[:3]:
+                if self.plan_attack(f):
+                    self.what = None          # (still logged as the fallback by round_start)
+                    return self.tac + ['total defence', '', '', 'stop', '', '']
+            return ['total defence', '', '', 'stop', '', '']
         t = list(spec_strategy or ['', 'attack', '', '', 'approach', '', '', 'attack', '', ''])[1:]
         out = []
         for i in range(0, len(t) - 2, 3):

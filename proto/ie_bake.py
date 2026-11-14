@@ -23,6 +23,14 @@ import toeemob as T
 
 NS = uuid.UUID('6f1c1d1e-2b9a-5e2e-8a6f-1e2b70ee0000')     # ie2toee bake namespace (uuid5 seeds)
 
+# ToEE decides friend or foe between NPCs by obj_f_npc_faction (Temple+ critter.cpp IsFriendly / NpcAllegianceShared:
+# shared faction, or both factionless; the array ends at the first 0). Converted townsfolk used to keep their template
+# proto's ToEE factions (14000.. "9 12" = Hommlet). Every non-hostile IE actor whose template has factions gets this one
+# instead, so the IE town is one ToEE side (its members help each other, AlertAllies), never shared with the hostile
+# (EA >= EVILCUTOFF) actors, which keep their factionless monster protos. Factionless neutrals (kegs on a barrel mesh,
+# rats) stay factionless so KOS monsters do not go after them (Temple+ WillKos skips factionless NPCs).
+IE_TOWN_FACTION = 160      # unused by vanilla protos.tab (1-34, 150)
+
 # engine enums (Temple+ temple_enums.h / OpenTemple GameObjects/*Flag.cs)
 OF = {n: 1 << i for i, n in enumerate(
     'DESTROYED OFF FLAT TEXT SEE_THROUGH SHOOT_THROUGH TRANSLUCENT SHRUNK DONTDRAW INVISIBLE NO_BLOCK CLICK_THROUGH '
@@ -174,8 +182,9 @@ class Baker(object):
         flags = CRITTER_OF | self.proto_flags(s['proto'], 20, OF, 'OF_')
         if s.get('invulnerable'):
             flags |= OF['INVULNERABLE']
-        if (s.get('actor') or '').lower() in getattr(self, 'hidden', ()):
-            flags |= OF['OFF']       # IE hidden until a cutscene/script shows it (HideCreature(Myself, FALSE))
+        if s.get('hidden') or (s.get('actor') or '').lower() in getattr(self, 'hidden', ()):
+            flags |= OF['OFF']       # IE hidden until a cutscene/script shows it (HideCreature(X, FALSE))
+            self.report.setdefault('hidden', []).append(s.get('actor') or s.get('resref'))
         o.set('flags', flags)
         if s.get('orient') is not None:
             o.set('rotation', ie_rotation(s['orient']))
@@ -192,6 +201,9 @@ class Baker(object):
             npc_flags |= ONF['WAYPOINTS_DAY'] | ONF['WAYPOINTS_NIGHT']
             self.report['patrols'].append({'actor': i, 'resref': s.get('resref'), 'waypoints': len(pts)})
         o.set('npc_flags', npc_flags)
+        fac = self.factions(s)
+        if fac is not None:
+            o.set('npc_faction', T.int_array(fac + [0]))
         # converted stat block (runtime/ie_critters.apply, as fields)
         o.set('critter_inventory_source', 0)
         ab = s.get('abilities')
@@ -261,6 +273,14 @@ class Baker(object):
         self.runtime[T.guid_name(o.id)] = {'k': 'npc', 'spec': {k: s[k] for k in keep if s.get(k) not in (None, [], '')}}
         self.report['npcs'] += 1
         return o
+
+    def factions(self, s):
+        """obj_f_npc_faction for a converted actor, or None to keep the template proto's (IE_TOWN_FACTION)."""
+        r = self.protos.get(int(s['proto']))
+        have = [int(x) for x in (r[154].split() if r else []) if x.lstrip('-').isdigit() and int(x)]
+        if s.get('hostility') == 'hostile':
+            return [f for f in have if f != IE_TOWN_FACTION] if IE_TOWN_FACTION in have else None
+        return [IE_TOWN_FACTION] if have else None
 
     # ---------------------------------------------------------------- stores (the merchant's barter stock)
     def store_box(self, i, store, x, y):
