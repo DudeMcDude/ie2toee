@@ -47,3 +47,23 @@ The in-game re-test after the fix could not run: wine is no longer installed on 
 click except I2AR1004 (critters left visible: a Targos NPC stands between the party's start tile and the cramped
 AR1004 door icon 2003, so neither the click nor scripted use reaches it). With IE2TOEE_HIDE=1 (hide, no destroy)
 AR1004 passes both ways by real click. Worth a look: a townsfolk NPC can block that cramped door in normal play.
+
+## Nov 14: Swift Thomas in AR1000, Reig attacking the party (playtest)
+- Swift Thomas: AR1000 actor "Swift Thomas (Hidden)" (12SWIFTH, also AR1100 and AR1201) has CRE V2.2 byte 0x29c = 1.
+  IESDP calls it "Visible", but in IWD2 it marks actors that start hidden (12SWIFTH vs 12SWIFT differ only there and in
+  the death variable; 258 of 1618 CREs, all the "..H" variants, 10GOBH, the AR1200 waves). His script 10THOMF0 starts
+  with CreatureHidden(Myself) -> NoAction(); 1000THMV unhides him only after Jump_Check (set in 12SWIFT's dialogue after
+  the palisade attack). ie_bake.start_hidden only found script-driven hiding, so he was baked visible next to the docks
+  goblins. Now iecre.Cre.start_hidden -> spec "hidden" -> OF_OFF, for non-hostile actors (hostile AR1200 waves keep the
+  script heuristic; 12PHAEN kept visible, its unhide script 12PHASPN is not attached yet). Newly hidden: AR1000
+  12SWIFTH + 10FIRTHH (Firtha's hidden copy), AR1100 12SWIFTH, AR1201 12SWIFTH + 12MESS (shown by 12CWAR2/12CWAR0).
+- Reig: not factions. Townsfolk had proto 14000's "9 12" (+ terminating 0), goblins 14186 none; nothing shared. The
+  runtime AttackedBy/HitBy ignored the object filter, and the events are recorded from san_start_combat (triggerer =
+  the critter itself, every turn) and san_enter_combat (triggerer = the critter's own target). So Reig fighting a
+  goblin matched AttackedBy([GOODCUTOFF]) in 00T02ET -> TEAM_2 = 1 -> Enemy() -> KOS + attack(leader), and the whole
+  team 2 with him (00TOWNI: TOWNIE_HOSTILE). Fix: _attacked() uses obj_f_npc_who_hit_me_last and matches the
+  attacker's side (party/followers vs not). Also ie_combat: a non-KOS non-party NPC (town_side) never targets the party
+  (Temple+ target pickers only skip IsFriendly, and an NPC is never friendly to a PC); its fallback attacks the nearest
+  KOS critter or defends. Bake: non-hostile actors with template factions get one town faction 160.
+- Not covered: Temple+ attacks of opportunity by a town-side NPC against a PC (engine IsFriendly), runtime-spawned
+  townsfolk keep proto factions.

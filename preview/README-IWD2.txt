@@ -126,9 +126,9 @@ INSTALL
 
 KNOWN ISSUES
 ------------
-  * Swift Thomas can appear in the opening west area of Targos, where goblins may attack him; he should start
-    hidden until the palisade-attack cutscene. Reig may attack the party when that fight starts (townsfolk
-    factions inherited from ToEE / a trailing faction 0). Not fixed yet.
+  * Fixed on the iwd2-targos branch after this preview (needs a reconvert): Swift Thomas no longer appears in
+    Targos before the palisade attack, and Reig and other townsfolk fighting goblins no longer turn on the party.
+    (The trailing faction 0 was only the end of ToEE's faction list, not the cause.)
   * Pathfinding: generated nodes are dense (6-tile spacing) with some redundant nodes in open areas, and
     link distances are straight-line / aerial rather than the actual walking route, which can look wrong
     (Targos was called out in playtest). A later unify-pass and walk-path linking are planned but are not
