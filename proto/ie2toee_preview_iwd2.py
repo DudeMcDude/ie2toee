@@ -16,7 +16,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import toeedata
 import ie_overrides
-from ie2toee_preview import (run, run_soft, copytree, mes_with, RUNTIME,
+from ie2toee_preview import (run, run_soft, copytree, mes_with, RUNTIME, install_varhooks,
                              ENGINE_MAP_IDS, TOWNMAP_ID_MAX, area_names, map_names, drop_high_maplist_ids,
                              copy_early_to_core)
 
@@ -240,6 +240,7 @@ def main():
     for f in [os.path.join(HERE, 'runtime', m + '.py') for m in RUNTIME] + [
             os.path.join(w, 'spells', 'ie_spellmap.py'), os.path.join(w, 'items', 'ie_itemmap.py'), tr]:
         shutil.copy(f, scr)
+    install_varhooks(scr)
     sn = {}
     for ar in ok:
         sp = os.path.join(w, 'I2' + ar + '_snippets.txt'); cur = None

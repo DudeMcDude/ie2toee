@@ -41,7 +41,15 @@ def script_base(i):
 def name_base(i):
     """interior n's creature name ids (description .mes): 20 per area, 60 for the cave (AR1201, 45 actors)"""
     return 27000 + 20 * i + 80 if i <= 18 else 27000 + 20 * 18 + 80 + 60 * (i - 18)
-RUNTIME = ['ie_runtime', 'ie_critters', 'ie_spellrt', 'ie_combat', 'ie_doors', 'ie_bakert', 'ie_itemrt', 'ie_travel', 'ie_movies_rt', 'ie_cutscene', 'map_tick', 'ie_spawn']
+def install_varhooks(scr):
+    """IE variable store save/load hook (ie_vars): Temple+ imports scr/tpModifiers/*.py at startup."""
+    d = os.path.join(scr, 'tpModifiers'); os.makedirs(d, exist_ok=True)
+    shutil.copy(os.path.join(HERE, 'runtime', 'tpModifiers', 'ie_varhooks.py'), d)
+    old = os.path.join(scr, 'ie_varslots.py')          # (slot table of older builds: no longer used)
+    if os.path.isfile(old):
+        os.remove(old)
+
+RUNTIME = ['ie_runtime', 'ie_critters', 'ie_spellrt', 'ie_combat', 'ie_doors', 'ie_bakert', 'ie_itemrt', 'ie_travel', 'ie_movies_rt', 'ie_cutscene', 'map_tick', 'ie_spawn', 'ie_vars']
 
 
 def flavour(ie):
@@ -375,6 +383,7 @@ def main():
             os.path.join(w, 'ie_travel_data.py')] + [os.path.join(w, 'ie_doors_%s.py' % ar.lower()) for ar in interiors] + [
             os.path.join(bake, 'ie_bake_%s.py' % ar.lower()) for ar in interiors]:
         shutil.copy(f, scr)
+    install_varhooks(scr)
     if os.path.isfile(os.path.join(mov, 'ie_movies_data.py')):
         shutil.copy(os.path.join(mov, 'ie_movies_data.py'), scr)
         copytree(os.path.join(mov, 'data'), os.path.join(inst, 'data'))

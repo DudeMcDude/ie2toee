@@ -65,7 +65,7 @@ T.AttackedBy(c, pc1, 0)
 check('unmatched event stays for another block', 'AttackedBy' in c.events)
 # the generated 00T02ET round: no TEAM_2 / Enemy() for a townsman that only fights goblins
 reig.hit_by = gob
-rt._mem.clear()
+rt.VARS.clear()
 c = ctx(reig, {'AttackedBy': reig})
 if T.AttackedBy(c, pc1, 0) and not T.Global(c, 'TEAM_2', 'MYAREA', 1):
     rt.A.SetGlobal(c, 'TEAM_2', 'MYAREA', 1)

@@ -110,7 +110,7 @@ class Game(object):
 pc = Obj('pc'); Game.party = [pc]; Game.leader = pc
 OBJS = {}
 rt.IN_GAME, rt.game, rt.OBJ_HANDLE_NULL, rt.ONF_KOS, rt.obj_t_npc, rt.OF_OFF = True, Game(), None, KOS, 14, OFF
-rt.SLOTS = {}
+rt.VARS.clear()
 rt.AREA_MAPS = {'AR1000': 5031, 'AR1200': 5040}
 A, T = rt.A, rt.T
 
@@ -179,7 +179,7 @@ if HAVE_IE:
               all(os.path.exists(os.path.join(scr, f)) for f in ('ie_bcs_1000thmv.py', 'ie_bcs_12phaspn.py', 'ie_bcs_ar1200_area.py')))
         sys.path.append(scr)
         import ie_bcs_1000thmv, ie_bcs_10thomf0, ie_bcs_12phaspn, ie_bcs_12phaen0, ie_bcs_ar1200_area
-        rt._mem.clear()
+        rt.VARS.clear()
         thomas = Obj('12swifth', hidden=True); OBJS['12swifth'] = thomas
         S = [ie_bcs_1000thmv, ie_bcs_10thomf0]
         rt.tick(thomas, '12swifth', 'AR1000', S, force=True)
@@ -196,7 +196,7 @@ if HAVE_IE:
         rt.set_var(None, 'Goblins_Attack_Palisade', 'GLOBAL', 1)
         area = rt.Ctx(pc, None, 'area_AR1200', 'AR1200', {})
         rt.run_script(area, ie_bcs_ar1200_area.BLOCKS)
-        # (offline no goblin is bound, so Dead() is true and the team states go straight on to 2)
+        # (offline no goblin is bound: Dead() reads the death vars, so the teams are not dead)
         check('AR1200.BCS battle setup: 1200_BATTLE_SETUP and GOBLIN_TEAM_8_STATE set',
               rt.get_var(area, '1200_BATTLE_SETUP', 'GLOBAL') in (1, 2) and rt.get_var(area, 'GOBLIN_TEAM_8_STATE', 'MYAREA') >= 1)
         check('battle setup never hides the leader', not pc.oflags & OFF)

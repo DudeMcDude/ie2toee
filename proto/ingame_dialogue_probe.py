@@ -75,10 +75,8 @@ def step(s):
         elif cmd == 'shot':
             log('SHOT ' + arg)
         elif cmd == 'vars':
-            for k2, i in sorted(rt.SLOTS.items()):
-                v = game.global_vars[i]
-                if v:
-                    log('VAR %s = %d' % (k2, v))
+            for k2, v in sorted(rt.ie_vars.items()):
+                log('VAR %s = %d' % (k2, v))
         elif cmd == 'pos':
             for ident, o in npcs.items():
                 x, y = location_to_axis(o.location)

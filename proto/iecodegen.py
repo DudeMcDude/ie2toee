@@ -2,10 +2,10 @@
 
 Produces Python 2.7 source that only calls ie_runtime (T.*, A.*, O/N/F, rt.CONT). IDS symbols are resolved to
 numbers at convert time with the player's IDS files when possible; unknown symbols are kept as strings and the
-runtime logs them. Variable names seen in Global/SetGlobal-style calls are collected so the converter can
-allocate persistent game.global_vars slots for them.
+runtime logs them. Variable names seen in Global/SetGlobal-style calls are collected (report counts, journal
+variables); at run time they live in the save-backed ie_vars store.
 """
-import keyword
+import keyword, re
 import iescript as S
 
 VAR_TRIGGERS = {'global', 'globalgt', 'globallt', 'bitglobal', 'globaltimerexpired', 'globaltimernotexpired',
@@ -119,6 +119,9 @@ class Gen(object):
                 self.vars.add(self.var_key(call.args[0], call.args[1]))
         if kind == 'T' and (n.startswith('numtimestalked') or n.startswith('numberoftimestalked')) or (kind == 'A' and n == 'setnumtimestalkedto'):
             self.vars.add(self.var_key('#talked', 'LOCALS'))
+        if kind == 'T' and n == 'dead' and call.args and isinstance(call.args[0], str) and \
+                re.match(r'^[\w ]+$', call.args[0]) and call.args[0].lower() not in ('myself', 'player1'):
+            self.vars.add(self.var_key('SPRITE_IS_DEAD' + call.args[0], 'GLOBAL'))   # Dead("name") = its death var
         if n in ('starttimer', 'startrandomtimer', 'timeractive', 'timerexpired') and call.args and \
                 isinstance(call.args[0], int):
             self.vars.add(self.var_key('#timer%d' % call.args[0], 'LOCALS'))
@@ -137,14 +140,18 @@ class Gen(object):
         self.jvars.setdefault(strref, set()).update(self.vars_in(calls))
 
     def var_key(self, name, scope):
-        s = scope.upper(); n = name.lower()
+        """Same keys as ie_runtime.var_key / ie_vars: 'GLOBAL:name', 'LOCALS:<ident>:name', '<AREA>:name'."""
+        if not (scope or '').strip() and ':' in name:
+            scope, name = name.split(':', 1)    # IE: empty area = scope in the name ("LOCALS:CREATURE_STATE_VAR")
+        s = re.sub(r'\s+', '', (scope or 'GLOBAL').upper()) or 'GLOBAL'
+        n = re.sub(r'\s+', '', name.lower())   # IE ignores spaces in variable names ("Apsel _Quest")
         if s == 'GLOBAL':
-            return 'global:' + n
+            return 'GLOBAL:' + n
         if s == 'LOCALS':
-            return 'locals:%s:%s' % (self.ident.lower(), n)
+            return 'LOCALS:%s:%s' % (self.ident.lower(), n)
         if s == 'MYAREA':
-            s = self.area.upper()
-        return 'area:%s:%s' % (s.lower(), n)
+            s = (self.area or '').upper()
+        return '%s:%s' % (s, n)
 
     def trigger(self, call):
         name, sig = self._canon('T', call.name)

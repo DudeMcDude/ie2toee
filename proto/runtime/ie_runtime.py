@@ -11,9 +11,9 @@
 # (LastTalkedToBy / Protagonist fallback). Each converted object has an IE identity string (its IE script name /
 # death variable) that keys LOCALS and NumTimesTalkedTo.
 #
-# Variables: IE GLOBAL / LOCALS / <area> / MYAREA variables are kept in game.global_vars slots that the converter
-# allocated (module ie_varslots: SLOTS = {'global:name': index, ...}); unallocated ones fall back to an in-memory
-# dict (logged, not saved). Timers (SetGlobalTimer) store the expiry time in game seconds.
+# Variables: every IE GLOBAL / LOCALS / <area> / MYAREA variable (and timer: absolute script-clock stamp) lives in the
+# save-backed dict of ie_vars, keyed 'GLOBAL:name', '<AREA>:name', 'LOCALS:<ident>:name'; it is written next to every
+# save and read back on load (Temple+ savehook, chained by tpModifiers/ie_varhooks.py).
 import random, re
 try:
     _NUM = (int, long, float)
@@ -49,13 +49,9 @@ def log_once(key, msg):
         log(msg)
 
 # ------------------------------------------------------------------------------------------------ variables
-SLOTS = {}
-try:
-    import ie_varslots
-    SLOTS = ie_varslots.SLOTS
-except ImportError:
-    pass
-_mem = {}
+import ie_vars
+ie_vars._log[0] = log
+VARS = ie_vars.STORE     # the live dict (tests: VARS.clear())
 
 _clk = [None, 0.0]   # [last game time seen, real time when it changed]
 
@@ -76,33 +72,25 @@ def _now():
     return gt + int(_real() - _clk[1])
 
 def var_key(c, name, scope):
-    s = (scope or 'GLOBAL').upper(); n = name.lower()
+    """ie_vars key: 'GLOBAL:name', 'LOCALS:<ident>:name', '<AREA>:name' (names lower case, spaces dropped as in the IE)."""
+    if not (scope or '').strip() and ':' in (name or ''):
+        scope, name = name.split(':', 1)        # IE: an empty area means the name carries it ("LOCALS:CREATURE_STATE_VAR")
+    s = re.sub(r'\s+', '', (scope or 'GLOBAL').upper()) or 'GLOBAL'
+    n = re.sub(r'\s+', '', (name or '').lower())   # IE ignores spaces in variable names ("Apsel _Quest")
     if s == 'GLOBAL':
-        return 'global:' + n
+        return 'GLOBAL:' + n
     if s == 'LOCALS':
-        return 'locals:%s:%s' % (c.ident.lower(), n)
+        return 'LOCALS:%s:%s' % ((c.ident if c is not None else '').lower(), n)
     if s == 'MYAREA':
-        s = c.area.upper()
-    return 'area:%s:%s' % (s.lower(), n)
+        s = ((c.area if c is not None else '') or '').upper()
+    return '%s:%s' % (s, n)
 
 def get_var(c, name, scope):
-    k = var_key(c, name, scope)
-    i = SLOTS.get(k)
-    if i is not None and IN_GAME:
-        return game.global_vars[i]
-    if i is None:
-        log_once('slot:' + k, 'IE_VAR_UNALLOCATED %s (kept in memory, not saved)' % k)
-    return _mem.get(k, 0)
+    return ie_vars.get(var_key(c, name, scope))
 
 def set_var(c, name, scope, value):
     k = var_key(c, name, scope)
-    i = SLOTS.get(k)
-    if i is not None and IN_GAME:
-        game.global_vars[i] = int(value)
-    else:
-        if i is None:
-            log_once('slot:' + k, 'IE_VAR_UNALLOCATED %s (kept in memory, not saved)' % k)
-        _mem[k] = int(value)
+    ie_vars.put(k, value)
     log('SET %s = %d' % (k, int(value)))
 
 # ------------------------------------------------------------------------------------------------ context
@@ -207,6 +195,8 @@ def O(c, name, inner=None):
             return _pc(c)
         p = _party()
         return p[0] if p else _pc(c)
+    if n.startswith('partyslot') and n[9:].isdigit():
+        n = 'player' + n[9:]                 # EE PartySlotN (portrait order) = PlayerN here
     if n.startswith('player') and n[6:].isdigit():
         p = _party(); i = int(n[6:]) - 1
         return p[i] if i < len(p) else None
@@ -234,6 +224,17 @@ def _actor_ident(c, name):
             for s_ in __import__('ie_creatures_' + area.lower()).CREATURES:
                 if s_.get('ident') and s_.get('actor'):
                     m[s_['actor'].lower()] = s_['ident']
+        except Exception:
+            pass
+        try:   # the baked area actors: names an ARE actor like the IE engine resolves it (from main f0052ef)
+            seen = {}
+            for o_ in __import__('ie_bake_' + area.lower()).OBJS.values():
+                sp = o_.get('spec') or {}
+                if sp.get('ident') and sp.get('actor'):
+                    seen.setdefault(sp['actor'].lower(), set()).add(sp['ident'])
+            for a_, ids_ in seen.items():
+                if len(ids_) == 1:
+                    m.setdefault(a_, ids_.pop())
         except Exception:
             pass
         _aliases[area] = m
@@ -393,7 +394,9 @@ class _Triggers(object):
     def GlobalLT(self, c, name, scope, v): return get_var(c, name, scope) < v
     def BitGlobal(self, c, name, scope, bits, mode=0):
         v = get_var(c, name, scope)
-        return (v & bits) != 0 if mode in (0, 1) else (v & bits) == 0
+        # GemRB BitGlobal trigger: HandleBitMod(value, bits, mode) != 0 (BITMODE.IDS 1 AND, 2 OR, 3 XOR; 4 NAND)
+        v = {2: v | bits, 3: v ^ bits, 4: v & ~bits}.get(mode, v & bits)
+        return v != 0
     def GlobalTimerExpired(self, c, name, scope):
         t = get_var(c, name, scope)
         return _now() >= t           # an unset timer (0) counts as expired, like the IE
@@ -493,6 +496,15 @@ class _Triggers(object):
         return ie_spellrt.have(c.me, spell)
     HaveSpellRES = HaveSpell
     def Dead(self, c, name):
+        # IE Dead("name") reads the creature's death variable (GemRB: GLOBAL SPRITE_IS_DEAD<name> > 0), it does not
+        # look for the creature: one that is elsewhere (or never existed) is not dead. Also true when the named
+        # creature is here and dead (killed before its death var counted).
+        if isinstance(name, str):
+            n = re.sub(r'\s+', '', name.lower())
+            if any(get_var(c, k, 'GLOBAL') > 0 for k in ('SPRITE_IS_DEAD' + n, '_DEAD' + n, n + '_DEAD')):
+                return True
+            o = N(c, name)
+            return o is not None and _dead(o)
         o = N(c, name)
         return o is None or _dead(o)
     def See(self, c, obj, *unused):   # IWD2 See(O, I:SkipHidden)
@@ -796,7 +808,7 @@ class _Actions(object):
     def IncrementGlobal(self, c, name, scope, v): set_var(c, name, scope, get_var(c, name, scope) + v)
     def BitGlobal(self, c, name, scope, bits, mode):
         v = get_var(c, name, scope)
-        v = {0: v & bits, 1: v | bits, 2: v ^ bits, 3: v & ~bits, 4: v ^ bits}.get(mode, v)   # BITMODE.IDS
+        v = {0: bits, 1: v & bits, 2: v | bits, 3: v ^ bits, 4: v & ~bits}.get(mode, v)   # GemRB BM_SET/AND/OR/XOR/NAND (BITMODE.IDS 1-3)
         set_var(c, name, scope, v)
     def SetGlobalTimer(self, c, name, scope, secs): set_var(c, name, scope, _now() + secs)
     def StartTimer(self, c, tid, secs): set_var(c, '#timer%d' % tid, 'LOCALS', _now() + secs)
@@ -1043,6 +1055,7 @@ class _Actions(object):
     def CutSceneId(self, c, obj):
         import ie_cutscene; return ie_cutscene.cutscene_id(c, obj)
     def Dialogue(self, c, obj): return self.StartDialog(c, None, obj)
+    def StartDialogueNoSet(self, c, obj): return self.StartDialog(c, None, obj)   # EE: talk with own dialogue
     def MoveViewPoint(self, c, pt, speed=0):
         u, v = ie_to_tile(c.area, pt[0], pt[1])
         log('CAMERA %s -> IE(%d,%d) tile(%d,%d)' % (c.ident, pt[0], pt[1], u, v))
@@ -1428,6 +1441,13 @@ def run_script(c, blocks):
                     _lastdefer[c.ident] = blocks.index((cond, responses))
                     log('DEFER %s #%d to the combat round: %s' % (c.ident, _lastdefer[c.ident], '; '.join(MODE['fail'])))
                 return True
+        pend = getattr(c, 'pending', None)
+        if pend is not None and not MODE['round']:
+            # IE (GemRB Scriptable::ExecuteScript): a Continue()d response is only queued; triggers further down,
+            # also in the next script slots, still see the old state (main f0052ef: efpikwrn / Hrothgar).
+            if cont:
+                pend.extend(acts[:-1]); continue
+            acts = pend + acts; del pend[:]
         run_actions(c, acts)
         if not cont:
             return True
@@ -1484,10 +1504,13 @@ def tick(obj, ident, area, scripts, force=False):
     if _busy.get(ident, 0) > now and not ev:
         return
     c = Ctx(obj, None, ident, area, ev)
+    c.pending = []
     for m in _live_scripts(ident, scripts):
         c.script = m
         if run_script(c, m.BLOCKS):
             break
+    if c.pending:
+        run_actions(c, c.pending)                         # only Continue()d responses matched this round
     # IE: AttackedBy/HitBy are true for one script round; left pending they also bypassed the busy check above, so
     # a heal cast was issued again on the next tick before the first resolved (double-spent IE count, EE test)
     for k in ('AttackedBy', 'HitBy'):
@@ -1564,6 +1587,59 @@ def combat_round(obj, ident, area, scripts):
 def event(ident, name, other=None):
     """Hook helper for san_* handlers: record an IE event trigger (AttackedBy, HitBy, Die, Entered...)."""
     _events.setdefault(ident, {})[name] = other
+    if name == 'Die' and ident:
+        death_vars(script_name(ident))
+
+def script_name(ident, area=None):
+    """IE script name of a converted creature: the ARE actor name for an area actor (IWD / IWD2 copy it over the CRE's
+    script name, GemRB IWD2ScriptName), else the ident itself (spawns answer to their CRE / INI script name; further
+    copies are ident#2, ident#3..)."""
+    ident = str(ident)
+    base = re.sub(r'#\d+$', '', ident)
+    if area is None:
+        for k, (idt, ar) in list(_bound.items()):
+            if idt == ident:
+                area = ar
+                break
+    if area:
+        nm = _ident_actor(area, base)
+        if nm:
+            return nm
+    return base
+
+def _ident_actor(area, ident):
+    area = (area or '').upper()
+    if area not in _actor_names:
+        m = {}
+        for a_ in (area, 'I2' + area):
+            try:
+                for s_ in __import__('ie_creatures_' + a_.lower()).CREATURES:
+                    if s_.get('ident') and s_.get('actor'):
+                        m[s_['ident'].lower()] = s_['actor']
+                break
+            except Exception:
+                pass
+        _actor_names[area] = m
+    return _actor_names[area].get(ident.lower())
+
+_actor_names = {}   # area -> {ident (lower): ARE actor name}
+
+def death_vars(name):
+    """What the IE engine does when a creature with script name `name` dies (GemRB Actor::Die): GLOBAL
+    "SPRITE_IS_DEAD<name>" += 1 (IWD, BG) and "_DEAD<name>" += 1 (IWD2), counted, so 'four beetles dead' checks
+    work; plus "<name>_DEAD" = 1 (BG2 SetDeathVar style). (Both counters: the var store has no slot limit.)"""
+    n = re.sub(r'\s+', '', str(name or '').lower())
+    if not n or n == 'none':
+        return
+    for k in ('GLOBAL:sprite_is_dead' + n, 'GLOBAL:_dead' + n):
+        _bump(k, 1)
+    _bump('GLOBAL:%s_dead' % n, 0)
+
+def _bump(k, inc):
+    """inc 1: += 1; inc 0: = 1"""
+    v = ie_vars.get(k) + 1 if inc else 1
+    ie_vars.put(k, v)
+    log('SET %s = %d (death)' % (k, v))
 
 def loop(obj, ident, area, mods, period_ms=1000):
     """Drive tick() from a time event (used for area scripts and in tests; creatures use san_heartbeat)."""
