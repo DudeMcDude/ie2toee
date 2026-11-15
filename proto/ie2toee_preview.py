@@ -49,11 +49,27 @@ INTERIORS = ['AR10%02d' % i for i in range(1, 17)]
 # the Orc Cave chain off AR1000's south-east road exit (To1200): AR1200 hill road, AR1201 Orc Cave (map ids MAP_ID+17/+18,
 # ground ids 917/918); converted like the interiors (map, exits, actors, containers)
 INTERIORS += ['AR1200', 'AR1201']
+# Chapter 1's first area, the end of the prologue: Hrothgar's departure cutscene (EHHROTHM) jumps the party to AR2000
+# (Kuldahar Pass; classic IWD plays AVALANCH there on first entry, IWD:EE in the cutscene). Its own exits lead to
+# unconverted chapter-1 areas (they log and do nothing). Its map id is set in AREA_IDS: MAP_ID + n would be 5031, the
+# start of the IWD2 module's ids (5031..5040; 5041..5049 are kept for IWD2's remaining Targos areas + its AR2000).
+INTERIORS += ['AR2000']
+AREA_IDS = {'AR2000': 5051}     # interiors without an entry: MAP_ID + n (n = 1-based position in INTERIORS)
+# the converted areas whose ARE header script runs (ie_cutscene area loop). AR1006 (the new-game start, Winter's Cradle):
+# the prologue chapter screen (IncrementChapter CHPTXT0/1) and, in IWD:EE, Hrothgar's opening cutscene EHHROTHT;
+# AR2000: the avalanche movie (classic) / journal clean-up (EE)
+AREA_SCRIPT_AREAS = (AREA, 'AR1006', 'AR2000')
+
+
+def map_id(i, ar):
+    return AREA_IDS.get(ar, MAP_ID + i)
 
 
 def script_base(i):
     """interior n's actor script ids (clear of the baked-object scripts GENERIC_BASE + n = 1281..)"""
-    return SCRIPT_BASE + 20 + 10 * i if i <= 14 else 1300 + 10 * (i - 15) if i <= 17 else 1330 + 50 * (i - 18)
+    # (n >= 19: 1500.. in steps of 50, clear of the spawnables 1400..1498 and the speech bubbles 1499)
+    return (SCRIPT_BASE + 20 + 10 * i if i <= 14 else 1300 + 10 * (i - 15) if i <= 17 else 1330 if i == 18
+            else 1500 + 50 * (i - 19))
 
 
 def name_base(i):
@@ -86,6 +102,24 @@ def ie_start(ie, w, interiors):
     except Exception as ex:
         print('warning: start %s not converted (%s); new game starts in the town' % (ar, ex))
         return MAP_ID, START
+
+
+def area_scripts(ie, areas):
+    """[(area, ARE header script resref)] of the AREA_SCRIPT_AREAS among `areas` that have one in the install"""
+    import iefs
+    from ieformats import Are
+    g = iefs.IEGame(ie); out = []
+    for ar in areas:
+        if ar not in AREA_SCRIPT_AREAS:
+            continue
+        try:
+            sc = (Are(g.read(ar, 'are')).script or '').strip().lower()
+            if sc and sc != 'none':
+                g.read(sc, 'bcs')
+                out.append((ar, sc))
+        except Exception as ex:
+            print('warning: %s area script: %s' % (ar, ex))
+    return out
 
 
 def flavour(ie):
@@ -240,8 +274,10 @@ def main():
                          'debug.recalc_neighbours/flush_nodes/genclearance with the optional args, DudeMcDude/TemplePlus '
                          'feature/pathnode-bake, given as --tp)')
     a = ap.parse_args()
-    assert MAP_ID + len(INTERIORS) <= 5198, 'map ids above 5198 crash the town map (see MAP_ID)'
-    assert not ENGINE_MAP_IDS & set(range(MAP_ID, MAP_ID + len(INTERIORS) + 1)), 'map ids hit engine special cases'
+    all_ids = [MAP_ID] + [map_id(i, ar) for i, ar in enumerate(INTERIORS, 1)]
+    assert max(all_ids) <= 5198, 'map ids above 5198 crash the town map (see MAP_ID)'
+    assert not ENGINE_MAP_IDS & set(all_ids), 'map ids hit engine special cases'
+    assert len(set(all_ids)) == len(all_ids), 'duplicate map ids'
     ie, toee = os.path.abspath(a.iwd), os.path.abspath(a.toee)
     out = os.path.abspath(a.out)
     tp = a.tp or next((p for p in (os.path.join(HERE, '..', '..', 'TemplePlus'), os.path.join(HERE, '..', 'TemplePlus'))
@@ -264,8 +300,8 @@ def main():
     interiors = {}      # area -> map id, for the interiors that converted
     for i, ar in enumerate(INTERIORS, 1):
         if run_soft('interior %s' % ar, ['ie2toee.py', '--game', ie, '--area', ar, '--out', w,
-                                         '--map-id', str(MAP_ID + i), '--ground-id', str(GROUND_ID + i)] + ovr):
-            interiors[ar] = MAP_ID + i
+                                         '--map-id', str(map_id(i, ar)), '--ground-id', str(GROUND_ID + i)] + ovr):
+            interiors[ar] = map_id(i, ar)
         else:
             print('warning: interior %s failed to convert and is skipped (its door stays a dead end)' % ar, flush=True)
     px, py = json.load(open(os.path.join(w, AREA + '_objects.json')))['placement']['canvas_offset']
@@ -275,14 +311,14 @@ def main():
     actors = open(os.path.join(cre, 'dialogue_actors.txt')).read().split()
     icre = {}           # interior -> its creature dir (actors baked like the town's: prefab .mob, permanent ids)
     for ar, mid in sorted(interiors.items()):
-        i = mid - MAP_ID; d = os.path.join(w, 'cre_' + ar.lower())
+        i = INTERIORS.index(ar) + 1; d = os.path.join(w, 'cre_' + ar.lower())
         if run_soft('creatures %s' % ar, ['ie_creatures.py', 'convert', ie, toee, d, '--area', ar,
                                          '--script-base', str(script_base(i)),
                                          '--name-base', str(name_base(i))] + tpa):
             icre[ar] = d
             actors += open(os.path.join(d, 'dialogue_actors.txt')).read().split()
     dlg_cmd = (['ie_dialogue.py', ie, os.path.join(cre, 'dialogue'), '--quest-base', str(QUEST_BASE)] + actors +
-        ['--area-script', '%s:%s' % (AREA, a1), '--area-map', '%s:%d:%d,%d' % (AREA, MAP_ID, px, py)] +
+        sum((['--area-script', '%s:%s' % (ar, sc)] for ar, sc in area_scripts(ie, [AREA] + sorted(interiors))), []) + ['--area-map', '%s:%d:%d,%d' % (AREA, MAP_ID, px, py)] +
         sum((['--area-map', '%s:%d:%d,%d' % ((ar, mid) + tuple(json.load(open(os.path.join(w, ar + '_objects.json')))
                                                               ['placement']['canvas_offset']))]      # (merges the interiors into ie_areas.py)
              for ar, mid in sorted(interiors.items())), []))
@@ -334,7 +370,7 @@ def main():
         spec = os.path.join(icre[ar], 'ie_creatures_%s.py' % al) if ar in icre else None
         run('bake %s' % ar, ['ie_bake.py', 'bake', '--area', ar, '--flavour', F] + (['--specs', spec] + shops(spec, ar) if spec else []) +
             ['--items', os.path.join(w, 'items', 'ie_itemmap.py'), '--maps', os.path.join(w, 'maps', ar),
-             '--map-id', str(mid), '--placement', '%d,%d' % (ox, oy), '--generic-script', str(GENERIC_BASE + mid - MAP_ID),
+             '--map-id', str(mid), '--placement', '%d,%d' % (ox, oy), '--generic-script', str(GENERIC_BASE + INTERIORS.index(ar) + 1),
              '--toee', toee, '--ie', ie, '--out', bake])
 
     run('travel exits', ['ie_exits.py', w, '--out', os.path.join(w, 'ie_travel_data.py'), '--ie', ie, '--area', '%s:%d' % (AREA, MAP_ID),
@@ -352,8 +388,8 @@ def main():
     path_overrides(os.path.join(bake, 'modules', 'ToEE', 'maps'), 'path node')
     print('== assemble', flush=True)
     mov = os.path.join(w, 'movies')
-    if not a.no_movies:   # intro only for now (long encode); the others: ie_movies.py convert ... without --only
-        run_soft('movies', ['ie_movies.py', 'convert', '--game', ie, '--toee', toee, '--out', mov, '--only', 'intro', 'slides', '--flavour', 'IWD'] +
+    if not a.no_movies:   # intro + the prologue-end avalanche (long encode); the rest: ie_movies.py convert ... without --only
+        run_soft('movies', ['ie_movies.py', 'convert', '--game', ie, '--toee', toee, '--out', mov, '--only', 'intro', 'avalanch', 'slides', '--flavour', 'IWD'] +
                  (['--ee', os.path.abspath(a.movies_ee)] if a.movies_ee else []))
     inst = os.path.join(out, 'install'); shutil.rmtree(inst, ignore_errors=True)
     M = os.path.join(inst, 'modules', MODULE); C = os.path.join(inst, 'modules', MODULE + '_core')

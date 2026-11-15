@@ -384,6 +384,7 @@ def main():
                 rep.setdefault('cutscenes', []).append({'res': r_, 'module': m, 'blocks': nb})
             except Exception as e:
                 print('warning: cutscene %s: %s' % (r_, e))
+    allvars.add('global:chapter')    # IncrementChapter (ie_runtime) and the chapter checks: always saved
     keys = sorted(allvars)
     if len(keys) > a.slot_max - a.slot_base + 1:
         raise SystemExit('too many variables (%d) for slots %d..%d' % (len(keys), a.slot_base, a.slot_max))

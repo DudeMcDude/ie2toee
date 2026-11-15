@@ -56,6 +56,7 @@ try:
 except ImportError:
     pass
 _mem = {}
+_leave = [None, 0.0]   # LeaveAreaLUA: [last target map, real time]
 
 _clk = [None, 0.0]   # [last game time seen, real time when it changed]
 
@@ -876,12 +877,21 @@ class _Actions(object):
             ie_movies_rt.play(res.lower())
     def IncrementChapter(self, c, res=''):
         """IE chapter break: CHAPTER += 1 and the chapter screen -> the converted ToEE slide (ie_movies.py).
-        IWD names the text ("CHPTXT<n>"); IWD2 passes "" and shows CHAPTERS.2DA row <new CHAPTER> (new games start at -1: prologue first)."""
+        IWD2 passes "" and shows CHAPTERS.2DA row <new CHAPTER> (new games start at -1: the first call -> 0 = prologue).
+        IWD names the text: IWD:EE ar2100 "CHPTXT1" (Chapter One, around SetGlobal Chapter 0/1). IWD's prologue break
+        is the new-game AR1006 block guarded by CHAPTER_BREAK_0 (classic: IncrementChapter("CHPTXT1"), whose classic
+        text is the prologue; EE: "CHPTXT0" then SetGlobal("Chapter",0)): it shows the prologue slide and CHAPTER
+        stays 0, so the prologue's CHAPTER-0 checks (classic ar2100: Global("CHAPTER","GLOBAL",0) -> Chapter One)
+        still hold."""
         old = get_var(c, 'CHAPTER', 'GLOBAL')
-        set_var(c, 'CHAPTER', 'GLOBAL', old + 1)
         m = re.match(r'chptxt(\d+)$', (res or '').lower())
-        n = int(m.group(1)) if m else old + 1     # IWD2: CHAPTER starts at -1, the first call -> 0 = prologue
-        log('CHAPTER %d -> slide %d' % (old + 1, n))
+        if m and old <= 0 and get_var(c, 'CHAPTER_BREAK_0', 'GLOBAL') == 0:
+            new, n = 0, 0               # the IWD prologue screen
+        else:
+            new = old + 1
+            n = int(m.group(1)) if m else new
+        set_var(c, 'CHAPTER', 'GLOBAL', new)
+        log('CHAPTER %d -> slide %d' % (new, n))
         if IN_GAME:
             import ie_movies_rt
             ie_movies_rt.play('chapter%d' % n)
@@ -892,12 +902,21 @@ class _Actions(object):
             ie_movies_rt.play('chapter%s' % m.group(1))
     def ReturnToSavedLocation(self, c): return None
     def LeaveAreaLUA(self, c, area, parchment, pt, face=0):
+        """Jump the party to `area` (a converted area; others log and do nothing). IE cutscenes move each PC with
+        its own block (EHHROTHM: CutSceneId(Player1..6) / ActionOverride(PlayerN, ..) + LeaveAreaLUAPanic): the
+        ToEE teleport moves the whole party, so repeats to the same map within a few seconds are skipped."""
         m = AREA_MAPS.get(area.upper())
+        if m and _leave[0] == m and _real() - _leave[1] < 5:
+            log('LEAVE_AREA %s -> map %s (party already on its way)' % (area, m))
+            return
         log('LEAVE_AREA %s -> map %s' % (area, m))
+        if m:
+            _leave[:] = [m, _real()]
         if m and IN_GAME:
             u, v = ie_to_tile(area, pt[0], pt[1])
             game.fade_and_teleport(0, 0, 0, m, u, v)
     LeaveArea = LeaveAreaLUA
+    LeaveAreaLUAPanic = LeaveAreaLUA
     def StartCutSceneMode(self, c):
         import ie_cutscene; ie_cutscene.mode(1)
     def EndCutSceneMode(self, c):
