@@ -131,6 +131,25 @@ def ie_to_tile(area, x, y):
     a = (X - calx) / 20.0; b = (Y - caly) / 14.0
     return int(round((b - a) / 2.0)), int(round((b + a) / 2.0))
 
+def arrival_tile(area, pt, near=32):
+    """ToEE tile for a script jump to IE point pt in `area`: a point on (within `near` px of) one of the area's
+    entrances lands on that entrance's converted arrival tile, which the converter moved onto walkable ground when
+    the IE point is not (edge entrances: AR2000 FR1000, where EHHROTHM sends the party); else the point itself."""
+    try:
+        import ie_travel_data
+        a = ie_travel_data.AREAS.get(area.upper(), {})
+        best = None
+        for n, (x, y) in a.get('ie_entrances', {}).items():
+            d = ((x - pt[0]) ** 2 + (y - pt[1]) ** 2) ** 0.5
+            if d <= near and n in a.get('entrances', {}) and (best is None or d < best[0]):
+                best = (d, n)
+        if best:
+            e = a['entrances'][best[1]]
+            return int(e[0]), int(e[1])
+    except Exception as ex:
+        log_once('arrival', 'IE_ERR arrival tile %s: %s' % (area, ex))
+    return ie_to_tile(area, pt[0], pt[1])
+
 def ctx_for(obj, other=None, ident=None, area=None):
     if ident is None:
         ident, area2 = _bound.get(_key(obj), ('', ''))
@@ -894,7 +913,10 @@ class _Actions(object):
         log('CHAPTER %d -> slide %d' % (new, n))
         if IN_GAME:
             import ie_movies_rt
-            ie_movies_rt.play('chapter%d' % n)
+            if new == 0:      # the new-game screen: after the intro movie (ie_movies_rt.prologue)
+                ie_movies_rt.prologue('chapter%d' % n)
+            else:
+                ie_movies_rt.play('chapter%d' % n)
     def TextScreen(self, c, res):
         m = re.match(r'chptxt(\d+)$', (res or '').lower())
         if m and IN_GAME:
@@ -913,7 +935,7 @@ class _Actions(object):
         if m:
             _leave[:] = [m, _real()]
         if m and IN_GAME:
-            u, v = ie_to_tile(area, pt[0], pt[1])
+            u, v = arrival_tile(area, pt)
             game.fade_and_teleport(0, 0, 0, m, u, v)
     LeaveArea = LeaveAreaLUA
     LeaveAreaLUAPanic = LeaveAreaLUA

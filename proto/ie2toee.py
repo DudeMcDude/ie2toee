@@ -747,8 +747,11 @@ def convert(game, area, outdir, map_id, ground_id, guidance, preview=False, clos
     def _arrival(e):
         u, v = tl(e['x'], e['y'])
         au, av, moved = arrival_tile(kind, bbox, u, v)
+        if moved is None:   # (an edge entrance in impassable ground, e.g. AR2000 FR1000 where EHHROTHM lands the party:
+            # the IE engine moves arrivals to the nearest passable spot) -> look further
+            au, av, moved = arrival_tile(kind, bbox, u, v, radius=12)
         if moved is None:
-            print(f'warning: {name} entrance {e["name"]} has no walkable tile within 5 tiles', file=sys.stderr)
+            print(f'warning: {name} entrance {e["name"]} has no walkable tile within 12 tiles', file=sys.stderr)
         return dict(arrival=[au, av], arrival_moved=bool(moved))
     regions_t = [dict(r, poly=[tl(*p) for p in r['poly']]) for r in are.regions]
     sr_open = are.sr_nodoors.copy()          # every door open: what a party can reach once it has opened the doors

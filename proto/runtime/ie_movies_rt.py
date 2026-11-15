@@ -18,6 +18,27 @@ def play_intro():
     return 1
 
 
+def prologue(slide):
+    """The new-game chapter screen (IWD AR1006's prologue break): the intro first if it has not played yet (the area
+    script can tick before the first critter heartbeat that plays it), then the slide, in one queue. Skippable like
+    every movie/slide (Temple+: Space, Enter, Esc or a click)."""
+    try:
+        import ie_movies_data
+        mv = ie_movies_data.MOVIES
+    except ImportError:
+        return 0
+    ids = []
+    if mv.get('intro') and not game.global_vars[FLAG_VAR]:
+        game.global_vars[FLAG_VAR] = 1
+        ids += list(mv['intro'])
+    ids += list(mv.get(slide) or [])
+    for m in ids:
+        game.moviequeue_add(m)
+    if ids:
+        game.moviequeue_play()
+    return len(ids)
+
+
 def play(key):
     """Queue and play a converted movie / chapter slide by key ('intro', 'chapter1', 'middle', ...)."""
     try:
