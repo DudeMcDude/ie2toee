@@ -303,6 +303,32 @@ def _party_side(o):
     except Exception:
         return False
 
+# ---- town faction (same rule as ie_bake.factions, for creatures that appear at runtime: ie_spawn)
+IE_TOWN_FACTION = 160      # unused by vanilla protos.tab (1-34, 150)
+
+def town_factions(have, hostility):
+    """obj_f_npc_faction for a converted creature whose proto gives `have`, or None to keep it: non-hostile creatures
+    with proto factions (14000 '9 12' Hommlet) share IE_TOWN_FACTION; hostile ones never carry it; factionless
+    creatures (kegs, rats, goblin protos) stay factionless."""
+    have = [int(f) for f in have if int(f)]
+    if hostility == 'hostile':
+        return [f for f in have if f != IE_TOWN_FACTION] if IE_TOWN_FACTION in have else None
+    return [IE_TOWN_FACTION] if have else None
+
+def set_town_faction(o, hostility):
+    """Apply town_factions to a spawned object (Temple+ obj_f_npc_faction is a 0-terminated int array)."""
+    try:
+        have = list(o.factions)
+    except Exception:
+        return None
+    new = town_factions(have, hostility)
+    if new is None or new == have:
+        return None
+    f = globals().get('obj_f_npc_faction', 363)
+    for i, v in enumerate(new + [0]):
+        o.obj_set_idx_int(f, i, v)
+    return new
+
 def _who_hit_me_last(me):
     f = globals().get('obj_f_npc_who_hit_me_last')
     if f is None:

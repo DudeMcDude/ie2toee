@@ -48,7 +48,7 @@ def portrait_for(s, seed):
         return pool[int(_hash('%s:%s' % (s.get('resref', '').lower(), seed)) % len(pool))]
     return s.get('portrait')
 
-def spawn(res, area, u, v, face=None, seed=None, near=None, taken=None, ident=None, script_id=None):
+def spawn(res, area, u, v, face=None, seed=None, near=None, taken=None, ident=None, script_id=None, town=True):
     """Spawn converted CRE `res` at tile (u, v); returns the object or None."""
     d = _data()
     s = d and d.SPECS.get(res.lower())
@@ -72,6 +72,12 @@ def spawn(res, area, u, v, face=None, seed=None, near=None, taken=None, ident=No
             pass
     except Exception, e:
         rt.log('IE_ERR spawn %s: %s' % (res, e)); return None
+    try:      # townsfolk get the town faction like baked ones (ie_bake.factions); hostiles/factionless stay as they are
+        fac = town and rt.set_town_faction(o, s.get('hostility'))      # (not summons: their side comes from the caster)
+        if fac:
+            rt.log('SPAWN %s faction %r' % (res, fac))
+    except Exception, e:
+        rt.log('IE_ERR spawn faction %s: %s' % (res, e))
     rt.bind(o, instance_ident(ident or s.get('ident') or res.lower()), area)
     if s.get('dead'):     # IE STATE_DEAD corpse (AR1200.BCS battle dressing: 12GOBD, 10SOLDRD, ...): lies dead
         try:
@@ -450,7 +456,7 @@ def summon(caster, res, target=None, pt=None):
         party, kos = 0, not kos or party
     taken, k = set(), 0
     for i in range(max(1, min(n, 8))):
-        o = spawn(cre, area, u, v, taken=taken)
+        o = spawn(cre, area, u, v, taken=taken, town=False)
         if o is None:
             continue
         k += 1
