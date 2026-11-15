@@ -58,6 +58,10 @@ while [ $(( $(date +%s) - T0 )) -lt "$SECS" ]; do
       grep -q '^DONE' "$P" && break
     fi
   fi
+  # STOP_ON_EXIT=1: stop waiting when the game process is gone (a crash), checked every ~3 s after the first 30 s
+  if [ -n "${STOP_ON_EXIT:-}" ] && [ $(( $(date +%s) - T0 )) -gt 30 ] && [ $(( $(date +%s) % 3 )) -eq 0 ] && ! pgrep -f TemplePlus.exe >/dev/null; then
+    echo "game exited at $(date +%T)"; echo "GAME EXITED" >> "$OUT/wine.out"; break
+  fi
 done
 import -display "$DISPLAY" -window root "$OUT/final.png" 2>/dev/null
 wineserver -k 2>/dev/null; sleep 1
