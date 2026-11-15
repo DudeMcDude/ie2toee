@@ -18,8 +18,10 @@ NEW IN THIS PREVIEW (2026-11-15)
     instead of a fixed block of ToEE global slots (Targos needs about 1,200 of them).
   * Bundled Temple+ 0.2.98 (see TemplePlus\IE-PREVIEW-SOURCE.txt): the info-point magnifier cursor no longer
     leaves a stale cursor on screen.
-  * New: an autoplayer (Autoplayer\README.txt) that starts a new game and drives the Shawford chain by itself,
-    for testing. It takes over the game window while it runs.
+  * New, work in progress: an autoplayer (Autoplayer\README.txt) that starts a new game and drives the Shawford
+    chain by itself, for testing. So far it gets to the goblin attack on the palisade (with two shortcuts) and
+    the game then crashes on entering the palisade area; the battle and Ulbrec are not reached yet. The older
+    Targos tour is still included. It takes over the game window while it runs.
   * Saves: start a NEW game (new maps, and older saves' quest/dialogue variables start from zero).
   * Pathing: the engine path node bake (clearance.bin and engine-relinked path nodes) runs only in the
     developer's Linux/Wine setup (--engine-pathnodes), not in convert_iwd2.bat; Windows converts use the
