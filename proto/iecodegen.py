@@ -118,6 +118,9 @@ class Gen(object):
         if (kind == 'T' and n in VAR_TRIGGERS) or (kind == 'A' and n in VAR_ACTIONS):
             if len(call.args) >= 2 and isinstance(call.args[0], str) and isinstance(call.args[1], str):
                 self.vars.add(self.var_key(call.args[0], call.args[1]))
+        if kind == 'T' and n == 'dead' and call.args and isinstance(call.args[0], str) and \
+                re.match(r'^[\w ]+$', call.args[0]) and call.args[0].lower() not in ('myself', 'player1'):
+            self.vars.add(self.var_key('SPRITE_IS_DEAD' + call.args[0], 'GLOBAL'))   # Dead("name") = its death var
         if kind == 'T' and (n.startswith('numtimestalked') or n.startswith('numberoftimestalked')) or (kind == 'A' and n == 'setnumtimestalkedto'):
             self.vars.add(self.var_key('#talked', 'LOCALS'))
         if n in ('starttimer', 'startrandomtimer', 'timeractive', 'timerexpired') and call.args and \
@@ -138,6 +141,8 @@ class Gen(object):
         self.jvars.setdefault(strref, set()).update(self.vars_in(calls))
 
     def var_key(self, name, scope):
+        if not (scope or '').strip() and ':' in name:
+            scope, name = name.split(':', 1)    # IE: empty area = scope in the name ("LOCALS:CREATURE_STATE_VAR")
         s = scope.upper(); n = re.sub(r'\s+', '', name.lower())   # IE ignores spaces in variable names ("Apsel _Quest")
         if s == 'GLOBAL':
             return 'global:' + n

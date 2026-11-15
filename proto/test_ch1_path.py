@@ -40,7 +40,14 @@ class Obj(object):
     def float_text_line(self, *a): pass
     def float_line(self, *a): pass
     def distance_to(self, o): return 1.0
+    def object_script_execute(self, other, evt):      # (only san_dialog is used: Dialogue/StartDialog)
+        mod = getattr(self, 'script_mod', None)
+        if mod is not None:
+            mod.san_dialog(self, other)
+        elif getattr(other, 'script_mod', None) is not None:
+            other.script_mod.san_dialog(other, self)
     def __repr__(self): return 'Obj(%s)' % self.name
+REG = {}
 
 class Game(object):
     def __init__(self):
@@ -58,14 +65,18 @@ class Game(object):
     def moviequeue_play(self): self.played.append(list(self.movies)); del self.movies[:]
     def obj_list_vicinity(self, *a): return []
     def scroll_to(self, *a): pass
-    def get_obj_by_id(self, g): return None
+    def get_obj_by_id(self, g): return REG.get(g)
+
+class Clock(object):
+    t = 1000
+    def time_game_in_seconds(self, x): return self.t
 
 class GV(dict):
     def __getitem__(self, k): return dict.get(self, k, 0)
 
-game = Game(); game.global_vars = GV()
+game = Game(); game.global_vars = GV(); game.time = Clock()
 toee = types.ModuleType('toee')
-for k, v in dict(game=game, OBJ_HANDLE_NULL=None, OLC_CRITTERS=0, OLC_NPC=0, RUN_DEFAULT=1, SKIP_DEFAULT=0,
+for k, v in dict(game=game, OBJ_HANDLE_NULL=None, OLC_CRITTERS=0, OLC_NPC=0, RUN_DEFAULT=1, SKIP_DEFAULT=0, san_dialog=9,
                  location_from_axis=location_from_axis, location_to_axis=location_to_axis).items():
     setattr(toee, k, v)
 sys.modules['toee'] = toee
@@ -96,6 +107,7 @@ def check(name, ok, info=''):
 def flush(n=50):
     """run the queued time events (IE waits / queued actions), like the game clock would"""
     for _ in range(n):
+        game.time.t += 10
         if not game.events:
             return
         ev = list(game.events); del game.events[:]
@@ -176,6 +188,7 @@ class Actor(object):
         self.mod = __import__(os.path.basename(path)[:-3])
         self.dlg = load_dlg(os.path.join(DLG, os.path.basename(path)[2:-3] + '.dlg'))    # py01187ie_x.py -> 01187ie_x.dlg
         self.obj = Obj(self.mod.IDENT, rt.AREA_MAPS.get(self.mod.AREA, 0))
+        self.obj.script_mod = self.mod; REG[self.obj.id] = self.obj
     def _ev(self, expr):
         if not expr:
             return True
@@ -249,6 +262,36 @@ if SCR:
         e = home.start()
         check('Hrothgar quest state Join_Posse=%d Supply_Quest=%d -> line %s' % (jp, sq, want or 'Know_Hrothgar 40'),
               e == (want or 40), e)
+
+    # -- the new-game opening in Winter's Cradle (AR1006): the prologue screen (after the intro), then Hrothgar
+    #    greets the party: IWD:EE through AR1006's area script (CDOpeningCut -> cutscene EHHROTHT), classic through
+    #    Hrothgar's own script EHHROTHT (cutscene inline, ends in his dialogue)
+    reset()
+    cradle = next((h for h in H if h.mod.AREA == 'AR1006'), None)
+    for o in game.party:
+        o.map = rt.AREA_MAPS.get('AR1006')
+    rt._bound.clear(); REG.clear()                    # only the Winter's Cradle Hrothgar is on the map
+    if cradle:
+        REG[cradle.obj.id] = cradle.obj
+        rt.bind(cradle.obj, cradle.mod.IDENT, 'AR1006')
+    ie_cutscene.STATE['hook'] = 1; ie_cutscene._area.clear(); ie_cutscene.mode(0)
+    for i in range(8):
+        ie_cutscene.map_tick(rt.AREA_MAPS.get('AR1006'), 1000); flush()
+        if cradle and hasattr(cradle.mod, 'san_heartbeat') and not game.leader.dialog:
+            try:
+                cradle.mod.san_heartbeat(cradle.obj, None); flush()
+            except Exception as e:
+                print('  (Hrothgar heartbeat: %r)' % e)
+        game.time.t += 10
+    check('new game: AR1006 area script ran the prologue break (CHAPTER_BREAK_0 = 1, CHAPTER 0)',
+          rt.get_var(None, 'CHAPTER_BREAK_0', 'GLOBAL') == 1 and rt.get_var(None, 'CHAPTER', 'GLOBAL') == 0)
+    check('new game: intro movie + prologue slide played first (skippable: Temple+ movie player)',
+          game.played and game.played[0] == list(MOV.get('intro', [])) + list(MOV.get('chapter0', [])), game.played)
+    d = game.leader.dialog
+    check("new game: Hrothgar greets the party (%s)" % ('IWD:EE cutscene EHHROTHT' if os.path.isfile(
+          os.path.join(SCR, 'ie_bcs_ehhrotht_area.py')) else 'his script EHHROTHT'),
+          cradle is not None and d is not None and d[0] is cradle.obj, d)
+    check('new game: cutscene mode over after the greeting', not ie_cutscene.active())
 
     # -- the critical path, from a new game
     reset()

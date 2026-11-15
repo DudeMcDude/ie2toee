@@ -77,6 +77,8 @@ def _now():
     return gt + int(_real() - _clk[1])
 
 def var_key(c, name, scope):
+    if not (scope or '').strip() and ':' in (name or ''):
+        scope, name = name.split(':', 1)        # IE: an empty area means the name carries it ("LOCALS:CREATURE_STATE_VAR")
     s = (scope or 'GLOBAL').upper(); n = re.sub(r'\s+', '', name.lower())   # IE ignores spaces in variable names ("Apsel _Quest")
     if s == 'GLOBAL':
         return 'global:' + n
@@ -226,6 +228,8 @@ def O(c, name, inner=None):
             return _pc(c)
         p = _party()
         return p[0] if p else _pc(c)
+    if n.startswith('partyslot') and n[9:].isdigit():
+        n = 'player' + n[9:]                 # EE PartySlotN (portrait order) = PlayerN here
     if n.startswith('player') and n[6:].isdigit():
         p = _party(); i = int(n[6:]) - 1
         return p[i] if i < len(p) else None
@@ -247,6 +251,18 @@ def _actor_ident(c, name):
             for s_ in __import__('ie_creatures_' + area.lower()).CREATURES:
                 if s_.get('ident') and s_.get('actor'):
                     m[s_['actor'].lower()] = s_['ident']
+        except Exception:
+            pass
+        try:   # IWD: the baked area actors (IWD:EE AR1006 'Hrothgar' is hroth.cre, death var HROTH; EHHROTHT
+               # names him by his ARE actor name, like the IE engine resolves it)
+            seen = {}
+            for o_ in __import__('ie_bake_' + area.lower()).OBJS.values():
+                sp = o_.get('spec') or {}
+                if sp.get('ident') and sp.get('actor'):
+                    seen.setdefault(sp['actor'].lower(), set()).add(sp['ident'])
+            for a_, ids_ in seen.items():
+                if len(ids_) == 1:
+                    m.setdefault(a_, ids_.pop())
         except Exception:
             pass
         _aliases[area] = m
@@ -347,7 +363,9 @@ class _Triggers(object):
     def GlobalLT(self, c, name, scope, v): return get_var(c, name, scope) < v
     def BitGlobal(self, c, name, scope, bits, mode=0):
         v = get_var(c, name, scope)
-        return (v & bits) != 0 if mode in (0, 1) else (v & bits) == 0
+        # GemRB BitGlobal trigger: HandleBitMod(value, bits, mode) != 0 (BITMODE.IDS 1 AND, 2 OR, 3 XOR; 4 NAND)
+        v = {2: v | bits, 3: v ^ bits, 4: v & ~bits}.get(mode, v & bits)
+        return v != 0
     def GlobalTimerExpired(self, c, name, scope):
         t = get_var(c, name, scope)
         return _now() >= t           # an unset timer (0) counts as expired, like the IE
@@ -413,6 +431,15 @@ class _Triggers(object):
         return ie_spellrt.have(c.me, spell)
     HaveSpellRES = HaveSpell
     def Dead(self, c, name):
+        # IE Dead("name") reads the creature's death variable (GemRB: GLOBAL SPRITE_IS_DEAD<name> > 0), it does not
+        # look for the creature: one that is elsewhere (or never existed: IWD's eftwnchk tests Dead("YSELF)")) is
+        # not dead. Also true when the named creature is here and dead (killed before its death var counted).
+        if isinstance(name, str):
+            n = re.sub(r'\s+', '', name.lower())
+            if any(get_var(c, k, 'GLOBAL') > 0 for k in ('SPRITE_IS_DEAD' + n, '_DEAD' + n, n + '_DEAD')):
+                return True
+            o = N(c, name)
+            return o is not None and _dead(o)
         o = N(c, name)
         return o is None or _dead(o)
     def See(self, c, obj, *unused):   # IWD2 See(O, I:SkipHidden)
@@ -703,7 +730,7 @@ class _Actions(object):
     def IncrementGlobal(self, c, name, scope, v): set_var(c, name, scope, get_var(c, name, scope) + v)
     def BitGlobal(self, c, name, scope, bits, mode):
         v = get_var(c, name, scope)
-        v = {0: v & bits, 1: v | bits, 2: v ^ bits, 3: v & ~bits, 4: v ^ bits}.get(mode, v)   # BITMODE.IDS
+        v = {0: bits, 1: v & bits, 2: v | bits, 3: v ^ bits, 4: v & ~bits}.get(mode, v)   # GemRB BM_SET/AND/OR/XOR/NAND (BITMODE.IDS 1-3)
         set_var(c, name, scope, v)
     def SetGlobalTimer(self, c, name, scope, secs): set_var(c, name, scope, _now() + secs)
     def StartTimer(self, c, tid, secs): set_var(c, '#timer%d' % tid, 'LOCALS', _now() + secs)
@@ -753,6 +780,13 @@ class _Actions(object):
                 (obj or _pc(c)).barter(c.me)
         except Exception as e:
             log('IE_ERR StartStore: %s' % e)
+    def ChangeCurrentScript(self, c, res=''):
+        # IE: replace the running script slot; "" = drop it (eftwnchk/efpikwrn drop themselves once not needed)
+        m = _cur_script[0]
+        if m is not None and not (res or '').strip():
+            _dropped.add((c.ident, m.__name__)); log('SCRIPT %s drops %s' % (c.ident, m.__name__))
+        else:
+            log('IE_UNSUPPORTED action ChangeCurrentScript(%r)' % (res,))
     def Enemy(self, c):
         log('ENEMY %s' % c.ident)
         if IN_GAME and c.me is not None:
@@ -948,6 +982,7 @@ class _Actions(object):
     def CutSceneId(self, c, obj):
         import ie_cutscene; return ie_cutscene.cutscene_id(c, obj)
     def Dialogue(self, c, obj): return self.StartDialog(c, None, obj)
+    def StartDialogueNoSet(self, c, obj): return self.StartDialog(c, None, obj)   # EE: talk with own dialogue
     def MoveViewPoint(self, c, pt, speed=0):
         u, v = ie_to_tile(c.area, pt[0], pt[1])
         log('CAMERA %s -> IE(%d,%d) tile(%d,%d)' % (c.ident, pt[0], pt[1], u, v))
@@ -1279,6 +1314,9 @@ ROUND_SECS = 1      # IE evaluates scripts once per AI round (~1 s)
 _last_tick = {}
 _first = {}
 
+_dropped = set()        # (ident, script module) removed by ChangeCurrentScript("")  (not saved: re-earned on reload)
+_cur_script = [None]
+
 def run_script(c, blocks):
     """IE script round: blocks = [(cond_fn, [(weight, [action_fns])])]. Top-down; the first block whose condition
     holds runs one weighted-random response. If that response ends with Continue(), evaluation goes on."""
@@ -1331,6 +1369,14 @@ def run_script(c, blocks):
                     _lastdefer[c.ident] = blocks.index((cond, responses))
                     log('DEFER %s #%d to the combat round: %s' % (c.ident, _lastdefer[c.ident], '; '.join(MODE['fail'])))
                 return True
+        pend = getattr(c, 'pending', None)
+        if pend is not None and not MODE['round']:
+            # IE (GemRB Scriptable::ExecuteScript): a Continue()d response is only queued; triggers further down,
+            # also in the next script slots, still see the old state.  efpikwrn's BitGlobal(CREATURE_STATE_VAR, 1)
+            # must not hide Hrothgar's opening cutscene (ehhrotht tests the same bit).
+            if cont:
+                pend.extend(acts[:-1]); continue
+            acts = pend + acts; del pend[:]
         run_actions(c, acts)
         if not cont:
             return True
@@ -1375,9 +1421,15 @@ def tick(obj, ident, area, scripts, force=False):
     if _busy.get(ident, 0) > now and not ev:
         return
     c = Ctx(obj, None, ident, area, ev)
+    c.pending = []
     for m in scripts:
+        if (c.ident, m.__name__) in _dropped:            # ChangeCurrentScript("") removed it
+            continue
+        _cur_script[0] = m
         if run_script(c, m.BLOCKS):
             break
+    if c.pending:
+        run_actions(c, c.pending)                         # only Continue()d responses matched this round
     # IE: AttackedBy/HitBy are true for one script round; left pending they also bypassed the busy check above, so
     # a heal cast was issued again on the next tick before the first resolved (double-spent IE count, EE test)
     for k in ('AttackedBy', 'HitBy'):
