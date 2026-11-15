@@ -22,6 +22,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import toeedata
 import ie_overrides
+import ie_install
 OVERRIDES = os.path.join(HERE, 'overrides', 'iwd')   # per-map hand overrides (ie_overrides.py, overrides/README.md)
 
 AREA, MAP_ID, GROUND_ID, START = 'AR1000', 5012, 900, (482, 424)
@@ -470,6 +471,11 @@ def main():
     copy_early_to_core(M, C)   # town map names / scroll limits are read before modules\IWD is mounted
     print('module overlay: %s  (%d areas: %s + %d interiors)' % (inst, 1 + len(interiors), AREA, len(interiors)))
     if a.install:
+        # an earlier convert's dialogue scripts with the same numbers would shadow ours (ie_install.py)
+        stale = ie_install.retire_stale(inst, toee, [MODULE, MODULE + '_core'])
+        if stale:
+            print('moved %d old converted script/dialogue files out of the way to %s' % (
+                len(stale), os.path.join(toee, 'ie2toee-stale')), flush=True)
         copytree(inst, toee)
         # The module archive: the player's own modules\ToEE.dat (base module data: rules, protos' scripts, ...),
         # hard-linked (or copied) as modules\IWD.dat. It makes the module selectable in TemplePlusConfig; the IWD
