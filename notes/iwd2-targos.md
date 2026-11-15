@@ -110,3 +110,10 @@ AR1004 passes both ways by real click. Worth a look: a townsfolk NPC can block t
 - Isher / Caulder in AR1200 were never gone: they are baked, their scripts run (Caulder's floaters), and 12ATKDEL only
   removes them once Goblins_Attack_Palisade != 0 (IE behaviour). The tour looked for givers only within ~20 tiles of the
   area entrances, and both stand ~70 tiles away; toee_autoplayer now scans the giver's placed spot first.
+- Var slots: 18 areas need 1218 IE vars for ToEE's 1000 (global vars 1000-1999). The dialogue step used to stop
+  ("too many variables"), and the install then kept the previous build's ie_areas.py (new areas had no map/placement).
+  Now GLOBAL/area vars and non-timer locals get slots; 218 actor timers (goblins, kegs) work in memory but are not saved.
+- Journal: 134 entries for 50 logbook slots. The new areas' entries are ordered last (--journal-late), so the quest ids
+  of the first ten areas are exactly those of the 10-area build; Deirdre/Koluhm/Ulbrec entries have no slot (flags work).
+- In game (box, harness save, teleport): Ulbrec, Deirdre, Koluhm, Ragni, Cahl-Hyred, Phaen (AR1106) found visible and their
+  dialogues open; AR1007 and AR1105 load. Autoplayer finds Isher at (535,473) and Caulder in AR1200 and talks to both.
