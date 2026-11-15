@@ -11,9 +11,9 @@
 # (LastTalkedToBy / Protagonist fallback). Each converted object has an IE identity string (its IE script name /
 # death variable) that keys LOCALS and NumTimesTalkedTo.
 #
-# Variables: IE GLOBAL / LOCALS / <area> / MYAREA variables are kept in game.global_vars slots that the converter
-# allocated (module ie_varslots: SLOTS = {'global:name': index, ...}); unallocated ones fall back to an in-memory
-# dict (logged, not saved). Timers (SetGlobalTimer) store the expiry time in game seconds.
+# Variables: every IE GLOBAL / LOCALS / <area> / MYAREA variable (and timer: absolute script-clock stamp) lives in the
+# save-backed dict of ie_vars, keyed 'GLOBAL:name', '<AREA>:name', 'LOCALS:<ident>:name'; it is written next to every
+# save and read back on load (Temple+ savehook, chained by tpModifiers/ie_varhooks.py).
 import random, re
 try:
     _NUM = (int, long, float)
@@ -49,13 +49,9 @@ def log_once(key, msg):
         log(msg)
 
 # ------------------------------------------------------------------------------------------------ variables
-SLOTS = {}
-try:
-    import ie_varslots
-    SLOTS = ie_varslots.SLOTS
-except ImportError:
-    pass
-_mem = {}
+import ie_vars
+ie_vars._log[0] = log
+VARS = ie_vars.STORE     # the live dict (tests: VARS.clear())
 _leave = [None, 0.0]   # LeaveAreaLUA: [last target map, real time]
 
 _clk = [None, 0.0]   # [last game time seen, real time when it changed]
@@ -77,35 +73,25 @@ def _now():
     return gt + int(_real() - _clk[1])
 
 def var_key(c, name, scope):
+    """ie_vars key: 'GLOBAL:name', 'LOCALS:<ident>:name', '<AREA>:name' (names lower case, spaces dropped as in the IE)."""
     if not (scope or '').strip() and ':' in (name or ''):
         scope, name = name.split(':', 1)        # IE: an empty area means the name carries it ("LOCALS:CREATURE_STATE_VAR")
-    s = (scope or 'GLOBAL').upper(); n = re.sub(r'\s+', '', name.lower())   # IE ignores spaces in variable names ("Apsel _Quest")
+    s = re.sub(r'\s+', '', (scope or 'GLOBAL').upper()) or 'GLOBAL'
+    n = re.sub(r'\s+', '', (name or '').lower())   # IE ignores spaces in variable names ("Apsel _Quest")
     if s == 'GLOBAL':
-        return 'global:' + n
+        return 'GLOBAL:' + n
     if s == 'LOCALS':
-        return 'locals:%s:%s' % (c.ident.lower(), n)
+        return 'LOCALS:%s:%s' % ((c.ident if c is not None else '').lower(), n)
     if s == 'MYAREA':
-        s = c.area.upper()
-    return 'area:%s:%s' % (s.lower(), n)
+        s = ((c.area if c is not None else '') or '').upper()
+    return '%s:%s' % (s, n)
 
 def get_var(c, name, scope):
-    k = var_key(c, name, scope)
-    i = SLOTS.get(k)
-    if i is not None and IN_GAME:
-        return game.global_vars[i]
-    if i is None:
-        log_once('slot:' + k, 'IE_VAR_UNALLOCATED %s (kept in memory, not saved)' % k)
-    return _mem.get(k, 0)
+    return ie_vars.get(var_key(c, name, scope))
 
 def set_var(c, name, scope, value):
     k = var_key(c, name, scope)
-    i = SLOTS.get(k)
-    if i is not None and IN_GAME:
-        game.global_vars[i] = int(value)
-    else:
-        if i is None:
-            log_once('slot:' + k, 'IE_VAR_UNALLOCATED %s (kept in memory, not saved)' % k)
-        _mem[k] = int(value)
+    ie_vars.put(k, value)
     log('SET %s = %d' % (k, int(value)))
 
 # ------------------------------------------------------------------------------------------------ context
@@ -1545,28 +1531,19 @@ _actor_names = {}   # area -> {ident (lower): ARE actor name}
 
 def death_vars(name):
     """What the IE engine does when a creature with script name `name` dies (GemRB Actor::Die): GLOBAL
-    "SPRITE_IS_DEAD<name>" += 1 (IWD, BG; IWD2 "_DEAD<name>"), counted, so 'four beetles dead' checks
-    (GlobalGT("SPRITE_IS_DEADEHBEETLE",3)) work; plus "<name>_DEAD" = 1 (BG2 SetDeathVar style). Dialogue and
-    scripts read these with Global(): Apsel's wolf quest is Global("SPRITE_IS_DEADEHWolf","GLOBAL",1)."""
+    "SPRITE_IS_DEAD<name>" += 1 (IWD, BG) and "_DEAD<name>" += 1 (IWD2), counted, so 'four beetles dead' checks
+    work; plus "<name>_DEAD" = 1 (BG2 SetDeathVar style). (Both counters: the var store has no slot limit.)"""
     n = re.sub(r'\s+', '', str(name or '').lower())
     if not n or n == 'none':
         return
-    inc = ['global:sprite_is_dead' + n, 'global:_dead' + n]
-    if not any(k in SLOTS for k in inc):
-        inc = inc[:1]                    # no converted dialogue/script reads either: keep the IWD one in memory
-    for k in inc:
+    for k in ('GLOBAL:sprite_is_dead' + n, 'GLOBAL:_dead' + n):
         _bump(k, 1)
-    _bump('global:%s_dead' % n, 0)
+    _bump('GLOBAL:%s_dead' % n, 0)
 
 def _bump(k, inc):
     """inc 1: += 1; inc 0: = 1"""
-    i = SLOTS.get(k)
-    if i is not None and IN_GAME:
-        v = game.global_vars[i] + 1 if inc else 1
-        game.global_vars[i] = v
-    else:
-        v = _mem.get(k, 0) + 1 if inc else 1
-        _mem[k] = v
+    v = ie_vars.get(k) + 1 if inc else 1
+    ie_vars.put(k, v)
     log('SET %s = %d (death)' % (k, v))
 
 def loop(obj, ident, area, mods, period_ms=1000):

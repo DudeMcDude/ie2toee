@@ -5,10 +5,9 @@ names) is derived from the game and must stay local. Nothing produced here is sh
 
     python3 ie_dialogue.py <IE dir> <out dir> --actor IDENT:AREA:SCRIPT_ID[:DLG][:BCS,BCS...] ...
                           [--area-script AREA:BCS] [--tlk dialog.tlk] [--fallback iesdp_opcodes.json]
-                          [--slot-base 1000]
 
 Output (<out>/modules/ToEE/...):  dlg/NNNNNie_<ident>.dlg   scr/pyNNNNNie_<ident>.py   scr/ie_bcs_<res>.py
-                                  scr/ie_varslots.py (persistent variable slots)   report.json
+                                  report.json
 The scr/ folder also needs proto/runtime/ie_runtime.py.
 """
 import os, re, json, argparse, math
@@ -384,14 +383,9 @@ def main():
                 rep.setdefault('cutscenes', []).append({'res': r_, 'module': m, 'blocks': nb})
             except Exception as e:
                 print('warning: cutscene %s: %s' % (r_, e))
-    allvars.add('global:chapter')    # IncrementChapter (ie_runtime) and the chapter checks: always saved
+    # IE variables live in the save-backed ie_vars dict at run time (no global_vars slots, no limit): only counted here
     keys = sorted(allvars)
-    if len(keys) > a.slot_max - a.slot_base + 1:
-        raise SystemExit('too many variables (%d) for slots %d..%d' % (len(keys), a.slot_base, a.slot_max))
-    slots = dict((k, a.slot_base + i) for i, k in enumerate(keys))
-    w(os.path.join(scr, 'ie_varslots.py'), HEADER + 'SLOTS = {\n%s\n}\n' %
-      '\n'.join('    %s: %d,' % (pystr(k), v) for k, v in sorted(slots.items(), key=lambda kv: kv[1])))
-    rep['vars'] = len(keys)
+    rep['vars'] = len(keys); rep['var_keys'] = keys
     # speech bubbles for floating text (FloatMessage/DisplayStringHead): one shared dialog file whose line ids are the
     # strrefs; ie_runtime floats them with objhndl.float_line (ToEE text bubble, lasts by text length) instead of the
     # short combat-style float_text_line.

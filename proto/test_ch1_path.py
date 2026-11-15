@@ -118,7 +118,7 @@ def flush(n=50):
                 print('  (time event %s: %s)' % (getattr(fn, '__name__', fn), e))
 
 def reset(maps=None):
-    game.global_vars.clear(); rt._mem.clear(); game.teleports[:] = []; game.played[:] = []
+    game.global_vars.clear(); rt.VARS.clear(); game.teleports[:] = []; game.played[:] = []
     rt._leave[:] = [None, 0.0]
     if maps:
         rt.AREA_MAPS.update(maps)

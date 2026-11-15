@@ -49,11 +49,10 @@ check('script name: spawn copy veira#2 -> veira', rt.script_name('veira#2') == '
 
 rt.death_vars('Pomab'); rt.death_vars('Pomab')
 check('death_vars counts (IE increments SPRITE_IS_DEAD)', T.Global(c, 'SPRITE_IS_DEADPomab', 'GLOBAL', 2))
-rt.SLOTS['global:_deadhedron'] = 1     # an IWD2 dialogue reads _DEAD<name>
 rt.death_vars('Hedron')
-check('IWD2 _DEAD<name> when a converted script reads it', rt._mem.get('global:_deadhedron') == 1)
+check('IWD2 _DEAD<name> counted too', rt.VARS.get('GLOBAL:_deadhedron') == 1 and rt.VARS.get('GLOBAL:hedron_dead') == 1)
 rt.death_vars('None'); rt.death_vars('')
-check('no script name: nothing set', 'global:sprite_is_deadnone' not in rt._mem)
+check('no script name: nothing set', 'GLOBAL:sprite_is_deadnone' not in rt.VARS)
 
 import ie_bake
 src = ie_bake.GENERIC_SCRIPT % {'area': 'AR1015'}
