@@ -90,3 +90,23 @@ AR1004 passes both ways by real click. Worth a look: a townsfolk NPC can block t
   usable during the battle), SetStartPos, Help() / Help trigger, PickPocketFailed. proto/test_scripts.py covers the rest
   offline (data checks need IWD2_DIR).
 
+
+## Nov 15: the rest of Targos (W1 of /workspace/ch1-plan.md) + Isher/Caulder (W2)
+- AREAS gets AR1007 (goblin store room under AR1002) and AR1101-AR1107 (the houses off AR1100), appended so the first
+  ten keep map ids 5031-5040 (old saves): AR1007 5041, AR1101 5042 ... AR1107 5048 (ground 960-967). Name ids: AR1007
+  21500.. (61 actors), AR1101-1107 21600+50k (all < 22000, the item names); script ids 3000+100k (2600-2999 are the
+  spawnables; vanilla has nothing in 1375-31999). The installer's stale-script sweep now covers 1500-3799.
+- Exits wire themselves (ie_exits: AR1002 To1007, AR1100 To1101-To1107 (no To1105: it is entered from AR1104), AR1104
+  To1105): 34 exit icons now. Engine path node bake (--engine-pathnodes) 18/18 areas; no one-way links.
+- Names: an interior off another outdoor area is named after that area ("Targos - Koluhm Bonecutter", "Targos
+  Palisade - Shawford Crale"), not after the start area ("Targos Docks - ...").
+- Shawford chain NPCs are placed: Ulbrec + Elytharra (AR1101), Deirdre + Loman + Jemeliah (AR1102), Koluhm + the
+  dead goblin/soldier "strange voices" (AR1107, start hidden). Also Phaen's house (AR1106: 11PHAEN; the AR1200 12PHAEN is
+  the battle copy), the temple (AR1103: Ragni, Denham, Maxiel, Valin, Garradun, Deagle, Urbek + a hidden doppelganger),
+  the Weeping Widow (AR1104: Cahl-Hyred + dogs; AR1105 has no actors), AR1007 (Rukwurm, Ulek, goblins, 12 kegs).
+- nav_check (offline): Ulbrec, Deirdre, Koluhm reachable from their entrances. AR1104 -> AR1105 (To1105 icon, the
+  stairs) is pinched below the leader clearance (no route offline; AR1105 is empty), and AR1101/AR1105 rooms behind
+  closed doors count as unreachable offline (doors are not modelled there).
+- Isher / Caulder in AR1200 were never gone: they are baked, their scripts run (Caulder's floaters), and 12ATKDEL only
+  removes them once Goblins_Attack_Palisade != 0 (IE behaviour). The tour looked for givers only within ~20 tiles of the
+  area entrances, and both stand ~70 tiles away; toee_autoplayer now scans the giver's placed spot first.
