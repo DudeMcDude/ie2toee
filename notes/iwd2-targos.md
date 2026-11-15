@@ -67,3 +67,26 @@ AR1004 passes both ways by real click. Worth a look: a townsfolk NPC can block t
   KOS critter or defends. Bake: non-hostile actors with template factions get one town faction 160.
 - Not covered: Temple+ attacks of opportunity by a town-side NPC against a PC (engine IsFriendly), runtime-spawned
   townsfolk keep proto factions.
+
+## Nov 15: script fixes (Swift Thomas' later reveal, Phaen, spawned townsfolk)
+- Root cause for Thomas and Phaen: IWD2 ARE V9.1 actors carry one more script slot at +0x90 (GemRB SCR_AREA). It was
+  never read, so 1000THMV / 1100THMV (unhide Swift Thomas once Jump_Check > 0), 12PHASPN (Phaen's reveal), 12ATKHID /
+  12ATKDEL (AR1200 townsfolk hidden / removed during the attack), 10FIRTHV, 12SHAWF0, 10BARDEL ... never ran. Now parsed
+  (ieformats.Are) and evaluated right after override (ie_creatures.actor_scripts). ie_bake.start_hidden ignores the
+  slot, so the AR1200 goblins left visible on purpose and Shawford keep their start state.
+- Phaen's trigger (1200_BATTLE_SETUP, PHAEN_SPAWN_TIMER) is set by AR1200.BCS, which never ran either: AR1200 and AR1201
+  name no area script and IWD2 runs <AREA>.BCS then (GemRB ForceAreaScript). Both run now. 12PHAEN starts hidden
+  (CRE flag; dropped from START_HIDDEN_KEEP) and appears about 5 s after the battle setup once the palisade attack
+  starts (Goblins_Attack_Palisade from Shawford). AR1200.BCS also hides the off-duty soldiers and recruits, lays out
+  IE corpses (spawned dead now), and sets GOBLIN_TEAM_x_STATE, so Goblin_Palisade_Quest can complete by itself.
+- Runtime: ChangeCurrentScript("") (a no-op before: the block fired every round and blocked the actor's later
+  scripts), IWD2 CreateCreature(res, name, point, face), HideCreature on a missing name no longer hides the caller
+  (area scripts: the party leader), NearestPC, AnyPCOnMap. Hidden non-hostile critters always run their scripts.
+- Spawned townsfolk (CreateCreature / INI / rest) get town faction 160 like baked ones (ie_runtime.town_factions);
+  hostile and factionless spawns unchanged, summons untouched.
+- 10FIRTHH (Firtha's hidden copy in AR1000) is never shown in IWD2: it is a hidden voice whose 10FIRTHV floats her cries
+  for help until AR1004's goblins are dead; it runs now. 12MESS is shown by the 12CWAR0 cutscene (already converted).
+- Not done: Activate/Deactivate (ambient sounds), SetMusic, CloseDoor, TriggerActivation (AR1200's To1100 exit stays
+  usable during the battle), SetStartPos, Help() / Help trigger, PickPocketFailed. proto/test_scripts.py covers the rest
+  offline (data checks need IWD2_DIR).
+

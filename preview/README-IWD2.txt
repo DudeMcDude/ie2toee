@@ -129,6 +129,9 @@ KNOWN ISSUES
   * Fixed on the iwd2-targos branch after this preview (needs a reconvert): Swift Thomas no longer appears in
     Targos before the palisade attack, and Reig and other townsfolk fighting goblins no longer turn on the party.
     (The trailing faction 0 was only the end of ToEE's faction list, not the cause.)
+    Also fixed there (reconvert + new game): Swift Thomas shows up at the docks again once you have talked to
+    him at the palisade, Phaen of the Rags stays hidden until the palisade attack, and the palisade's own
+    battle script now runs (off-duty soldiers leave, the goblin teams count toward the quest).
   * Pathfinding: generated nodes are dense (6-tile spacing) with some redundant nodes in open areas, and
     link distances are straight-line / aerial rather than the actual walking route, which can look wrong
     (Targos was called out in playtest). A later unify-pass and walk-path linking are planned but are not

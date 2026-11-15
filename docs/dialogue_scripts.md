@@ -62,7 +62,11 @@ If the files are in a folder that isn't mounted yet at discovery (e.g. loose `mo
   it evaluates the blocks top-down, runs one weighted-random response of the first true block, and only keeps
   evaluating when that response ends in `Continue()`. `OR(n)` groups are honoured.
 * Creature scripts: the NPC's ToEE script (`py<id>ie_<ident>.py`) imports its BCS modules in IE priority order and
-  ticks them from `san_heartbeat` (throttled to one round per second). `san_first_heartbeat` sets `OnCreation`.
+  ticks them from `san_heartbeat` (throttled to one round per second). Order (GemRB): override, the IWD2 ARE actor
+  "area" slot (V9.1 actor +0x90, e.g. 1000THMV / 12PHASPN / 12ATKHID), specifics, class, race, general, default.
+  Hidden (OF_OFF) critters get no engine heartbeat; `ie_bakert.hidden_tick` runs the scripts of hidden non-hostile
+  critters, and of hidden hostile ones only when a script is written for the hidden state (CreatureHidden /
+  StartCutScene). `ChangeCurrentScript("")` drops the running script for that actor. `san_first_heartbeat` sets `OnCreation`.
   `san_dying` -> `Die`, `san_enter_combat`/`san_start_combat` -> `AttackedBy`. These are event triggers that the
   next round consumes (`AttackedBy`/`HitBy` last one round).
 * Combat rounds:
@@ -74,7 +78,8 @@ If the files are in a folder that isn't mounted yet at discovery (e.g. loose `mo
     static strategy is the fallback.
   * Hostile creatures defer Spell and Attack responses until their first round.
   * Details: [spells.md, Combat rounds](spells.md#combat-rounds-san_start_combat).
-* Area scripts: driven by `rt.loop(holder, 'area_<AREA>', AREA, [module])`, a real-time time event. In the pilot the
+* Area scripts: IWD2 runs `<AREA>.BCS` when the ARE header names none (GemRB ForceAreaScript; AR1200, AR1201).
+  Driven by `rt.loop(holder, 'area_<AREA>', AREA, [module])`, a real-time time event. In the pilot the
   holder is the party leader. For release, the converter should place an invisible holder object per map with a
   `san_heartbeat`.
 * Action queue: actions run in order. Actions that take time (`Wait`, `MoveToPoint`, `AttackOneRound`...) return a
