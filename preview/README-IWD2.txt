@@ -1,14 +1,35 @@
-ICEWIND DALE II (TARGOS) IN THE TEMPLE OF ELEMENTAL EVIL ENGINE - EARLY PREVIEW (2026-11-11b)
-===========================================================================================
+ICEWIND DALE II (TARGOS) IN THE TEMPLE OF ELEMENTAL EVIL ENGINE - EARLY PREVIEW (2026-11-15)
+==========================================================================================
 
 An early-preview, AI-assisted experiment. It converts the opening of Icewind Dale II - Targos (the docks
 I2AR1000, its interiors AR1001-AR1006, AR1100, the palisade AR1200 and AR1201) - from YOUR OWN copy of Icewind Dale II into maps for
 The Temple of Elemental Evil running on the bundled Temple+ build. No Icewind Dale II data is included in this
 download: the converter reads it from your install, on your PC. This is not a playable conversion of IWD2.
 
-NEW IN THIS PREVIEW (2026-11-11b)
+NEW IN THIS PREVIEW (2026-11-15)
 --------------------------------
   Still an early-preview, AI-assisted experiment: not a playable or polished conversion.
+  * The rest of Targos is converted: AR1007 (the goblin store room) and the houses AR1101-AR1107 (Ulbrec,
+    Deirdre, Koluhm and others) as maps 5041-5048, so the Shawford quest chain has its people.
+  * Swift Thomas starts hidden; townsfolk fighting goblins no longer turn on the party; AR1200/AR1201 area
+    scripts run (the palisade attack).
+  * Thick blocker edges are a little more lenient, so the party gets closer to exit icons and doors.
+  * IE variables (globals, area and actor locals, timers) are kept in a file next to each save (<save>.iev)
+    instead of a fixed block of ToEE global slots (Targos needs about 1,200 of them).
+  * Bundled Temple+ 0.2.98 (see TemplePlus\IE-PREVIEW-SOURCE.txt): the info-point magnifier cursor no longer
+    leaves a stale cursor on screen.
+  * New: an autoplayer (Autoplayer\README.txt) that starts a new game and drives the Shawford chain by itself,
+    for testing. It takes over the game window while it runs.
+  * Saves: start a NEW game (new maps, and older saves' quest/dialogue variables start from zero).
+  * Pathing: the engine path node bake (clearance.bin and engine-relinked path nodes) runs only in the
+    developer's Linux/Wine setup (--engine-pathnodes), not in convert_iwd2.bat; Windows converts use the
+    generator's nodes, so the party may not path well to some exit icons. If you fix tiles with the DM Sector
+    Tiles editor ("Save Tile Edits") or make a better path node set for a map, please send the files
+    (%USERPROFILE%\Saved Games\TemplePlus\dm_tile_edits\<module>\map<id>.json, and the map's pathnodenew.pnd /
+    pathnodedist.pnd / clearance.bin) with the map id, so they can ship as overrides.
+
+EARLIER (2026-11-11b)
+--------------------------------
   * The IE dialogue window now has the 130x150 side portrait slot (it was missing from the IWD2 skin even
     though IWD already had it). Talk to Hedron after a reconvert, or by adding the portrait key to skin.json
     and restarting. A reconvert with this package installs the slot.
