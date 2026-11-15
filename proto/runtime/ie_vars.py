@@ -62,6 +62,8 @@ def _check():
     if g is None:
         return
     t = _gv(g)
+    if t is None:
+        return                    # (no readable global_vars: keep the store)
     if t and t == _state['token']:
         return
     if STORE:
