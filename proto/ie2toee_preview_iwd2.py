@@ -1,10 +1,10 @@
-"""IWD2 proof of concept: converts Targos (IE areas AR1000-AR1006, AR1100, AR1200-AR1201) of YOUR OWN Icewind Dale II install
+"""IWD2 proof of concept: converts Targos (IE areas AR1000-AR1007, AR1100-AR1107, AR1200-AR1201) of YOUR OWN Icewind Dale II install
 (GOG or retail) into ToEE maps for the preview Temple+ build.
 
   python ie2toee_preview_iwd2.py --iwd2 "C:\\GOG Games\\Icewind Dale 2" --toee "C:\\GOG Games\\ToEE-IWD2" [--out iwd2_out] [--install]
 
 Same converter steps as ie2toee_preview.py (map, spells, creatures, items, bake, travel exits, exit icons, path nodes),
-plus dialogue for the Targos NPCs (ie_dialogue.py; journal/quests not yet) and the IE dialogue window (ie_dialog_skin.py, from your install's GUI). Maps are named I2AR1000.. (map ids from map_id_base in guidance/iwd2.json, currently 5031-5040, immediately after IWD's 5012-5030) so they stay <= 5198 (temple.dll town map) and do not collide with IWD or ENGINE_MAP_IDS.
+plus dialogue for the Targos NPCs (ie_dialogue.py; journal/quests not yet) and the IE dialogue window (ie_dialog_skin.py, from your install's GUI). Maps are named I2AR1000.. (map ids from map_id_base in guidance/iwd2.json, currently 5031-5048: AR1000-1006, AR1100, AR1200, AR1201 = 5031-5040 (unchanged, old saves), then AR1007, AR1101-1107 = 5041-5048) so they stay <= 5198 (temple.dll town map) and do not collide with IWD or ENGINE_MAP_IDS.
 Install target (use a COPY of ToEE): maps, ground art, rules -> modules\\ToEE; scripts and description .mes ->
 modules\\ToEE_core (Temple+ discovers scripts before modules\\ToEE is mounted); item icons -> data\\.
 Nothing of IWD2 is shipped: everything is read from the install you point it at.
@@ -22,11 +22,18 @@ from ie2toee_preview import (run, run_soft, copytree, mes_with, RUNTIME,
 
 GUIDE = os.path.join(HERE, 'guidance', 'iwd2.json')
 OVERRIDES = os.path.join(HERE, 'overrides', 'iwd2')   # per-map hand overrides (ie_overrides.py, overrides/README.md)
-AREAS = ['AR1000', 'AR1001', 'AR1002', 'AR1003', 'AR1004', 'AR1005', 'AR1006', 'AR1100', 'AR1200', 'AR1201']
+AREAS = ['AR1000', 'AR1001', 'AR1002', 'AR1003', 'AR1004', 'AR1005', 'AR1006', 'AR1100', 'AR1200', 'AR1201',
+         # the rest of Targos (appended so the first ten keep their map ids): AR1007 goblin warehouse off AR1002,
+         # AR1101-AR1107 the houses off AR1100 (Ulbrec 1101, Deirdre 1102, Koluhm 1107: the Shawford chain)
+         'AR1007', 'AR1101', 'AR1102', 'AR1103', 'AR1104', 'AR1105', 'AR1106', 'AR1107']
 SPAWN_SCRIPT_BASE = 2600   # runtime-spawned creatures with a dialog/scripts: 2600..2999
 # name ids stay below the ~30000 description cap: 28000+250i for the first 8 areas, then the free gap 20800-21999
-# (spawn names 20300.., item names 22000..); AR1200 has >100 actors, so its scripts get 150 slots
-AREA_BASES = {'AR1200': (21000, 2300), 'AR1201': (21400, 2450)}
+# (spawn names 20300.., item names 22000..); AR1200 has >100 actors, so its scripts get 150 slots.
+# Areas 10+ (AR1007: 61 actors, AR1101-1107: <= 8 each): names 21500.. (100 for AR1007, then 50 each, all < 22000);
+# scripts 3000+100k (2600-2999 are the spawnables; vanilla ToEE has no scripts 1375-31999)
+AREA_BASES = {'AR1200': (21000, 2300), 'AR1201': (21400, 2450), 'AR1007': (21500, 3000)}
+AREA_BASES.update({ar: (21600 + 50 * k, 3100 + 100 * k) for k, ar in enumerate(['AR1101', 'AR1102', 'AR1103', 'AR1104', 'AR1105', 'AR1106', 'AR1107'])})
+SCRIPT_ID_MAX = 3799   # (installer: stale scripts of an earlier build in 1500..SCRIPT_ID_MAX are moved aside)
 SCRIPT_BASE = 1500  # area i's actor scripts 1500+100i.. (vanilla ToEE: <= 1374); dialogue for the actors with a DLG
 START = (450, 490)   # fallback: I2AR1000 tile of IWD2's own new-game spot (STARTARE.2DA 2390,860, the docks)
 
@@ -304,13 +311,13 @@ def main():
     copy_early_to_core(M, C)   # town map names / scroll limits are read before modules\ToEE is mounted
     print('overlay: %s  (%d areas: %s)' % (inst, len(ok), ' '.join('I2' + x for x in ok)))
     if a.install:
-        # scripts/dialogs of an earlier install in our id range (1500-2999) that this build no longer has (ids moved):
+        # scripts/dialogs of an earlier install in our id range (1500-SCRIPT_ID_MAX) that this build no longer has (ids moved):
         # moved aside (out/stale_install), never deleted, so Temple+ sees one file per script id
         for sub in ('scr', 'dlg'):
             d_ = os.path.join(toee, 'modules', 'ToEE_core', sub)
             for f in (os.listdir(d_) if os.path.isdir(d_) else []):
                 m_ = re.match(r'(?:py)?(\d{5})ie_', f)
-                if m_ and 1500 <= int(m_.group(1)) <= 2999 and not os.path.exists(os.path.join(C, sub, f)):
+                if m_ and 1500 <= int(m_.group(1)) <= SCRIPT_ID_MAX and not os.path.exists(os.path.join(C, sub, f)):
                     os.makedirs(os.path.join(out, 'stale_install', sub), exist_ok=True)
                     shutil.move(os.path.join(d_, f), os.path.join(out, 'stale_install', sub, f))
         copytree(inst, toee)

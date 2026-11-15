@@ -151,7 +151,7 @@ def area_names(ie, w, specs, shops, start_area='AR1000', prefix=''):
             for c in gl.get('CREATURES', []):
                 if (c.get('resref') or '').lower() in ie_creatures.PORTRAITS:
                     try:
-                        name = '%s - %s' % (town, t.get(iecre.Cre(g.read(c['resref'], 'cre'), c['resref']).as_dict()['name_strref']))
+                        name = '%s - %s' % (wmp.get(parent.get(key)) or town, t.get(iecre.Cre(g.read(c['resref'], 'cre'), c['resref']).as_dict()['name_strref']))
                         break
                     except Exception:
                         pass
@@ -169,8 +169,10 @@ def area_names(ie, w, specs, shops, start_area='AR1000', prefix=''):
         pa = parent.get(key)
         # look up the parent's display name under either the prefixed or bare key
         pname = next((out[k] for k in out if _bare_area(k, prefix) == pa and out[k]), None)
+        ptown = wmp.get(pa) or town   # an interior off another outdoor area (IWD2 Targos AR1100) is named after that area
         out[ar] = ('%s - Outskirts' % town if at & 1 else '%s - Cave' % town if at & 0x20 else
-                   '%s - Side Room' % pname if pa not in (None, start_area) and pname else '%s - House (%s)' % (town, key))
+                   '%s - Side Room' % pname if pa not in (None, start_area) and pa not in wmp and pname else
+                   '%s - House (%s)' % (ptown, key))
     return {ar: n.replace('{', '(').replace('}', ')') for ar, n in out.items()}
 
 
