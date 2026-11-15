@@ -111,6 +111,7 @@ class Ctx(object):
         self.me, self.other, self.ident, self.area = me, other, ident, area
         self.events = events or {}
         self.last_trigger = None
+        self.script = None      # the BCS module being evaluated (ChangeCurrentScript)
     def __repr__(self):
         return 'Ctx(%s)' % self.ident
 
@@ -209,6 +210,12 @@ def O(c, name, inner=None):
     if n.startswith('player') and n[6:].isdigit():
         p = _party(); i = int(n[6:]) - 1
         return p[i] if i < len(p) else None
+    if n == 'nearestpc':          # (12PHASPN: FaceObject(NearestPC) as Phaen appears)
+        p = _party()
+        try:
+            return min(p, key=lambda o: base.distance_to(o)) if p and base is not None else (p and p[0] or None)
+        except Exception:
+            return p and p[0] or None
     if n in ('nearestenemyof', 'nearest', 'secondnearestenemyof'):
         return _nearest_enemy(base)
     if n in ('lastattackerof', 'lasthitter', 'lasttargetedby', 'lasthelp'):
@@ -344,6 +351,15 @@ class _Triggers(object):
     def InCutsceneMode(self, c):
         import ie_cutscene; return ie_cutscene.active()
     def EntirePartyOnMap(self, c): return True      # (the converted party always travels together)
+    def AnyPCOnMap(self, c):
+        """a party member is on the caller's area (scripts only tick while the party is on the map)."""
+        if not IN_GAME:
+            return True
+        try:
+            m = AREA_MAPS.get((c.area or '').upper())
+            return m is None or game.leader.map == m
+        except Exception:
+            return True
     def False_(self, c): return False
 
     def Global(self, c, name, scope, v): return get_var(c, name, scope) == v
@@ -734,6 +750,8 @@ COMBAT_ACTIONS = set(['Spell', 'SpellNoDec', 'ForceSpell', 'ForceSpellRange', 'R
 def _noop(*args):
     return None
 
+_MISSING = object()     # an action argument that was not given (vs. an object reference that resolved to None)
+
 class _Actions(object):
     def __getattribute__(self, name):
         if MODE['dry'] and name[:1] != '_' and name not in COMBAT_ACTIONS:
@@ -915,8 +933,29 @@ class _Actions(object):
                 pass
         return 2
     def SetInterrupt(self, c, flag): return None
-    def CreateCreature(self, c, cre, pt, face=0):
-        import ie_spawn; ie_spawn.create(c, cre, pt, face)
+    def ChangeCurrentScript(self, c, res):
+        """Replace the script being evaluated for this actor; "" removes it (12ATKHID / 12ATKUHP / 12SHAWF0 drop themselves
+        once done). Left as a no-op the block fired every round and, having no Continue(), kept the actor's later
+        scripts (combat AI) from ever running."""
+        cur = getattr(c, 'script', None)
+        if cur is None:
+            return None
+        rep_ = None
+        if res:
+            try:
+                rep_ = __import__('ie_bcs_%s' % res.lower())
+            except ImportError:
+                log_once('ccs:' + res.lower(), 'IE_UNSUPPORTED ChangeCurrentScript(%s): not converted, script dropped' % res)
+        _swapped[(c.ident, cur.__name__)] = rep_
+        log('CHANGE_SCRIPT %s %s -> %s' % (c.ident, cur.__name__, rep_ and rep_.__name__ or '(none)'))
+    def CreateCreature(self, c, cre, *rest):
+        # IWD/BG CreateCreature(S:NewObject, P:Location, I:Face); IWD2 adds S:ScriptName before the point
+        # (AR1200.BCS: CreateCreature("12GOBD", "DEAD_BODY_00", [2200.2159], 14), later HideCreature("DEAD_BODY_00"))
+        rest = list(rest)
+        name = rest.pop(0) if rest and isinstance(rest[0], str) else ''
+        pt = rest[0] if rest else (-1, -1)
+        face = rest[1] if len(rest) > 1 else 0
+        import ie_spawn; ie_spawn.create(c, cre, pt, face, name or None)
     CreateCreatureImpassable = CreateCreature
     def CreateCreatureObject(self, c, cre, obj, *rest):
         import ie_spawn; ie_spawn.create(Ctx(obj or c.me, c.other, c.ident, c.area, c.events), cre, (-1, -1), 0)
@@ -1066,8 +1105,10 @@ class _Actions(object):
             x, y = location_to_axis(c.me.location)
             _walk(c.me, x + random.randint(-3, 3), y + random.randint(-3, 3))
         return 2
-    def HideCreature(self, c, obj=None, flag=1):
-        o = obj or c.me
+    def HideCreature(self, c, obj=_MISSING, flag=1):
+        # a named target that is not there (destroyed, never spawned: AR1200.BCS hides DEAD_BODY_xx, Swift_Thomas ...)
+        # does nothing; it used to fall back to c.me, which for an area script is the party leader
+        o = c.me if obj is _MISSING else obj
         if IN_GAME and o is not None:
             (o.object_flag_set if flag else o.object_flag_unset)(OF_OFF)
     def ChangeEnemyAlly(self, c, obj, ea):
@@ -1384,6 +1425,18 @@ def _cutscene_on():
     except ImportError:
         return False
 
+_swapped = {}      # (ident, module name) -> replacement module or None (ChangeCurrentScript); memory only
+
+def _live_scripts(ident, scripts):
+    out = []
+    for m in scripts:
+        seen = 0
+        while m is not None and (ident, m.__name__) in _swapped and seen < 8:
+            m = _swapped[(ident, m.__name__)]; seen += 1
+        if m is not None:
+            out.append(m)
+    return out
+
 def tick(obj, ident, area, scripts, force=False):
     """Run one script round for a creature/area. `scripts` = list of generated BCS modules in IE priority order
     (override, specifics, class, race, general, default). Throttled to ROUND_SECS; skipped while the object's
@@ -1405,7 +1458,8 @@ def tick(obj, ident, area, scripts, force=False):
     if _busy.get(ident, 0) > now and not ev:
         return
     c = Ctx(obj, None, ident, area, ev)
-    for m in scripts:
+    for m in _live_scripts(ident, scripts):
+        c.script = m
         if run_script(c, m.BLOCKS):
             break
     # IE: AttackedBy/HitBy are true for one script round; left pending they also bypassed the busy check above, so

@@ -73,6 +73,13 @@ def spawn(res, area, u, v, face=None, seed=None, near=None, taken=None, ident=No
     except Exception, e:
         rt.log('IE_ERR spawn %s: %s' % (res, e)); return None
     rt.bind(o, instance_ident(ident or s.get('ident') or res.lower()), area)
+    if s.get('dead'):     # IE STATE_DEAD corpse (AR1200.BCS battle dressing: 12GOBD, 10SOLDRD, ...): lies dead
+        try:
+            o.critter_kill_by_effect()
+        except Exception, e:
+            rt.log('IE_ERR kill corpse %s: %s' % (res, e))
+        rt.log('SPAWN %s at tile(%d,%d) (corpse)' % (res, u, v))
+        return o
     rt.log('SPAWN %s at tile(%d,%d) portrait %s' % (res, u, v, por))
     if script_id or s.get('script_id'):
         game.timeevent_add(_heartbeat, (o, 1), HEARTBEAT_MS, 1)
@@ -97,8 +104,8 @@ def _heartbeat(o, first=0):
     game.timeevent_add(_heartbeat, (o, 0), HEARTBEAT_MS, 1)
     return 0
 
-def create(c, res, pt, face=0):
-    """IE CreateCreature(res, point, face)."""
+def create(c, res, pt, face=0, name=None):
+    """IE CreateCreature(res, point, face); IWD2 `name` = the script name the new creature answers to."""
     if not rt.IN_GAME:
         rt.log('SPAWN %s at %r (dry)' % (res, pt)); return None
     x, y = (pt[0], pt[1]) if isinstance(pt, (tuple, list)) and len(pt) >= 2 else (-1, -1)
@@ -108,7 +115,8 @@ def create(c, res, pt, face=0):
         u, v = location_to_axis(me.location)
     else:
         u, v = rt.ie_to_tile(c.area, x, y)
-    return spawn(res, c.area or '', u, v, face, seed='%s:%s:%s' % ((c.area or '').upper(), x, y) if x >= 0 and _N[0] == 0 else None)
+    return spawn(res, c.area or '', u, v, face, seed='%s:%s:%s' % ((c.area or '').upper(), x, y) if x >= 0 and _N[0] == 0 else None,
+                 ident=name)
 
 _IDS = {}
 

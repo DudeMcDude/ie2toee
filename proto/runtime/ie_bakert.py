@@ -223,9 +223,10 @@ def _names(f, out):
             _names(k, out)
 
 def _wants_hidden(m):
-    """Only scripts written for the hidden state run while hidden (12caba05: wait hidden, then StartCutScene;
-    12atkuhp: CreatureHidden(Myself) -> unhide). The ordinary combat scripts of a hidden goblin wave would see the
-    party and attack from hiding."""
+    """A hidden KOS critter only runs scripts written for the hidden state (12caba05: wait hidden, then StartCutScene;
+    12atkuhp: CreatureHidden(Myself) -> unhide); the ordinary combat scripts of a hidden goblin wave would see the
+    party and attack from hiding. Hidden non-hostile critters always run theirs, as in the IE (Firtha's hidden voice
+    10FIRTHH: 10FIRTHV floats her cries for help; Swift Thomas' 1000THMV waits for Jump_Check)."""
     k = 'wants_' + m.__name__
     if k not in _hb_mods:
         ns = set()
@@ -257,8 +258,10 @@ def hidden_tick(gen, mapid):
             if not (o.object_flags_get() & OF_OFF) or (o.object_flags_get() & OF_DESTROYED):
                 continue
             m = _hb_module(o.scripts[san_heartbeat], rt._bound[k][0])
-            if m is None or not hasattr(m, 'IDENT') or not _wants_hidden(m):
+            if m is None or not hasattr(m, 'IDENT'):
                 continue
+            if not _wants_hidden(m) and (o.npc_flags_get() & ONF_KOS):
+                continue      # (a hidden hostile's ordinary combat scripts would attack from hiding)
             m.san_heartbeat(o, o); n += 1
         if n and not _hb_mods.get('logged%d' % gen):
             _hb_mods['logged%d' % gen] = 1; _log('IE_BAKE hidden tick: %d hidden critters run their scripts' % n)
