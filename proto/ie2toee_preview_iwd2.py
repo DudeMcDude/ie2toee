@@ -76,6 +76,10 @@ def main():
     ap.add_argument('--tp', help='the preview Temple+ folder')
     ap.add_argument('--out', default='iwd2_preview_out')
     ap.add_argument('--install', action='store_true')
+    ap.add_argument('--engine-pathnodes', action='store_true',
+                    help='after --install (box/Linux + Wine only): Temple+ itself writes clearance.bin and recalculates the '
+                         'path node links for every map (pathnode_bake.sh; env TOEE_DIR, TP_DIST, TOEE_XVFB). Without '
+                         'clearance.bin the engine could not path the party to most IWD2 exit icons')
     a = ap.parse_args()
     ie, toee, out = os.path.abspath(a.iwd2), os.path.abspath(a.toee), os.path.abspath(a.out)
     if 'chitin.key' not in [n.lower() for n in os.listdir(ie)]:
@@ -314,6 +318,17 @@ def main():
             for f in fs:
                 if f.endswith('.pyc'): os.remove(os.path.join(root, f))
         print('installed into %s' % toee)
+        if a.engine_pathnodes:   # engine-side path node links + clearance data (as ie2toee_preview.py --engine-pathnodes)
+            import subprocess
+            print('== engine path nodes + clearance', flush=True)
+            env = dict(os.environ, TOEE_OVERLAY=toee, PNBAKE_MODULE='ToEE', PNBAKE_COPY_TO=os.path.join(M, 'maps'),
+                       TP_DIST=os.environ.get('TP_DIST', a.tp or ''))
+            r = subprocess.run(['bash', os.path.join(HERE, 'pathnode_bake.sh'), tr], cwd=HERE, env=env)
+            if r.returncode:
+                sys.exit('step "engine path nodes" failed (exit %d)' % r.returncode)
+            for ar in ok:   # hand-made path node data still wins
+                for d_ in (os.path.join(M, 'maps', 'I2' + ar), os.path.join(toee, 'modules', 'ToEE', 'maps', 'I2' + ar)):
+                    ie_overrides.install_pathnodes(OVERRIDES, 'I2' + ar, d_)
     print('done. Start a NEW game in TemplePlus.exe: it begins at the Targos docks.')
 
 
