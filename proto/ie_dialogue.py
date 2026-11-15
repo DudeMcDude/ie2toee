@@ -304,6 +304,7 @@ def main():
     ap.add_argument('--new-game', action='append', default=[], help='NAME=value: an IE GLOBAL a new game starts with (IWD2: CHAPTER=-1)')
     ap.add_argument('--barks-sid', type=int, default=1499, help='dialog script id of the speech-bubble file (dlg/NNNNNie_barks.dlg)')
     ap.add_argument('--quest-base', type=int, default=120, help='first ToEE quest id for IE journal entries (vanilla: 0-60)')
+    ap.add_argument('--journal-late', action='append', default=[], help='AREA whose journal entries get quest slots last')
     ap.add_argument('--quest-max', type=int, default=199, help='last one (the logbook has 200 quests)')
     a = ap.parse_args()
     game = iefs.IEGame(a.game)
@@ -384,8 +385,23 @@ def main():
             except Exception as e:
                 print('warning: cutscene %s: %s' % (r_, e))
     keys = sorted(allvars)
-    if len(keys) > a.slot_max - a.slot_base + 1:
-        raise SystemExit('too many variables (%d) for slots %d..%d' % (len(keys), a.slot_base, a.slot_max))
+    room = a.slot_max - a.slot_base + 1
+    if len(keys) > room:
+        # ToEE has 2000 global vars (1000.. ours): when they run out, GLOBALs and area vars keep their slots first, then
+        # actor LOCALS (talk counts before timers); the rest stay in memory only (ie_runtime IE_VAR_UNALLOCATED: they
+        # work, but are not saved). IWD2 Targos with all 18 areas: ~1200 vars, the overflow is goblin/keg timers.
+        def rank(k):
+            n = k.split(':')[-1]
+            return (0 if k.startswith('global:') else 1 if k.startswith('area:') else
+                    2 if not n.startswith('#') else 3 if n == '#talked' else 4)
+        keep = set(sorted(keys, key=lambda k: (rank(k), k))[:room])
+        drop = [k for k in keys if k not in keep]
+        if any(rank(k) < 2 for k in drop):
+            raise SystemExit('too many GLOBAL/area variables for slots %d..%d' % (a.slot_base, a.slot_max))
+        print('warning: %d variables for %d slots %d..%d: %d actor locals stay unsaved (in memory), e.g. %s' % (
+            len(keys), room, a.slot_base, a.slot_max, len(drop), ', '.join(drop[:5])))
+        rep['vars_unsaved'] = drop
+        keys = sorted(keep)
     slots = dict((k, a.slot_base + i) for i, k in enumerate(keys))
     w(os.path.join(scr, 'ie_varslots.py'), HEADER + 'SLOTS = {\n%s\n}\n' %
       '\n'.join('    %s: %d,' % (pystr(k), v) for k, v in sorted(slots.items(), key=lambda kv: kv[1])))
@@ -405,7 +421,11 @@ def main():
     # journal entries -> ToEE logbook quests (mes/gamequestlog.mes: title at id, description at id + 200)
     qids = list(range(a.quest_base, a.quest_max + 1)); jmap = {}; jl = []
     merged = merge_journals(journals, origin, text, jvars, jerase)
-    for r in sorted(r for r in journals if r not in merged):
+    # journal slots by strref, but entries first seen in a --journal-late area come after all the others, so areas
+    # appended to a converter's list (IWD2: AR1007, AR1101-1107) cannot push the earlier areas' entries (Shawford's
+    # chain, Isher, Caulder) out of the 50 slots, and the earlier ones keep their quest ids (saves)
+    late = set(x.upper() for x in a.journal_late)
+    for r in sorted((r for r in journals if r not in merged), key=lambda r: (jarea.get(r, '') in late, r)):
         if not qids:
             print('warning: more journal entries than quest slots %d..%d: %d dropped' % (a.quest_base, a.quest_max, len(journals) - len(jmap)))
             break

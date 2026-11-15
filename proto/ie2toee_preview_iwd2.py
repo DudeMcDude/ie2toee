@@ -33,6 +33,7 @@ SPAWN_SCRIPT_BASE = 2600   # runtime-spawned creatures with a dialog/scripts: 26
 # scripts 3000+100k (2600-2999 are the spawnables; vanilla ToEE has no scripts 1375-31999)
 AREA_BASES = {'AR1200': (21000, 2300), 'AR1201': (21400, 2450), 'AR1007': (21500, 3000)}
 AREA_BASES.update({ar: (21600 + 50 * k, 3100 + 100 * k) for k, ar in enumerate(['AR1101', 'AR1102', 'AR1103', 'AR1104', 'AR1105', 'AR1106', 'AR1107'])})
+LATE_AREAS = AREAS[10:]   # their journal entries get the 50 logbook slots last (the first ten keep theirs)
 SCRIPT_ID_MAX = 3799   # (installer: stale scripts of an earlier build in 1500..SCRIPT_ID_MAX are moved aside)
 SCRIPT_BASE = 1500  # area i's actor scripts 1500+100i.. (vanilla ToEE: <= 1374); dialogue for the actors with a DLG
 START = (450, 490)   # fallback: I2AR1000 tile of IWD2's own new-game spot (STARTARE.2DA 2390,860, the docks)
@@ -156,7 +157,7 @@ def main():
         except Exception as e:
             print('warning: area script of %s: %s' % (ar, e))
     dlg_cmd = ['ie_dialogue.py', ie, dlg, '--strip-directions', '--quest-base', '150', '--quest-max', '199',
-               '--new-game', 'CHAPTER=-1'] + actors + amap + ascr
+               '--new-game', 'CHAPTER=-1'] + actors + amap + ascr + sum((['--journal-late', x] for x in LATE_AREAS), [])
     run_soft('dialogue', dlg_cmd)
     spw = os.path.join(w, 'spawnables')   # CreateCreature / spawn-point / summon CREs (ie_spawn.py at runtime)
     run_soft('spawnables', ['ie_creatures.py', 'spawnables', ie, toee, spw, '--whole-game', '--scr', dlg,
