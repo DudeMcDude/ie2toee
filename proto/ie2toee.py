@@ -2,7 +2,7 @@
 """Prototype: convert one IE area (BG/IWD/IWD2) into a ToEE/Temple+ map folder.
 
   python3 ie2toee.py --game <IE install> --area AR1000 --out <outdir> [--map-id 5012] [--ground-id 900]
-                     [--guidance guidance/iwd.json] [--closed-doors] [--preview]
+                     [--guidance guidance/iwd.json] [--closed-doors] [--preview] [--overrides overrides/iwd]
 
 Writes (all derived from the player's own files, on the player's machine):
   art/ground/<AREA>/yyyyxxxx.jpg  256x256 background tiles (+ <AREA>_night if an N variant exists)
@@ -59,6 +59,10 @@ DEFAULT_GUIDANCE = {
     # Per-area: "areas": {"AR1000": {"widen_narrow": 0}} disables it; "searchmap_fix" rects still apply after it;
     # "anchor_fix": {"To1201": [u, v]} overrides a travel region's anchor (its exit icon / trigger point).
     "widen_narrow": 0,   # opt-in (e.g. 2); off by default
+    # lenient blocker edges (lenient_edges): subtiles shaved off the edges of thick blocked regions, since a ToEE
+    # mover's radius reaches well past its model; walls keep a core, thin walls and door cells are not touched.
+    # Per-area "edge_leniency" overrides it. Off by default (IWD's maps and hand overrides were tuned without it).
+    "edge_leniency": 0,
     "placement": "centre",   # or [cx, cy] canvas offset of the IE image's top-left pixel
     "cal": [0.0, 0.0],       # extra canvas-pixel correction (CAL_DX, CAL_DY)
     "areas": {
@@ -66,16 +70,18 @@ DEFAULT_GUIDANCE = {
         # floor there): the exit icon at the door was on a 1-2 tile sliver the party could not path onto
         # Easthaven dock (Jhonen's route, path nodes 107-118): the IE search map pinches the plank walkway and its link
         # to the snow bank to 1-2 cells; 14 cells (snow / planks in the art) at the pinch let the leader-radius bake through
-        "AR1000": {"searchmap_fix": [[115,95,2,3,11],[114,97,1,1,11],[114,98,1,5,2],[115,102,1,2,2],[56,201,1,1,2],[57,202,1,1,2],[50,198,1,1,2],[49,197,1,1,2]]},
+        "AR1000": {"searchmap_fix": [[115,95,2,3,11],[114,97,1,1,11],[114,98,1,5,2],[115,102,1,2,2],[115,103,1,1,2],[116,104,1,2,2],[117,106,1,1,2],[118,107,1,1,2],[119,108,1,1,2],[120,109,1,1,2],[56,201,1,1,2],[57,202,1,1,2],[50,198,1,1,2],[49,197,1,1,2]]},
         "AR1009": {"searchmap_fix": [[13, 28, 3, 4, 9]]},
         # AR1200 To1201 cave mouth: the icon (481,459) ended a 1-tile corridor (u=481, v=459-462) a radius-25 PC could not
         # fit; 4 cells make tiles (480,461) and (482,460-462) walkable so the corridor is 3 tiles wide, and 5 more (the
         # rows above/beside the icon tile, the cave mouth's tip) give the icon tile itself room for the PC radius
-        "AR1200": {"searchmap_fix": [[15, 17, 1, 1, 11], [11, 19, 1, 1, 11], [12, 20, 1, 1, 11], [13, 21, 1, 1, 11],
-                                     [10, 14, 3, 1, 11], [9, 15, 1, 1, 11], [13, 15, 1, 1, 11]],
-                   # the leader still stopped at (481,463), 3 tiles short of the auto anchor (481,460): icon + anchor
-                   # moved there, just outside the cave mouth (approved by Shai, 2026-10-28)
-                   "anchor_fix": {"To1201": [481, 463]}},
+        # AR1200 To1201 cave mouth: the icon sat at the end of a 1-tile corridor; a 9-cell shave there (2026-10-28) did not
+        # give the PC radius a connected route (offline fit check 2026-10-30), so it was removed: the icon + anchor sit at
+        # (481,463), just outside the cave mouth, where the leader stops (approved by Shai, 2026-10-28)
+        "AR1200": {"anchor_fix": {"To1201": [481, 463]}},
+        # AR1201: the IE container point is the chest's launch point, ~1.5 tiles from the chest drawn in the art; the ToEE
+        # chest objects go to the tile of their IE polygon's centre instead
+        "AR1201": {"container_fix": {"Chest 1": [489, 433], "Chest 2": [504, 500]}},
     }
 }
 
@@ -187,23 +193,83 @@ def sample_kinds(sr, pl, guidance, SU, SV):
     return kind, mat
 
 
-def build_tile_grid(sr, pl, guidance, bbox):
+def lenient_edges(kind, keep, n):
+    """ToEE movers have a radius (a PC 25 inches, ~2.7 subtiles) that reaches well past the model, while IE search maps
+    are drawn for small IE actors: passages, doorways and exit spots that IE walks through are too tight for ToEE.
+    So the blocked edges are lenient: `n` times, a blocked subtile next to a walkable one becomes walkable, but only
+    where the blocked region is at least 3 subtiles thick there (it lies in a 3x3 block of blocked subtiles), so every
+    wall keeps a solid core of at least 1 subtile (thin walls, fences and door leaves stay as they are) and the party
+    still cannot walk through buildings. Flyover counts as a blocker too (IWD2 draws most walls and the void around
+    interiors as flyover; at water it widens piers and gangways). `keep` cells (door cells, outside the IE image) are
+    never shaved. kind: [tu, tv, i, j] (0 walk, 1 block, 2 flyover); returns a new array."""
+    S = kind.transpose(0, 2, 1, 3).reshape(kind.shape[0] * 3, kind.shape[1] * 3).copy()
+    K = keep.transpose(0, 2, 1, 3).reshape(S.shape)
+    H, W = S.shape
+    for _ in range(n):
+        B = S != 0                   # block and flyover (IWD2 marks most walls/void as flyover, value 8)
+        Bp = np.pad(B, 1, constant_values=True)
+        core = np.ones_like(B)       # erosion by 3x3
+        for dy in range(3):
+            for dx in range(3):
+                core &= Bp[dy:dy + H, dx:dx + W]
+        cp = np.pad(core, 1, constant_values=False)
+        thick = np.zeros_like(B)     # opening: dilation of the core by 3x3
+        for dy in range(3):
+            for dx in range(3):
+                thick |= cp[dy:dy + H, dx:dx + W]
+        Wp = np.pad(S == 0, 1, constant_values=False)
+        edge = np.zeros_like(B)
+        for dy in range(3):
+            for dx in range(3):
+                edge |= Wp[dy:dy + H, dx:dx + W]
+        thin = B & ~thick            # thin walls / fences: never shaved, and neither are the cells that join them to a
+        # thick wall (else the joint would open a gap beside them). Lone 1-2 subtile nubs (the stair steps a diagonal
+        # IE cell edge leaves) are not walls: they are shaved like the edge they stick out of
+        tp2 = np.pad(thin, 2, constant_values=False)
+        n5 = np.zeros(B.shape, np.int16)
+        for dy in range(5):
+            for dx in range(5):
+                n5 += tp2[dy:dy + H, dx:dx + W]
+        nub = thin & (n5 <= 2) & edge
+        thin &= ~nub
+        tp = np.pad(thin, 1, constant_values=False)
+        near_thin = np.zeros_like(B)
+        for dy in range(3):
+            for dx in range(3):
+                near_thin |= tp[dy:dy + H, dx:dx + W]
+        free = ((B & thick & ~core & edge) | nub) & ~K & ~near_thin
+        if not free.any():
+            break
+        S[free] = 0
+    return S.reshape(kind.shape[0], 3, kind.shape[1], 3).transpose(0, 2, 1, 3).copy()
+
+
+
+def build_tile_grid(sr, pl, guidance, bbox, protect=None, lenient=0):
     """Per tile in bbox: flags (Block/FlyOver per subtile, sampled at the 3x3 subtile centres) and
-    footstep material. Outside the IE image = blocked."""
+    footstep material. Outside the IE image = blocked.
+    lenient > 0: lenient_edges() shaves that many subtiles off the edges of thick blocked regions (`protect`: an
+    SR-shaped bool mask of cells never shaved, the door cells)."""
     u0, u1, v0, v1 = bbox
     U, V = np.meshgrid(np.arange(u0, u1), np.arange(v0, v1), indexing='ij')
     sub = (np.arange(3) + 0.5) / 3.0
     SU = U[..., None, None] + sub[None, None, :, None]   # [..., i(x), j(y)]
     SV = V[..., None, None] + sub[None, None, None, :]
     kind, mat = sample_kinds(sr, pl, guidance, SU, SV)
+    if lenient:
+        keep = sample_kinds(np.where(protect, 0, 1).astype(sr.dtype) if protect is not None else np.ones_like(sr),
+                            pl, {'searchmap': {'0': ['block', 'ReservedBlocked'], '1': ['walk', 'Dirt']}}, SU, SV)[0] != 0
+        k0 = kind
+        kind = lenient_edges(kind, keep, lenient)   # (outside the image samples as blocked in `keep` too: never shaved)
+        mat = mat.copy(); mat[(kind == 0) & (k0 != 0)] = -1   # shaved: footstep material from the tile's other subtiles
     shift = (np.arange(3)[:, None] + 3 * np.arange(3)[None, :])   # i + 3j  (BlockX{i}Y{j})
     flags = ((kind == 1) * (BLOCK0 << shift)).sum((-1, -2)) | ((kind == 2) * (FLY0 << shift)).sum((-1, -2))
     walk = (kind == 0).reshape(*kind.shape[:2], 9)
     fm = mat.reshape(*mat.shape[:2], 9)
     tmat = fm[..., 4].copy()
     for a, b in zip(*np.nonzero(walk.any(-1))):
-        vals, cnt = np.unique(fm[a, b][walk[a, b]], return_counts=True)
-        tmat[a, b] = vals[cnt.argmax()]
+        vals, cnt = np.unique(fm[a, b][walk[a, b] & (fm[a, b] >= 0)], return_counts=True)
+        tmat[a, b] = vals[cnt.argmax()] if len(vals) else MATERIAL['Dirt']
     return U, V, flags.astype(np.uint32), tmat.astype(np.uint8), kind
 
 
@@ -376,7 +442,7 @@ def write_doors(g, are, wed, tis_for, pl, guidance, sr, bbox, outdir, name, door
     'faithful' extra: both WED tile variants as ground-overlay patches (TGA, canvas coords) for a runtime tile swap.
     Writes <AREA>_doors.json and art/ground/<AREA>_doors/*.tga (derived from the player's files: local only)."""
     tis = tis_for(wed.overlays[0]['tis'])
-    U, V, flags_nod, _, _ = build_tile_grid(are.sr_nodoors, pl, guidance, bbox)
+    U, V, flags_nod, _, _ = build_tile_grid(are.sr_nodoors, pl, guidance, bbox, are.sr_protect, are.lenient)
     u0, v0 = bbox[0], bbox[2]
     pdir = os.path.join(outdir, 'art', 'ground', name + '_doors')
     os.makedirs(pdir, exist_ok=True)
@@ -521,6 +587,32 @@ def region_anchors(kind_open, bbox, regions, start, near=0.8, limit=6.0, avoid=N
                         seen[x, y] = True; q.append((x, y))
         return tiles
 
+    # Fallback reachability on the 3x3 subtiles (8-connected), like ToEE pathing. An IE pier, ramp or gangway can join
+    # the rest of the map only through partly walkable tiles, which the whole-tile flood above cannot cross (AR1000
+    # To1011: the Churin pier was an island, the region got no anchor and its exit icon fell back to the polygon
+    # centroid, a tile of the closed double door). Used only for regions the whole-tile search gives no anchor, so
+    # anchors that already work stay where they are. Returns the fully walkable tiles, not in `excl`, whose 9 subtiles
+    # are all reachable from `start`.
+    sub_walk = (kind_open == 0).transpose(0, 2, 1, 3).reshape(kind_open.shape[0] * 3, kind_open.shape[1] * 3)
+
+    def reach_sub(excl=None):
+        if not (0 <= su < walk.shape[0] and 0 <= sv < walk.shape[1]) or not walk[su, sv] or (excl is not None and excl[su, sv]):
+            return []
+        m = sub_walk & ~np.repeat(np.repeat(excl, 3, 0), 3, 1) if excl is not None else sub_walk
+        seen = np.zeros(m.shape, bool); s0 = (su * 3 + 1, sv * 3 + 1); seen[s0] = True
+        q = deque([s0])
+        while q:
+            a, b = q.popleft()
+            for da in (-1, 0, 1):
+                for db in (-1, 0, 1):
+                    x, y = a + da, b + db
+                    if 0 <= x < m.shape[0] and 0 <= y < m.shape[1] and m[x, y] and not seen[x, y]:
+                        seen[x, y] = True; q.append((x, y))
+        full = seen.reshape(walk.shape[0], 3, walk.shape[1], 3).all((1, 3)) & walk
+        if excl is not None:
+            full &= ~excl
+        return [(int(a), int(b)) for a, b in zip(*np.nonzero(full))]
+
     def nearest(tiles, r):
         return min(((_poly_dist(a + bbox[0] + 0.5, b + bbox[2] + 0.5, r['poly']), a + bbox[0], b + bbox[2]) for a, b in tiles),
                    default=None)
@@ -549,7 +641,7 @@ def region_anchors(kind_open, bbox, regions, start, near=0.8, limit=6.0, avoid=N
     clear = reach(walk & ~avoid) if avoid is not None else []
     if doors is not None:   # the icon may stand right in front of the frame: only the door's own tiles are excluded
         clear = reach(walk & ~doors) or clear
-    out = {}
+    out = {}; sub_clear = None
     for k, r in enumerate(regions):
         if r['type'] != 'travel':
             continue
@@ -557,8 +649,18 @@ def region_anchors(kind_open, bbox, regions, start, near=0.8, limit=6.0, avoid=N
         if os.environ.get('IE2TOEE_ANCHOR_DEBUG'):
             print('anchor %s target %.1f,%.1f doors %d -> %s' % (r.get('name'), target(r)[0], target(r)[1],
                   sum(_poly_dist(t[0], t[1], r['poly']) <= 3.0 for t in door_t), best))
+        if not (best and best[0] <= limit):   # whole-tile search found nothing: retry on subtiles (see reach_sub)
+            if sub_clear is None:
+                sub_clear = (reach_sub(doors) if doors is not None else []) or (reach_sub(avoid) if avoid is not None else [])
+            sub_best = nearest_to(sub_clear, r) if sub_clear else None
+            if sub_best and sub_best[0] <= limit:
+                best = sub_best
+                if os.environ.get('IE2TOEE_ANCHOR_DEBUG'):
+                    print('anchor %s: subtile fallback -> %s' % (r.get('name'), best))
         if not (best and best[0] <= limit):
             best = nearest(every, r)
+        if not (best and best[0] <= limit):
+            best = nearest(reach_sub(), r)
         if best and near < best[0] <= limit:   # (near < 0: every region)
             out[k] = [int(best[1]), int(best[2])]
     return out
@@ -628,6 +730,13 @@ def load_area(game, area, guidance, closed_doors=False):
             if 0 <= cy < sr.shape[0] and 0 <= cx < sr.shape[1]:
                 sr[cy, cx] = DOOR_BLOCK_VALUE
     are.sr_nodoors = sr_nodoors
+    # door cells (either state) are never shaved by the lenient edges (build_tile_grid): the runtime switches them
+    are.sr_protect = np.zeros(sr.shape, bool)
+    for d in are.doors:
+        for cx, cy in list(d['open_cells']) + list(d['closed_cells']):
+            if 0 <= cy < sr.shape[0] and 0 <= cx < sr.shape[1]:
+                are.sr_protect[cy, cx] = True
+    are.lenient = int(ag.get('edge_leniency', guidance.get('edge_leniency', 0)))
     wn = ag.get('widen_narrow', guidance.get('widen_narrow', 0)) if are.area_type & 1 else 0
     are.widened = 0
     if wn:
@@ -653,7 +762,23 @@ def convert(game, area, outdir, map_id, ground_id, guidance, preview=False, clos
         report['night_tiles'] = write_ground(render_background(wn, tis_for(wn.overlays[0]['tis']), None, doors_closed), pl,
                                              os.path.join(outdir, 'art', 'ground', name + '_night'), guidance['jpeg_quality'])
     bbox = pl.tile_bbox()
-    U, V, flags, mats, kind = build_tile_grid(sr, pl, guidance, bbox)
+    U, V, flags, mats, kind = build_tile_grid(sr, pl, guidance, bbox, are.sr_protect, are.lenient)
+    # per-map hand overrides (ie_overrides.py, overrides/<game>/<AREA>/): Temple+ DM tile edits on top of the baked
+    # search map + "searchmap_fix", minus the door bits the runtime switches (as the in-game tile editor protects them)
+    import ie_overrides
+    ovr = guidance.get('overrides_dir')
+    tile_edits = ie_overrides.load_tile_edits(ovr, name, warn=lambda m: print('warning: ' + m, file=sys.stderr)) if ovr else []
+    door_bits = ie_overrides.door_bits(are.doors, door_cell_masks, pl, sr.shape) if tile_edits else {}
+
+    def edited(grid):   # build_tile_grid() result with the same tile edits applied (flags + subtile kinds)
+        if tile_edits:
+            ie_overrides.apply_tile_edits(tile_edits, bbox, grid[2], grid[4], door_bits)
+        return grid
+    if tile_edits:
+        report['tile_edits'] = ie_overrides.apply_tile_edits(tile_edits, bbox, flags, kind, door_bits)
+        if report['tile_edits']['stale']:
+            print('warning: %s: %d tile edit(s) were painted on a tile that converts differently now (applied anyway)'
+                  % (name, report['tile_edits']['stale']), file=sys.stderr)
     report['tile_bbox'] = bbox
     report['sectors'] = write_sectors(U, V, flags, mats, mapdir)
     report['walkable_subtiles'] = int((kind == 0).sum())
@@ -702,8 +827,8 @@ def convert(game, area, outdir, map_id, ground_id, guidance, preview=False, clos
         for cx, cy in d['open_cells']:
             if 0 <= cy < sr_open.shape[0] and 0 <= cx < sr_open.shape[1]:
                 sr_open[cy, cx] = DOOR_BLOCK_VALUE
-    kind_open = build_tile_grid(sr_open, pl, guidance, bbox)[4]
-    kind_nod = build_tile_grid(are.sr_nodoors, pl, guidance, bbox)[4]
+    kind_open = edited(build_tile_grid(sr_open, pl, guidance, bbox, are.sr_protect, are.lenient))[4]    # (tile edits too: only doors differ)
+    kind_nod = edited(build_tile_grid(are.sr_nodoors, pl, guidance, bbox, are.sr_protect, are.lenient))[4]
     dt = ((kind != kind_nod) | (kind_open != kind_nod)).any((-1, -2))          # tiles a door changes
     near_door = dt.copy()
     for da in (-1, 0, 1):
@@ -720,7 +845,8 @@ def convert(game, area, outdir, map_id, ground_id, guidance, preview=False, clos
         placement=dict(canvas_offset=[pl.cx, pl.cy], scale=pl.scale, cal=[pl.calx - CAL_X0, pl.caly - CAL_Y0]),
         entrances=[dict(e, toee=tl(e['x'], e['y']), **_arrival(e)) for e in are.entrances],
         actors=[dict(a, toee=tl(a['x'], a['y'])) for a in are.actors],
-        containers=[dict(c, toee=tl(c['x'], c['y']), poly=[tl(*p) for p in c['poly']]) for c in are.containers],
+        containers=[dict(c, toee=list(ag.get('container_fix', {}).get(c['name'], tl(c['x'], c['y']))), poly=[tl(*p) for p in c['poly']])
+                    for c in are.containers],   # per-area "container_fix": {name: [u, v]} places a container by hand
         regions=regions_t,
         doors=[dict(d, wed=next((dict(cells=len(w['cells']), closed_polys=len(w['closed_polys'])) for w in wed.doors
                                  if w['name'].lower() == d['wed_id'].lower()), None)) for d in are.doors],
@@ -756,10 +882,14 @@ def main():
     ap.add_argument('--map-id', type=int, default=5012); ap.add_argument('--ground-id', type=int, default=900)
     ap.add_argument('--guidance'); ap.add_argument('--preview', action='store_true')
     ap.add_argument('--closed-doors', action='store_true')
+    ap.add_argument('--overrides', help='per-map override folder (overrides/<game>, holding <AREA>/*.json Temple+ DM tile '
+                    'edits; see overrides/README.md). Off by default: IE games share area names (IWD and IWD2 AR1000)')
     a = ap.parse_args()
     guid = json.loads(json.dumps(DEFAULT_GUIDANCE))
     if a.guidance:
         guid.update(json.load(open(a.guidance)))
+    if a.overrides:
+        guid['overrides_dir'] = os.path.abspath(a.overrides)
     print(json.dumps(convert(a.game, a.area, a.out, a.map_id, a.ground_id, guid, a.preview, a.closed_doors), indent=1))
 
 

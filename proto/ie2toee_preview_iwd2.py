@@ -15,11 +15,13 @@ import iefs
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import toeedata
+import ie_overrides
 from ie2toee_preview import (run, run_soft, copytree, mes_with, RUNTIME,
                              ENGINE_MAP_IDS, TOWNMAP_ID_MAX, area_names, map_names, drop_high_maplist_ids,
                              copy_early_to_core)
 
 GUIDE = os.path.join(HERE, 'guidance', 'iwd2.json')
+OVERRIDES = os.path.join(HERE, 'overrides', 'iwd2')   # per-map hand overrides (ie_overrides.py, overrides/README.md)
 AREAS = ['AR1000', 'AR1001', 'AR1002', 'AR1003', 'AR1004', 'AR1005', 'AR1006', 'AR1100', 'AR1200', 'AR1201']
 SPAWN_SCRIPT_BASE = 2600   # runtime-spawned creatures with a dialog/scripts: 2600..2999
 # name ids stay below the ~30000 description cap: 28000+250i for the first 8 areas, then the free gap 20800-21999
@@ -99,9 +101,10 @@ def main():
     assert not ENGINE_MAP_IDS & set(ids_used), 'map ids hit engine special cases: %s' % sorted(ENGINE_MAP_IDS & set(ids_used))
     w = os.path.join(out, 'work'); os.makedirs(w, exist_ok=True)
     ok = []
+    ovr = ['--overrides', OVERRIDES] if os.path.isdir(OVERRIDES) else []   # per-map hand overrides (DM tile edits)
     for ar in AREAS:
         if run_soft('map %s' % ar, ['ie2toee.py', '--game', ie, '--area', ar, '--out', w, '--map-id', str(G[ar]['map']),
-                                    '--ground-id', str(G[ar]['ground']), '--guidance', GUIDE]):
+                                    '--ground-id', str(G[ar]['ground']), '--guidance', GUIDE] + ovr):
             ok.append(ar)
         else:
             print('warning: %s failed to convert and is skipped' % ar, flush=True)
@@ -166,6 +169,10 @@ def main():
     run('exit icons', ['ie_exiticons.py', '--travel', tr, '--maps', os.path.join(bake, 'modules', 'ToEE', 'maps'),
                        '--jumppoints', os.path.join(bake, 'rules', 'jumppoint.tab')])
     run('path nodes', ['ie_pathnodes.py', '--travel', tr, '--maps', os.path.join(bake, 'modules', 'ToEE', 'maps')])
+    for ar in ok:   # hand-made path node data (overrides/iwd2/I2<AREA>/) wins over the generator
+        got = ie_overrides.install_pathnodes(OVERRIDES, 'I2' + ar, os.path.join(bake, 'modules', 'ToEE', 'maps', 'I2' + ar))
+        if got:
+            print('path node override I2%s: %s' % (ar, ' '.join(got)), flush=True)
 
     # IE dialogue window (Temple+ uses it only when art\interface\dialog_ie\skins.json exists): built from YOUR
     # install's GUI (classic: GUIW.CHU message window; EE: ui.menu/bgee.lua gamelog), default for every conversation

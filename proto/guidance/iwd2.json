@@ -11,6 +11,8 @@
   "jpeg_quality": 92,
   "pathnode_spacing_tiles": 10,
   "pathnode_link_tiles": 28,
+  "_edge_leniency": "ToEE movers have a radius well past the model: the blocked search-map edges are shaved by this many subtiles where the block is thick (ie2toee.lenient_edges); walls keep a core, thin walls and doors are untouched",
+  "edge_leniency": 2,
   "searchmap": {
     "0": [
       "block",
