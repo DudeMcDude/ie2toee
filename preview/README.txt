@@ -1,14 +1,36 @@
-ICEWIND DALE IN THE TEMPLE OF ELEMENTAL EVIL ENGINE - PLAYER PREVIEW (2026-11-11b)
-==================================================================================
+ICEWIND DALE IN THE TEMPLE OF ELEMENTAL EVIL ENGINE - PLAYER PREVIEW (2026-11-15)
+=================================================================================
 
 IMPORTANT: PYTHON 3.9 OR NEWER MUST BE INSTALLED
   The converter is a Python program. Before you start, install Python 3.9+ from
   https://www.python.org/downloads/ and, in the installer, tick "Add python.exe to PATH".
   Without it convert.bat stops with a message. You also need your own Icewind Dale or Icewind Dale: EE.
 
-NEW IN THIS PREVIEW (2026-11-11b)
+NEW IN THIS PREVIEW (2026-11-15)
 --------------------------------
   Still an early-preview, AI-assisted experiment: not a playable or polished conversion.
+  * The prologue now ends in AR2000 Kuldahar Pass (map 5051): Hrothgar greets the party in Winter's Cradle on a
+    new game, the posse / caravan / Pomab steps work, and "Let us be off" plays the departure and the avalanche.
+  * IE script fixes: Dead("name") reads the death variables (a dying creature sets SPRITE_IS_DEAD<name>, which
+    fixes Apsel's wolf quest), BitGlobal modes, Continue() ordering, LOCALS names, PartySlotN,
+    StartDialogueNoSet.
+  * IE variables (globals, area and actor locals, timers) are kept in a file next to each save (<save>.iev)
+    instead of a fixed block of ToEE global slots, so there is no limit on their number.
+  * Bundled Temple+ 0.2.98 (see TemplePlus\IE-PREVIEW-SOURCE.txt): the info-point magnifier cursor no longer
+    leaves a stale cursor (e.g. the portrait drag icon) on screen.
+  * New: an autoplayer (Autoplayer\README.txt) that starts a new game and plays the prologue to AR2000 by
+    itself, for testing. It takes over the game window while it runs.
+  * Saves: start a NEW game. Older saves load, but their quest/dialogue variables start from zero because of the
+    new variable store.
+  * Pathing: the engine path node bake (clearance.bin and engine-relinked path nodes) still runs only in the
+    developer's Linux/Wine setup, not in convert.bat; Windows converts use the generator's nodes, plus shipped
+    per-map overrides (AR1000). If you fix tiles with the DM Sector Tiles editor ("Save Tile Edits") or make a
+    better path node set for a map, please send the files (%USERPROFILE%\Saved Games\TemplePlus\dm_tile_edits\
+    <module>\map<id>.json, and the map's pathnodenew.pnd / pathnodedist.pnd / clearance.bin) with the map id,
+    so they can ship as overrides.
+
+EARLIER (2026-11-11b)
+--------------------------------
   * Per-map overrides: hand tile edits and culled pathnodes now survive a reconvert. After the generator
     runs, the override wins. This preview includes AR1000 Easthaven (map 5012): 125 tile edits and a culled
     path node set (pathnodenew.pnd / pathnodedist.pnd / clearance.bin, 204 nodes), and AR1010 (map 5022):
