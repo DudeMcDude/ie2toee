@@ -23,7 +23,7 @@ python3 proto/ie_dialogue.py <IE install> <out> \
     --actor IDENT:AREA:SCRIPT_ID[:DLG][:BCS,BCS...]      # one per NPC
     --area-script AREA:BCS                               # area scripts
     --area-map AREA:TOEE_MAP[:canvas_x,canvas_y]         # for LeaveAreaLUA / coordinates (from <AREA>_objects.json)
-    [--tlk path/dialog.tlk | --lang en_US] [--fallback opcodes.json] [--slot-base 1000 --slot-max 1999]
+    [--tlk path/dialog.tlk | --lang en_US] [--fallback opcodes.json]
 ```
 
 Copy `<out>/modules/ToEE/{dlg,scr}` and `ie_runtime.py` into the module. Script discovery runs before the module
@@ -91,9 +91,12 @@ If the files are in a folder that isn't mounted yet at discovery (e.g. loose `mo
 
 ### Variables, timers
 
-* GLOBAL, LOCALS (per IE identity), `<AREA>` and `MYAREA` variables map to `game.global_vars` slots that the
-  converter allocates (`ie_varslots.py`, default 1000-1999), so they persist in saves. Unallocated names fall back
-  to memory and get logged.
+* GLOBAL, LOCALS (per IE identity), `<AREA>` and `MYAREA` variables (and timers) live in one dict,
+  `runtime/ie_vars.py`, keyed `GLOBAL:name`, `<AREA>:name`, `LOCALS:<ident>:name` (no slot table, no limit).
+  It is saved as `<save>.iev` (plain JSON) next to each save archive by Temple+'s `post_save` hook and read back by
+  its `load` hook; `scr/tpModifiers/ie_varhooks.py` chains both at startup and keeps any previous (Co8) hook.
+  A token in `game.global_vars[992]` makes a new game, or a save without its `.iev`, start with an empty dict.
+  `game.global_vars` keeps only engine-side flags: 990 intro played, 991 new-game globals set, 992 the token.
 * Timers keep their expiry time on a script clock. That clock is game time, plus real time while the Temple+ game
   clock stands still (outside combat, rest and travel the ToEE clock is frozen; the IE clock always runs). An unset
   timer counts as expired, as in the IE.

@@ -75,7 +75,8 @@ try:
             except Exception:
                 pass
         for i, k in enumerate(real):
-            ie_vars.put(k, 100000 + i)
+            if k not in rt.VARS:                    # (keeps the timers set above)
+                ie_vars.put(k, 100000 + i)
     before = dict(rt.VARS)
     engine_save('Slot0001')
     f = os.path.join(sd, 'Slot0001.iev')
