@@ -373,7 +373,11 @@ class Baker(object):
             def walk(o):
                 if isinstance(o, dict):
                     if 'actor' in o and isinstance(o.get('scripts'), list):
-                        scr[(o['actor'] or '').lower()] = [x.lower() for x in o['scripts'] if x]
+                        # not the IWD2 'area' slot (12ATKUHP / 12PHASPN / 12SHAWF0 would turn this heuristic on for the
+                        # AR1200 goblins left visible on purpose and for Shawford); those actors' start state is the
+                        # CRE hidden flag (spec 'hidden') as before
+                        skip = (o.get('area_script') or '').lower()
+                        scr[(o['actor'] or '').lower()] = [x.lower() for x in o['scripts'] if x and x.lower() != skip]
                     for v in o.values(): walk(v)
                 elif isinstance(o, list):
                     for v in o: walk(v)

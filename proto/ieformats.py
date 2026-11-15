@@ -198,8 +198,7 @@ class Are:
                 orient=struct.unpack_from('<H', data, o + 0x34)[0],
                 schedule=struct.unpack_from('<I', data, o + 0x40)[0] & 0xFFFFFF,
                 dialog=cstr(data[o + 0x48:o + 0x50]),
-                scripts=dict(zip(('override', 'general', 'class', 'race', 'default', 'specific'),
-                                 (cstr(data[k:k + 8]) for k in range(o + 0x50, o + 0x80, 8)))),
+                scripts=self._actor_scripts(data, o),
                 cre=cstr(data[o + 0x80:o + 0x88]),
                 embedded_cre=data[emb_off:emb_off + emb_size] if emb_off and emb_size else None))
         # spawn points (0xC8 each) and the single rest-interruption record (0xE4): creature resrefs or
@@ -269,6 +268,23 @@ class Are:
                                 y=struct.unpack_from('<H', data, o + 0x22)[0], bam=cstr(data[o + 0x28:o + 0x30]),
                                 flags=struct.unpack_from('<I', data, o + 0x34)[0])
                            for o in (anim_off + i * 0x4C for i in range(anim_n))]
+
+    def _actor_scripts(self, data, o):
+        sc = dict(zip(('override', 'general', 'class', 'race', 'default', 'specific'),
+                      (cstr(data[k:k + 8]) for k in range(o + 0x50, o + 0x80, 8))))
+        if self.version == 'V9.1':
+            # IWD2 has one more actor script slot after the CRE offset/size (GemRB AREImporter: SCR_AREA, "special 1"),
+            # evaluated right after the override script: Swift Thomas' 1000THMV (unhide after Jump_Check), Phaen's
+            # 12PHASPN, the AR1200 soldiers' 12ATKHID/12ATKDEL, Firtha's 10FIRTHV, ...
+            sc['area'] = cstr(data[o + 0x90:o + 0x98])
+        return sc
+
+    def script_or_default(self, resref, exists):
+        """The area script; IWD2 (GemRB ForceAreaScript) runs <AREA>.BCS when the header names none (AR1200, AR1201).
+        exists(name) -> bool tells whether that BCS is in the game."""
+        if self.script or self.version != 'V9.1':
+            return self.script
+        return resref.upper() if exists(resref) else ''
 
     @property
     def has_night(self):

@@ -131,11 +131,12 @@ def main():
     shutil.rmtree(os.path.join(w, 'spawnables'), ignore_errors=True)
     amap = sum((['--area-map', '%s:%d:%d,%d' % ((ar, G[ar]['map']) + tuple(json.load(open(os.path.join(w, 'I2' + ar + '_objects.json')))
                 ['placement']['canvas_offset']))] for ar in ok), [])
-    ascr = []      # each area's own script (ARE V9.1 header +0xA4)
+    ascr = []      # each area's own script (ARE V9.1 header +0xA4; none named -> <AREA>.BCS, GemRB ForceAreaScript)
     gm = iefs.IEGame(ie)
+    import ieformats
     for ar in ok:
         try:
-            d_ = gm.read(ar.lower(), 'are'); r_ = d_[0xa4 if d_[4:8] == b'V9.1' else 0x94:][:8].rstrip(b'\0').decode('latin-1')
+            r_ = ieformats.Are(gm.read(ar.lower(), 'are')).script_or_default(ar, lambda n: gm.exists(n, 'bcs'))
             if r_:
                 ascr += ['--area-script', '%s:%s' % (ar, r_.lower())]
         except Exception as e:
