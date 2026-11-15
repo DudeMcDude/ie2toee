@@ -89,7 +89,7 @@ try:
     A.SetGlobal(c, 'Join_Posse', 'GLOBAL', 5); A.SetGlobal(c, 'After_Save', 'GLOBAL', 1)
     engine_load('Slot0001')
     check('load restores every variable exactly (%d vars)' % len(before), dict(rt.VARS) == before)
-    check('%d+ variables persisted (synthetic 4000%s)' % (len(before), ', IWD2 build %d' % len(real) if real else ''),
+    check('%d+ variables persisted (synthetic 4000%s)' % (len(before), ', converted build %d' % len(real) if real else ''),
           len(before) >= 4000 and (not real or all(k in rt.VARS for k in real)))
     check('load clears first: a var set after the save is gone', rt.get_var(c, 'After_Save', 'GLOBAL') == 0)
     check('GLOBAL Join_Posse back to 1', T.Global(c, 'Join_Posse', 'GLOBAL', 1))
