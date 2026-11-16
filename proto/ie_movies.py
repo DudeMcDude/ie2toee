@@ -90,7 +90,7 @@ def to_bink1(src, dst, tmp):
     return outs
 
 
-def convert(game, toee, out, ee=None, only=None, flavour=None):
+def convert(game, toee, out, ee=None, only=None, flavour=None, reuse_from=None):
     import iefs, toeedata
     flavour = flavour or ('IWD2' if find_loose(game, 'intro', ('mve',)) and
                           open(find_loose(game, 'intro', ('mve',)), 'rb').read(3) == b'BIK' else 'IWD')
@@ -106,8 +106,12 @@ def convert(game, toee, out, ee=None, only=None, flavour=None):
         src = find_loose(game, res, ('mve', 'bik'))
         try:
             parts = [dst]
-            if os.path.exists(dst) and os.environ.get('IE_MOVIES_REUSE'):
-                parts = [dst] + sorted(glob.glob(dst[:-4] + '-[0-9].bik'))
+            cached = os.path.join(reuse_from or out, 'data', 'movies', name)
+            if os.environ.get('IE_MOVIES_REUSE') and os.path.isfile(cached):
+                parts = [cached] + sorted(glob.glob(cached[:-4] + '-[0-9].bik'))
+                if os.path.abspath(cached) != os.path.abspath(dst):
+                    for part in parts:
+                        shutil.copy2(part, md)
             elif src and open(src, 'rb').read(4) == b'BIKi':
                 shutil.copy(src, dst)
             else:
@@ -283,8 +287,9 @@ def main():
     c = sp.add_parser('convert')
     c.add_argument('--game', required=True); c.add_argument('--ee'); c.add_argument('--toee', required=True)
     c.add_argument('--out', required=True); c.add_argument('--only', nargs='*'); c.add_argument('--flavour')
+    c.add_argument('--reuse-from', help='previous movie output to read when IE_MOVIES_REUSE is set')
     a = ap.parse_args()
-    convert(a.game, a.toee, a.out, a.ee, a.only, a.flavour)
+    convert(a.game, a.toee, a.out, a.ee, a.only, a.flavour, a.reuse_from)
 
 
 if __name__ == '__main__':

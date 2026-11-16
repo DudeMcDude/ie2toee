@@ -23,6 +23,7 @@ sys.path.insert(0, HERE)
 import toeedata
 import ie_overrides
 import ie_install
+from ie_build import preview_build
 OVERRIDES = os.path.join(HERE, 'overrides', 'iwd')   # per-map hand overrides (ie_overrides.py, overrides/README.md)
 
 AREA, MAP_ID, GROUND_ID, START = 'AR1000', 5012, 900, (482, 424)
@@ -282,6 +283,11 @@ def main():
                          'debug.recalc_neighbours/flush_nodes/genclearance with the optional args, DudeMcDude/TemplePlus '
                          'feature/pathnode-bake, given as --tp)')
     a = ap.parse_args()
+    with preview_build(a.out, (a.iwd, a.toee, a.tp, a.movies_ee, HERE)) as stage:
+        convert(a, stage)
+
+
+def convert(a, stage):
     all_ids = [MAP_ID] + [map_id(i, ar) for i, ar in enumerate(INTERIORS, 1)]
     assert max(all_ids) <= 5198, 'map ids above 5198 crash the town map (see MAP_ID)'
     assert not ENGINE_MAP_IDS & set(all_ids), 'map ids hit engine special cases'
@@ -298,7 +304,7 @@ def main():
         if not iefs.has_ee_ui(ie):
             sys.exit(iefs.old_iwdee_error(ie))
     print('IE install: %s (%s)\nToEE: %s\nTemple+: %s\nout: %s' % (ie, F, toee, tp, out))
-    w = os.path.join(out, 'work'); os.makedirs(w, exist_ok=True)
+    w = os.path.join(stage, 'work')
     tpa = ['--tp', os.path.abspath(tp)] if tp else []
     a1 = AREA.lower()
 
@@ -397,9 +403,9 @@ def main():
     print('== assemble', flush=True)
     mov = os.path.join(w, 'movies')
     if not a.no_movies:   # intro + the prologue-end avalanche (long encode); the rest: ie_movies.py convert ... without --only
-        run_soft('movies', ['ie_movies.py', 'convert', '--game', ie, '--toee', toee, '--out', mov, '--only', 'intro', 'avalanch', 'slides', '--flavour', 'IWD'] +
+        run_soft('movies', ['ie_movies.py', 'convert', '--game', ie, '--toee', toee, '--out', mov, '--reuse-from', os.path.join(out, 'work', 'movies'), '--only', 'intro', 'avalanch', 'slides', '--flavour', 'IWD'] +
                  (['--ee', os.path.abspath(a.movies_ee)] if a.movies_ee else []))
-    inst = os.path.join(out, 'install'); shutil.rmtree(inst, ignore_errors=True)
+    inst = os.path.join(stage, 'install')
     M = os.path.join(inst, 'modules', MODULE); C = os.path.join(inst, 'modules', MODULE + '_core')
     os.makedirs(os.path.join(inst, 'modules'), exist_ok=True)   # modules\IWD.dat: see the install step
     for d in ('maps', 'art/ground', 'art/clip', 'rules', 'mes', 'dlg', 'scr', 'mes/description'):
@@ -514,7 +520,7 @@ def main():
         '\n'.join(l for l in lim if not (re.match(r'\s*\{(\d+)\}', l) and int(re.match(r'\s*\{(\d+)\}', l).group(1)) in ids.values())) + '\n')
     open(os.path.join(M, 'rules', 'daynight.nxd'), 'wb').close()   # no vanilla NPC day/night moves (they name map ids)
     copy_early_to_core(M, C)   # town map names / scroll limits are read before modules\IWD is mounted
-    print('module overlay: %s  (%d areas: %s + %d interiors)' % (inst, 1 + len(interiors), AREA, len(interiors)))
+    print('module overlay: %s  (%d areas: %s + %d interiors)' % (os.path.join(out, 'install'), 1 + len(interiors), AREA, len(interiors)))
     if a.install:
         # an earlier convert's dialogue scripts with the same numbers would shadow ours (ie_install.py)
         stale = ie_install.retire_stale(inst, toee, [MODULE, MODULE + '_core'])
