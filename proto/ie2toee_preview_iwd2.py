@@ -15,6 +15,7 @@ import iefs
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import toeedata
+from ie_build import preview_build
 import ie_overrides
 from ie2toee_preview import (run, run_soft, copytree, mes_with, RUNTIME, install_varhooks,
                              ENGINE_MAP_IDS, TOWNMAP_ID_MAX, area_names, map_names, drop_high_maplist_ids,
@@ -89,6 +90,11 @@ def main():
                          'path node links for every map (pathnode_bake.sh; env TOEE_DIR, TP_DIST, TOEE_XVFB). Without '
                          'clearance.bin the engine could not path the party to most IWD2 exit icons')
     a = ap.parse_args()
+    with preview_build(a.out, (a.iwd2, a.toee, a.tp, HERE)) as stage:
+        convert(a, stage)
+
+
+def convert(a, stage):
     ie, toee, out = os.path.abspath(a.iwd2), os.path.abspath(a.toee), os.path.abspath(a.out)
     if 'chitin.key' not in [n.lower() for n in os.listdir(ie)]:
         sys.exit('%s does not look like an Icewind Dale II install (no chitin.key)' % ie)
@@ -111,7 +117,7 @@ def main():
     ids_used = [G[ar]['map'] for ar in AREAS]
     assert max(ids_used) <= TOWNMAP_ID_MAX, 'map ids above %d crash the town map (see map_id_base)' % TOWNMAP_ID_MAX
     assert not ENGINE_MAP_IDS & set(ids_used), 'map ids hit engine special cases: %s' % sorted(ENGINE_MAP_IDS & set(ids_used))
-    w = os.path.join(out, 'work'); os.makedirs(w, exist_ok=True)
+    w = os.path.join(stage, 'work')
     ok = []
     ovr = ['--overrides', OVERRIDES] if os.path.isdir(OVERRIDES) else []   # per-map hand overrides (DM tile edits)
     for ar in AREAS:
@@ -142,8 +148,6 @@ def main():
                 own = [x for x in (p_[4].split(',') if len(p_) > 4 else []) if x and not x.lower().startswith('00')]
                 actors += ['--actor', '%s:%s:%s::%s' % (tuple(p_[:3]) + (','.join(own),))]
     dlg = os.path.join(w, 'dialogue')
-    shutil.rmtree(dlg, ignore_errors=True)   # regenerated each build: no stale scripts from earlier id layouts
-    shutil.rmtree(os.path.join(w, 'spawnables'), ignore_errors=True)
     amap = sum((['--area-map', '%s:%d:%d,%d' % ((ar, G[ar]['map']) + tuple(json.load(open(os.path.join(w, 'I2' + ar + '_objects.json')))
                 ['placement']['canvas_offset']))] for ar in ok), [])
     ascr = []      # each area's own script (ARE V9.1 header +0xA4; none named -> <AREA>.BCS, GemRB ForceAreaScript)
@@ -188,12 +192,12 @@ def main():
 
     # IE dialogue window (Temple+ uses it only when art\interface\dialog_ie\skins.json exists): built from YOUR
     # install's GUI (classic: GUIW.CHU message window; EE: ui.menu/bgee.lua gamelog), default for every conversation
-    sk = os.path.join(w, 'skin'); shutil.rmtree(sk, ignore_errors=True)
+    sk = os.path.join(w, 'skin')
     run('dialog skin', ['ie_dialog_skin.py', ie, sk, '--skin', skin, '--default', skin])
     print('== assemble', flush=True)
     mov = os.path.join(w, 'movies')   # IWD2's .mve are Bink 1 already: a plain copy (ie_movies.py)
-    run_soft('movies', ['ie_movies.py', 'convert', '--game', ie, '--toee', toee, '--out', mov, '--flavour', 'IWD2'])
-    inst = os.path.join(out, 'install'); shutil.rmtree(inst, ignore_errors=True)
+    run_soft('movies', ['ie_movies.py', 'convert', '--game', ie, '--toee', toee, '--out', mov, '--reuse-from', os.path.join(out, 'work', 'movies'), '--flavour', 'IWD2'])
+    inst = os.path.join(stage, 'install')
     M = os.path.join(inst, 'modules', 'ToEE'); C = os.path.join(inst, 'modules', 'ToEE_core'); scr = os.path.join(C, 'scr')
     for d in (os.path.join(M, 'rules'), scr, os.path.join(C, 'mes', 'description')):
         os.makedirs(d, exist_ok=True)
@@ -311,7 +315,7 @@ def main():
         '\n'.join(l for l in lim if not (re.match(r'\s*\{(\d+)\}', l) and int(re.match(r'\s*\{(\d+)\}', l).group(1)) in our_ids)) + '\n')
     open(os.path.join(M, 'rules', 'daynight.nxd'), 'wb').close()   # no vanilla NPC day/night moves (they name map ids)
     copy_early_to_core(M, C)   # town map names / scroll limits are read before modules\ToEE is mounted
-    print('overlay: %s  (%d areas: %s)' % (inst, len(ok), ' '.join('I2' + x for x in ok)))
+    print('overlay: %s  (%d areas: %s)' % (os.path.join(out, 'install'), len(ok), ' '.join('I2' + x for x in ok)))
     if a.install:
         # scripts/dialogs of an earlier install in our id range (1500-SCRIPT_ID_MAX) that this build no longer has (ids moved):
         # moved aside (out/stale_install), never deleted, so Temple+ sees one file per script id
