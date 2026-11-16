@@ -18,6 +18,7 @@ import argparse, os, re, shutil, subprocess, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import toeedata
+from ie_build import preview_build
 
 AREA, MAP_ID, GROUND_ID, START = 'AR1000', 5900, 900, (482, 424)
 MODULE = 'IWD'          # Temple+ module: modules\IWD.dat (link to your ToEE.dat) + modules\IWD (maps, art, rules, mes) +
@@ -246,6 +247,11 @@ def main():
                          'debug.recalc_neighbours/flush_nodes/genclearance with the optional args, DudeMcDude/TemplePlus '
                          'feature/pathnode-bake, given as --tp)')
     a = ap.parse_args()
+    with preview_build(a.out, (a.iwd, a.toee, a.tp, a.movies_ee, HERE)) as stage:
+        convert(a, stage)
+
+
+def convert(a, stage):
     ie, toee = os.path.abspath(a.iwd), os.path.abspath(a.toee)
     out = os.path.abspath(a.out)
     tp = a.tp or next((p for p in (os.path.join(HERE, '..', '..', 'TemplePlus'), os.path.join(HERE, '..', 'TemplePlus'))
@@ -254,7 +260,7 @@ def main():
         sys.exit('%s does not look like a ToEE folder (no temple.dll)' % toee)
     F = flavour(ie); skin = 'iwdee' if F == 'IWDEE' else 'iwd'
     print('IE install: %s (%s)\nToEE: %s\nTemple+: %s\nout: %s' % (ie, F, toee, tp, out))
-    w = os.path.join(out, 'work'); os.makedirs(w, exist_ok=True)
+    w = os.path.join(stage, 'work')
     tpa = ['--tp', os.path.abspath(tp)] if tp else []
     a1 = AREA.lower()
 
@@ -339,9 +345,9 @@ def main():
     print('== assemble', flush=True)
     mov = os.path.join(w, 'movies')
     if not a.no_movies:   # intro only for now (long encode); the others: ie_movies.py convert ... without --only
-        run_soft('movies', ['ie_movies.py', 'convert', '--game', ie, '--toee', toee, '--out', mov, '--only', 'intro', '--flavour', 'IWD'] +
+        run_soft('movies', ['ie_movies.py', 'convert', '--game', ie, '--toee', toee, '--out', mov, '--reuse-from', os.path.join(out, 'work', 'movies'), '--only', 'intro', '--flavour', 'IWD'] +
                  (['--ee', os.path.abspath(a.movies_ee)] if a.movies_ee else []))
-    inst = os.path.join(out, 'install'); shutil.rmtree(inst, ignore_errors=True)
+    inst = os.path.join(stage, 'install')
     M = os.path.join(inst, 'modules', MODULE); C = os.path.join(inst, 'modules', MODULE + '_core')
     os.makedirs(os.path.join(inst, 'modules'), exist_ok=True)   # modules\IWD.dat: see the install step
     for d in ('maps', 'art/ground', 'art/clip', 'rules', 'mes', 'dlg', 'scr', 'mes/description'):
@@ -422,7 +428,7 @@ def main():
         raise SystemExit('MapList.mes: no entry for map %d' % MAP_ID)
     open(ml, 'w', encoding='latin-1', newline='').write('\n'.join(t))
     copy_early_to_core(M, C)   # town map names / scroll limits are read before modules\IWD is mounted
-    print('module overlay: %s  (%d areas: %s + %d interiors)' % (inst, 1 + len(interiors), AREA, len(interiors)))
+    print('module overlay: %s  (%d areas: %s + %d interiors)' % (os.path.join(out, 'install'), 1 + len(interiors), AREA, len(interiors)))
     if a.install:
         copytree(inst, toee)
         # The module archive: the player's own modules\ToEE.dat (base module data: rules, protos' scripts, ...),
