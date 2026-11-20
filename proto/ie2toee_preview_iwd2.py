@@ -18,6 +18,7 @@ import toeedata
 import json
 from ie_map_alerts import apply_map_alert_distances
 from ie_build import preview_build
+from ie_movies import movie_tool_check, report_prologue_media
 import ie_overrides
 from ie2toee_preview import (run, run_soft, copytree, mes_with, RUNTIME, install_varhooks,
                              ENGINE_MAP_IDS, TOWNMAP_ID_MAX, area_names, map_names, drop_high_maplist_ids,
@@ -115,7 +116,10 @@ def main():
                          'clearance.bin the engine could not path the party to most IWD2 exit icons')
     a = ap.parse_args()
     with preview_build(a.out, (a.iwd2, a.toee, a.tp, HERE)) as stage:
+        missing = movie_tool_check('IWD2')
+        report_prologue_media('IWD2', missing)
         convert(a, stage)
+        report_prologue_media('IWD2', missing, stage / 'work/movies/ie_movies_data.py')
 
 
 def convert(a, stage):
