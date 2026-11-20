@@ -2,6 +2,7 @@
 rem Icewind Dale II (Targos) in ToEE - proof-of-concept converter. Usage:
 rem   convert_iwd2.bat "C:\path\to\Icewind Dale 2" "C:\path\to\ToEE copy"
 setlocal
+if exist "%~dp0media-tools\" set "PATH=%~dp0media-tools;%PATH%"
 cd /d "%~dp0"
 if "%~2"=="" (
   echo Usage: convert_iwd2.bat "C:\path\to\Icewind Dale 2" "C:\path\to\ToEE copy"
