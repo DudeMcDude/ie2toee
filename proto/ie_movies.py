@@ -24,6 +24,13 @@ MOVIES = {'IWD': [('intro', 'intro'), ('bislogo', 'bislogo'), ('tsrlogo', 'tsrlo
 
 
 def find_loose(root, res, exts):
+    # The EE root movies directory contains the default soundtrack.
+    # A recursive search can encounter lang/de_DE before the root copy.
+    for directory in ('movies', 'data', ''):
+        for path in glob.glob(os.path.join(root, directory, '*')):
+            name, ext = os.path.splitext(os.path.basename(path))
+            if name.lower() == res and ext.lower().lstrip('.') in exts and os.path.isfile(path):
+                return path
     for p in glob.glob(os.path.join(root, '**', '*'), recursive=True):
         b, e = os.path.splitext(os.path.basename(p))
         if b.lower() == res and e.lower().lstrip('.') in exts:
@@ -32,7 +39,7 @@ def find_loose(root, res, exts):
 
 
 def radvideo():
-    for p in [os.environ.get('RADVIDEO', '')] + glob.glob(os.path.expanduser('~/.wine*/drive_c/Program Files*/RADVideo/radvideo64.exe')) + [
+    for p in [os.environ.get('RADVIDEO', ''), shutil.which('radvideo64.exe')] + glob.glob(os.path.expanduser('~/.wine*/drive_c/Program Files*/RADVideo/radvideo64.exe')) + [
             r'C:\Program Files (x86)\RADVideo\radvideo64.exe', r'C:\Program Files\RADVideo\radvideo64.exe']:
         if p and os.path.isfile(p):
             return p
@@ -289,7 +296,16 @@ def main():
     c.add_argument('--out', required=True); c.add_argument('--only', nargs='*'); c.add_argument('--flavour')
     c.add_argument('--reuse-from', help='previous movie output to read when IE_MOVIES_REUSE is set')
     a = ap.parse_args()
-    convert(a.game, a.toee, a.out, a.ee, a.only, a.flavour, a.reuse_from)
+    entries = convert(a.game, a.toee, a.out, a.ee, a.only, a.flavour, a.reuse_from)
+    requested = set(a.only or ('intro', 'slides'))
+    expected = requested - {'slides'}
+    if 'slides' in requested:
+        expected.add('chapter0')
+    missing = sorted(expected - {key for key, name in entries.values()})
+    if missing:
+        print('WARNING: No playable entry for %s. Check the movie conversion messages above. '
+              'Narrated slides need ffmpeg and ffprobe. Encoding IWD movies also needs RAD Video Tools. '
+              'After configuring the tools, rerun the converter.' % ', '.join(missing), flush=True)
 
 
 if __name__ == '__main__':

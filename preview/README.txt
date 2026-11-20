@@ -1,4 +1,4 @@
-ICEWIND DALE IN THE TEMPLE OF ELEMENTAL EVIL ENGINE - PLAYER PREVIEW (2026-11-20)
+ICEWIND DALE IN THE TEMPLE OF ELEMENTAL EVIL ENGINE - PLAYER PREVIEW (2026-11-20b)
 =================================================================================
 
 IMPORTANT: PYTHON 3.9 OR NEWER MUST BE INSTALLED
@@ -6,7 +6,17 @@ IMPORTANT: PYTHON 3.9 OR NEWER MUST BE INSTALLED
   https://www.python.org/downloads/ and, in the installer, tick "Add python.exe to PATH".
   Without it convert.bat stops with a message. You also need your own Icewind Dale or Icewind Dale: EE.
 
-NEW IN THIS PREVIEW (2026-11-20)
+PROLOGUE PLAYTEST UPDATE (2026-11-20b)
+
+Easthaven now plays its English opening movie, narrated prologue and avalanche when converted with the media tools. Targos plays its existing intro followed by its narrated prologue. The converter reports missing opening entries and looks for RAD Video Tools on PATH.
+
+The Easthaven party reached Kuldahar Pass with all six sidequests. In Targos the autoplayer installs Jorun's wheel, pursues the remaining siege attackers, and can finish fallen raiders that the area script still counts as alive. Town defenders can leave initiative after the scripted victory. The same party completed all sixteen sidequests and received Ulbrec's assignment to Shaengarne across checkpoint replays with combat assistance enabled.
+
+Extract the ZIP for your game to a fresh folder. Before running its conversion batch file, put ffmpeg.exe and ffprobe.exe on PATH or in a media-tools folder next to the batch file. Include any DLLs required by your FFmpeg build. For IWD, install RAD Video Tools or put radvideo64.exe on PATH or in media-tools. You can also set RADVIDEO to its full executable path. IWD2 already supplies its intro in Bink format. Rerun conversion against your own games and start a new campaign to see the opening.
+
+Known issues include unreachable containers at the Snowdrift Inn and in several Targos interiors, shared stock portraits on several Targos residents, and a possible delay after Hedron's dialogue. The previously reported native siege crash did not recur in this playtest.
+
+PREVIOUS PREVIEW (2026-11-20)
 --------------------------------
 The Kuldahar Pass Hermit has a new portrait. More Easthaven townsfolk and squirrels use the commissioned portrait set.
 
