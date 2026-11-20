@@ -1,130 +1,209 @@
-ICEWIND DALE IN THE TEMPLE OF ELEMENTAL EVIL ENGINE - PLAYER PREVIEW (2026-10-26)
-=================================================================================
+ICEWIND DALE II (TARGOS) IN THE TEMPLE OF ELEMENTAL EVIL ENGINE - EARLY PREVIEW (2026-11-20)
+==========================================================================================
 
-IMPORTANT: PYTHON 3.9 OR NEWER MUST BE INSTALLED
-  The converter is a Python program. Before you start, install Python 3.9+ from
-  https://www.python.org/downloads/ and, in the installer, tick "Add python.exe to PATH".
-  Without it convert.bat stops with a message. You also need your own Icewind Dale or Icewind Dale: EE.
+An early-preview, AI-assisted experiment. It converts the opening of Icewind Dale II - Targos (the docks
+I2AR1000, its interiors AR1001-AR1006, AR1100, the palisade AR1200 and AR1201) - from YOUR OWN copy of Icewind Dale II into maps for
+The Temple of Elemental Evil running on the bundled Temple+ build. No Icewind Dale II data is included in this
+download: the converter reads it from your install, on your PC. This is not a playable conversion of IWD2.
 
-NEW IN THIS PREVIEW (2026-10-26)
+NEW IN THIS PREVIEW (2026-11-20)
 --------------------------------
-  * Exit icons: building doors and the town exits show a clickable travel icon. Click it and the party walks
-    there and travels.
-  * Dialogue paging: conversations with more than 5 replies show all of them, paged with More... / Back.
-  * Better pathing: the converter places many more path nodes, so long walks across Easthaven (and clicks on far
-    exit icons) find a route instead of the party standing still.
-  * Known issue: the exit icon of one building (AR1009) may still not react to a click from some spots. If the party
-    doesn't move, walk closer to it and click again.
-  * Old saves: saves made with an earlier preview keep the old maps' state. Start a NEW game after converting and
-    installing this preview (and reconvert: run convert.bat again into your ToEE copy).
+Six new portraits cover Crandall, Eldgull, Cahl-Hyred, Veira, Ghille-Laider and Loman. Targos guards, archers, recruits, mercenaries, sailors and hounds now draw on the appropriate portrait pools.
 
-WHAT THIS IS
-------------
-A preliminary adaptation that loads an Icewind Dale map into the ToEE engine (Temple+). It converts the
-first town, Easthaven (IE area AR1000), from YOUR OWN copy of Icewind Dale and lets you walk around it in ToEE:
+Small Infinity Engine loot piles now put one or two item stacks directly on the ground. On the Targos docks you can pick up dropped weapons, gold and ammunition individually. Larger piles and heaps with scripts, traps, locks or keys retain their containers.
 
-  * the IE area art, walkable and blocked tiles
-  * IE doors: the door art opens and closes, and closed doors block movement
-  * the town's creatures, converted to ToEE critters with their IE equipment, some of them on IE patrol routes
-  * IE items with their own inventory icons (the town's shops are in its interiors, which are still empty)
-  * the 14 building interiors (AR1001-AR1014): walk into a building's door and the whole party enters it, walk
-    into the interior's exit and it is back in town. Interiors are bare maps with their doors: no people, no
-    furniture objects, no shops, no scripts yet
-  * IE journal entries as ToEE logbook quests, with titles, under an "Easthaven" tab (a solved step is shown as
-    the same quest, completed)
-  * dialogue in an IE-style dialogue window (IWD look for classic, IWD:EE look for the Enhanced Edition)
-  * IE spells mapped to ToEE/Temple+ spells where an equivalent exists, and IE creature/area scripts
-  * everything is baked into the map files, so it survives saving and loading like a normal ToEE map
+Hover over a painted barrel, chest or other container to outline its original shape. Hold Tab to outline painted containers that still have items. Click the shape to use it. Locks, traps, scripts and inventory still belong to the original container. The new engine reads these shapes from the converted maps.
 
-This is NOT a playable conversion of Icewind Dale. There is no campaign, no travel beyond Easthaven's buildings, no quests
-beyond what the town's scripts and dialogue happen to do, and many rules are approximations. It's a technology
-preview to try out and to send feedback on.
+Extract to a fresh preview folder and rerun the converter against your own game files. Launch the included TemplePlus.exe for manual play, or use the chapter autoplayer. For the clearest comparison with an earlier conversion, enter the map in a fresh game.
 
-No Icewind Dale data is included in this download. The converter reads it from your own install, on your PC.
+Targos uses an 18-tile ally alert distance. The dock now has 19 small ground-loot spots and six painted barrels.
+The chapter autoplayer shows its current goals in the upper right. Dialogue and cutscene timing and combat movement have also been revised.
+
+PREVIOUS PREVIEW (2026-11-17)
+--------------------------------
+  The chapter autoplayer walks between objectives, follows the action with the camera,
+  and checks sidequest outcomes. Its PCs receive a combat boost and heal between fights.
+  The route includes sixteen Targos errands. The converter updates starting equipment,
+  scripted containers and town defenders' targeting. The engine can still crash during
+  the palisade battle. A complete run through Ulbrec remains unverified.
+  Extract this preview to a fresh folder and rerun the conversion command below against
+  your own game files to pick up the converter changes. See Autoplayer\README.txt for
+  the chapter commands and combat assist setting.
+
+PREVIOUS PREVIEW (2026-11-15)
+--------------------------------
+  Still an early-preview, AI-assisted experiment: not a playable or polished conversion.
+  * The rest of Targos is converted: AR1007 (the goblin store room) and the houses AR1101-AR1107 (Ulbrec,
+    Deirdre, Koluhm and others) as maps 5041-5048, so the Shawford quest chain has its people.
+  * Swift Thomas starts hidden; townsfolk fighting goblins no longer turn on the party; AR1200/AR1201 area
+    scripts run (the palisade attack).
+  * Thick blocker edges are a little more lenient, so the party gets closer to exit icons and doors.
+  * IE variables (globals, area and actor locals, timers) are kept in a file next to each save (<save>.iev)
+    instead of a fixed block of ToEE global slots (Targos needs about 1,200 of them).
+  * Bundled Temple+ 0.2.98 (see TemplePlus\IE-PREVIEW-SOURCE.txt): the info-point magnifier cursor no longer
+    leaves a stale cursor on screen.
+  * New, work in progress: an autoplayer (Autoplayer\README.txt) that starts a new game and drives the Shawford
+    chain by itself, for testing. So far it gets to the goblin attack on the palisade (with two shortcuts) and
+    the game then crashes on entering the palisade area; the battle and Ulbrec are not reached yet. The older
+    Targos tour is still included. It takes over the game window while it runs.
+  * Saves: start a NEW game (new maps, and older saves' quest/dialogue variables start from zero).
+  * Pathing: the engine path node bake (clearance.bin and engine-relinked path nodes) runs only in the
+    developer's Linux/Wine setup (--engine-pathnodes), not in convert_iwd2.bat; Windows converts use the
+    generator's nodes, so the party may not path well to some exit icons. If you fix tiles with the DM Sector
+    Tiles editor ("Save Tile Edits") or make a better path node set for a map, please send the files
+    (%USERPROFILE%\Saved Games\TemplePlus\dm_tile_edits\<module>\map<id>.json, and the map's pathnodenew.pnd /
+    pathnodedist.pnd / clearance.bin) with the map id, so they can ship as overrides.
+
+EARLIER (2026-11-11b)
+--------------------------------
+  * The IE dialogue window now has the 130x150 side portrait slot (it was missing from the IWD2 skin even
+    though IWD already had it). Talk to Hedron after a reconvert, or by adding the portrait key to skin.json
+    and restarting. A reconvert with this package installs the slot.
+  * Bundled Temple+ 0.2.97 (see TemplePlus\IE-PREVIEW-SOURCE.txt). The magnifier cursor for IE info points
+    (signs and the like) could stay on after leaving the region: the hover flag was only updated on a plain
+    mouse move inside the game view. Leaving via the party bar, scrolling the map under a still mouse,
+    dragging, or opening a radial menu could leave it stuck until you moved again in the game view. Each
+    frame now re-checks that the mouse is over the game view, no radial menu is open, and the region is
+    still under the cursor. Drop-in: no reconvert for the cursor fix. Not yet re-checked in game after
+    the fix.
+  * Saves: the map ids are unchanged (5031-5040), so 2026-11-10 and 2026-11-11 saves should still load. Saves
+    from before 2026-11-10 (old 59xx ids) don't work; start a NEW game. Temple+ 0.2.97 can be dropped in
+    without a reconvert. The side portrait slot needs a reconvert, or a skin.json drop-in and a restart.
+
+EARLIER (2026-11-11)
+--------------------------------
+  * The IE dialogue window is now actually installed. The 2026-11-10 converter never built it, so
+    conversations used the stock ToEE window. convert_iwd2.bat now builds it from YOUR Icewind Dale II's own GUI
+    (classic IWD2: the GUIW08.CHU message panel, GUWBTP38, designed for 800x600, since IWD2 has no 640x480
+    GUIW.CHU art) and installs it into modules\ToEE\art\interface\dialog_ie. Re-run convert_iwd2.bat (no new
+    flag) to get it; a reconvert is required for the window. Not tested in game on Windows yet.
+  * Editions: classic IWD2 (GOG 2.01 / retail, no lang folder) uses the classic IWD skin. IWD2:EE with ui.menu
+    and bgee.lua uses the IWD:EE skin. A folder that looks like an Enhanced Edition (lang folder) but lacks
+    those files stops the convert with a message to update it and run convert_iwd2.bat again (no special flag).
+  * Equipped inventory icons: the IE transparent colour (green) no longer shows behind items in the paper-doll
+    slots. The bag view was already fine; the equipped slots ignore alpha. New converts write clean icons. For an
+    existing ToEE copy, run  fix_inventory_icons.bat "C:\GOG Games\ToEE-IWD2"  instead of a full reconvert.
+  * Bundled Temple+ 0.2.96. The DM Sector Tiles editor has "Save Tile Edits". Only the tiles you painted by
+    hand are saved, as JSON in %USERPROFILE%\Saved Games\TemplePlus\dm_tile_edits\<module>\map<id>.json,
+    and they are re-applied when a sector loads. Door cells set by scripts are protected from painting and
+    saving.
+
+EARLIER (2026-11-10)
+--------------------------------
+  * Town maps (mini maps): every converted area has a town map built from its own background, and the town map
+    list names the Targos places instead of ToEE ones.
+  * Prologue narration: the chapter slide's narration plays again (it was silent and the slide could stall).
+    Movies and slides can be skipped with Space, Enter, Esc or a mouse click; a slide whose sound fails to play
+    ends after 3 seconds and a small in-game notice asks you to report it.
+  * IE dialogue window (only once convert_iwd2.bat installs it, i.e. from 2026-11-11): the side portrait
+    is shown only when a real big portrait exists (no blurry upscaled small portrait or placeholder head); the
+    dialogue scrollbar art is fixed.
+  * Commissioned portraits, batch 8 (art generated via Gemini): generic monster and townsfolk art for about 310
+    IWD2 creatures in 20 families (goblins, orcs, orogs, spiders, shadows, zombies, ogres, harpies, trolls,
+    wolves, townspeople and more); elites and chiefs get the stronger-looking art.
+  * Bundled Temple+ 0.2.92.
+  * The converted maps got new map ids (5031-5040); saves from before 2026-11-10 don't work.
+
+EARLIER (2026-11-04)
+--------------------------------
+  * New areas: the Targos palisade (AR1200) and its small interior (AR1201).
+  * Palisade cutscene: after the first goblin bands fall, the goblin sorcerer Caballus breaches the wall with a
+    Fireball, conjures in a goblin wave (summon hexagram) and teleports away.
+  * Summon spells: IE summoning spells conjure their creatures by caster level, with vanilla ToEE / Co8 stand-ins
+    where needed (dire rats, efreeti, elementals, ice devil for gelugon...).
+  * Spawned creatures run their own IE scripts and dialogue; cutscene camera pans, GUI hiding and speech bubbles.
+  * Commissioned portraits, batch 7 (art generated via Gemini): 25 Targos NPCs and goblin leaders - Caballus,
+    Ghotrag, Vghotan, Black Geoffrey, Blanchard Pike, Olap, Jorun, Swift Thomas, Illigmar, Gohar, Magdar, Lumbar,
+    Nolan, Firtha, Brogan, Screed, Tarran, Anson, Isherwood, Gable, Kadence, Niles, Honest Jon, Tabard Mooncalf
+    and the drill sergeants.
+
+EARLIER (2026-11-02)
+--------------------------------
+  * Cutscenes: black letterbox bars and a faint dark wash while a cutscene runs, and mouse clicks are blocked
+    until it ends (or a dialogue opens). PlaySequence now plays ToEE animations (attack, cast, hit, fall...)
+    instead of only being logged; several cutscene steps for one character run one after another.
+  * Creature spawns: script CreateCreature spawns appear (facing and portrait), area spawn .INI files are
+    converted (spawns on entering an area and timed spawns, with their variable conditions and caps), and
+    spawned groups spread out instead of stacking on one tile.
+  * Rest encounters: on converted IE maps, the area's rest table decides whether resting is safe and what
+    interrupts it, through hooks on ToEE/Co8's random_encounter.py (vanilla maps keep Co8's behaviour).
+  * Kegs and other scripted objects spawn as named barrel critters.
+  * Script error fixes: See()/Range() argument errors and .lower errors on object handles are gone.
+  * Portrait batch 6: 30 commissioned monster portraits (hook horror, snow and ice trolls, yuan-ti, lizard men,
+    dire wolves, Malarites, wights, salamanders, armored skeletons, umber hulk, beetles, orcs, goblins, wyvern
+    and two bosses) with "elite" variants for the tougher versions and mirrored copies for variety.
+  * Still an early, AI-assisted experiment: not playable or polished.
+
+EARLIER (2026-11-01)
+--------------------------------
+  * Area scripts run on a game-time map tick in the bundled Temple+ build (pause with menus/inventory, survive
+    save/load).
+  * First cutscenes (IE cutscene sequencer, fades, floating text); the chapter screens show as ToEE slides with
+    subtitles; the IWD2 intro movie is copied from your own install (IWD2's movies are already Bink).
+  * Commissioned NPC portraits: Targos NPCs (Ulbrec, Shawford, Hedron, Reig, Guthewulfe, Kickshaw, Oswald...),
+    the Targos children, and monster portraits (yeti, frost giant, winter wolf, verbeeg, boring beetle) with an
+    upgraded variant and mirrored copies. Installed into data\art\interface\portraits.
+  * Fixes: the party can walk off the start ship (wider gangway), hint-text markers are no longer spawned as
+    people, NPCs always wield their weapons.
 
 REQUIREMENTS
 ------------
-  * The Temple of Elemental Evil (GOG or Steam).
-  * Icewind Dale (classic, GOG/CD) or Icewind Dale: Enhanced Edition (GOG/Steam/Beamdog), installed.
-  * Windows.
-  * Python 3.9 or newer, installed BEFORE you run the converter: https://www.python.org/downloads/
-    In the installer, tick "Add python.exe to PATH". The converter then installs its three Python packages
-    itself (numpy, pillow, fonttools).
-  * The Temple+ build in the TemplePlus folder of this download. It's Temple+ 1.0.98 plus the preview
-    features: the IE dialogue window, the door/tile hooks, and module support (a module can choose where a new
-    game starts). Official Temple+ can't show the converted doors or the IE dialogue window, and doesn't start
-    new games in Easthaven.
+  * The Temple of Elemental Evil (GOG or Steam), a COPY used only for this preview (not your IWD1 preview copy).
+  * Icewind Dale II (GOG 2.01 or retail), installed. An Enhanced Edition folder must be up to date (with
+    ui.menu and bgee.lua), or convert_iwd2.bat stops with a message.
+  * Windows, and Python 3.9+ from https://www.python.org/downloads/ (tick "Add python.exe to PATH").
+  * The Temple+ build in the TemplePlus folder of this download (official Temple+ lacks the preview features,
+    including the area-script map tick). The converter also reads its spell tables, so always run it through
+    convert_iwd2.bat (it passes --tp TemplePlus).
 
 INSTALL
 -------
-1. Make a COPY of your ToEE folder, e.g. "C:\GOG Games\ToEE-IWD", and use the copy from here on. The preview adds
-   files to the ToEE folder and switches every dialogue to the IE window, so keep your normal game separate.
-2. Unzip this download anywhere, e.g. C:\IWD-in-ToEE-preview.
-3. Run the converter once, with your Icewind Dale folder and the ToEE copy. It takes a few minutes:
-
-     convert.bat "C:\GOG Games\Icewind Dale" "C:\GOG Games\ToEE-IWD"
-
-   (For the Enhanced Edition, give its folder: the one with chitin.key and the lang folder.) The converter
-   writes the module into output\install and copies it into the ToEE copy. If it stops with an error, the
-   message names the step that failed.
-4. Run TemplePlus\TemplePlusConfig.exe. Set the ToEE folder to your ToEE COPY, choose windowed or full
-   screen as you like, and save. Decline any offer to update Temple+; an update would replace the preview
-   build with official Temple+.
-   (If you already use Temple+: the settings are shared, so switch the folder back for your normal game.)
-
-HOW TO START
-------------
-The converter installs Icewind Dale as its own Temple+ module, "IWD" (modules\IWD.dat, modules\IWD and
-modules\IWD_core in the ToEE copy). Your normal ToEE module is left alone.
-modules\IWD.dat is not new data: it's your own modules\ToEE.dat, hard-linked (or copied, if a link isn't
-possible) under the module's name, because Temple+ needs a <module>.dat to list a module. The converter makes it;
-if you delete it, copy modules\ToEE.dat to modules\IWD.dat yourself (or run the converter again).
-1. In TemplePlus\TemplePlusConfig.exe, pick the module "IWD" in the module list and save.
-2. Start TemplePlus\TemplePlus.exe and start a NEW game with any party. It begins in Easthaven; no console
-   command is needed. (To play normal ToEE again, pick the module "ToEE" in TemplePlusConfig.)
-3. (Old saves from before this version: load one and type  import iwd; iwd.go()  in the Shift+~ console.)
-4. Click townsfolk to talk to them (IE dialogue window) and click doors to open and close them. Walk into a
-   building's doorway to go inside, and into the exit area inside to come out. Save and load as usual.
-   To leave Easthaven for good, load a save from before the trip.
+1. Copy your ToEE folder, e.g. "C:\GOG Games\ToEE-IWD2".
+2. Unzip this download anywhere and run:
+     convert_iwd2.bat "C:\GOG Games\Icewind Dale 2" "C:\GOG Games\ToEE-IWD2"
+3. Run TemplePlus\TemplePlusConfig.exe, set the ToEE folder to the copy, module "ToEE", save. Decline updates.
+4. Start TemplePlus\TemplePlus.exe and start a NEW game: it begins at the Targos docks.
+   Conversations use the IE dialogue window that step 2 built from your IWD2 GUI, including the side
+   portrait slot in this preview. After updating the converter, run convert_iwd2.bat again to rebuild
+   and reinstall it (or add the portrait key to skin.json and restart).
+   Saves from the 2026-11-10 and 2026-11-11 previews should still load. Saves from older previews
+   (59xx map ids) don't work; start a new game.
+5. Optional, for a copy converted with an older preview: fix_inventory_icons.bat "C:\GOG Games\ToEE-IWD2"
+   clears the green behind equipped icons without a full reconvert (the dialogue window still needs step 2).
 
 KNOWN ISSUES
 ------------
-  * Easthaven and its 14 building interiors are converted, but the interiors are empty (no people, shops or
-    scripts yet). The road south (to AR1200) and two interior side doors (AR1015, AR1016) lead to areas that are
-    not in the preview: you get a one-time "This exit (ARxxxx) is not in the preview" note and stay put. The world
-    map doesn't know Easthaven.
-  * Travel is a 4-times-a-second check of where your party is, so it works in a loaded save too; after arriving
-    (or loading) it only fires once the party has stepped out of every exit area, so it never bounces you back.
-  * Rules are approximations: IE stats, THAC0 and saves are mapped to D&D 3.5 equivalents. Some IE spells have no
-    ToEE counterpart yet and are left out (the creature just doesn't cast them). Item usability restrictions are
-    dropped, and some weapons map to their nearest ToEE type.
-  * Fights work but use simplified IE combat scripts; there's no IE-style target selection.
-  * Patrols: walkers pause a fixed 3 s at each waypoint, and one patroller stays at its first waypoint.
-  * Potions can stack into another potion of the same ToEE type.
-  * Already-converted inventories may show a green background on equipped icons (IE's transparent
+  * Fixed on the iwd2-targos branch after this preview (needs a reconvert): Swift Thomas no longer appears in
+    Targos before the palisade attack, and Reig and other townsfolk fighting goblins no longer turn on the party.
+    (The trailing faction 0 was only the end of ToEE's faction list, not the cause.)
+    Also fixed there (reconvert + new game): Swift Thomas shows up at the docks again once you have talked to
+    him at the palisade, Phaen of the Rags stays hidden until the palisade attack, and the palisade's own
+    battle script now runs (off-duty soldiers leave, the goblin teams count toward the quest).
+  * Pathfinding: generated nodes are dense (6-tile spacing) with some redundant nodes in open areas, and
+    link distances are straight-line / aerial rather than the actual walking route, which can look wrong
+    (Targos was called out in playtest). A later unify-pass and walk-path linking are planned but are not
+    in this preview.
+  * The Temple+ info-cursor fix is in this build but has not been re-tested in game yet (the bug itself
+    was found in playtest).
+  * Copies converted before 2026-11-11 may show a green background on equipped icons (IE's transparent
     colour). New converts fix this; for an existing ToEE copy, run fix_inventory_icons.bat on that folder.
-  * Wands and other charged items show no charges.
-  * Converted NPCs may carry a few extra default ToEE items.
-  * IWD:EE: one NPC of the classic town isn't in the EE version of the area.
-  * Some IE script actions and triggers aren't supported yet; they are skipped (Temple+ log: IE_UNSUPPORTED).
-  * The IE dialogue window is used for every conversation in the ToEE copy, including ToEE's own NPCs.
-  * Temple+ may log harmless warnings when loading the map.
+  * The cutscene input lock blocks mouse clicks only; keyboard shortcuts still work. Some PlaySequence animations
+    are a best guess at the matching ToEE animation.
+  * Spawned creatures don't run their own IE scripts or dialogue yet; some spawn .INI options (e.g. per-difficulty
+    variants) are read but ignored. Targos has no rest table, so resting there stays quiet.
+  * Portraits were checked in game for Hedron, Guthewulfe and a few spawned monsters (snow trolls) only.
+  * Goblins in the interiors start combat on arrival; a townsperson can block the AR1004 door.
+  * IWD2 journal text isn't shown yet; some feats/spells have no ToEE equivalent.
+  * AR1201 -> AR1200: use the exit with the party close to it. The battle after the palisade cutscene is not
+    tuned yet, and summons don't check that the caster has the spell memorised.
+  * The IWD2 dialogue window, including the new side portrait slot, should be checked in game on Windows.
+  * Not yet tested on a clean Windows install. Feedback welcome.
 
-UNINSTALL
----------
-Delete the ToEE copy and this folder. Set the ToEE folder in TemplePlusConfig back to your normal game.
-
-FEEDBACK
---------
-Please post feedback, screenshots and bug reports in the Icewind Dale / ie2toee thread on co8.org (Circle of
-Eight forums). Include the converter's messages, your edition (classic or EE), and
-%USERPROFILE%\Saved Games\TemplePlus\TemplePlus.log after the problem happened.
-
-CREDITS / LICENCES
+FEEDBACK / CREDITS
 ------------------
+Feedback in the ie2toee thread on co8.org, with %USERPROFILE%\Saved Games\TemplePlus\TemplePlus.log.
 Converter: ie2toee (https://github.com/DudeMcDude/ie2toee), see converter\LICENSE.txt.
-Engine: Temple+ (https://github.com/GrognardsFromHell/TemplePlus, MIT licence). The preview changes to Temple+
-are in TemplePlus\ie-preview-changes.diff (against Temple+ master 03d72045). Source:
-https://github.com/DudeMcDude/TemplePlus/tree/preview/iwd-module
-commit 15b268bf (https://github.com/DudeMcDude/TemplePlus/commit/15b268bf63ab1dccba92050842d843462f974351). Icewind Dale is (c) its publishers. You need your own legal copy;
-nothing from it is redistributed here. The Temple of Elemental Evil is (c) its publishers.
+Engine: Temple+ (MIT, https://github.com/GrognardsFromHell/TemplePlus); preview changes listed in
+TemplePlus\IE-PREVIEW-SOURCE.txt, source https://github.com/DudeMcDude/TemplePlus/tree/feature/dm-tile-edits-save
+Portrait art (art\portraits) was commissioned for this project (AI-assisted, via Gemini).
+Icewind Dale II and The Temple of Elemental Evil are (c) their publishers; nothing from them is redistributed.

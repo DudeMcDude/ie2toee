@@ -12,6 +12,14 @@ ART = os.path.join(os.path.dirname(HERE), 'art', 'portraits')
 MASTERS = os.environ.get('IE_PORTRAIT_MASTERS', '/workspace/portrait-art/masters')   # ie_<key>/ie_<key>_master.png
 # key -> (portraits.mes base id, display name used in file names)
 ART_IDS = {
+    'crandall': (12930, 'Crandall'),
+    'eldgull': (12940, 'Eldgull'),
+    'cahl_hyred': (12950, 'CahlHyred'),
+    'veira': (12960, 'Veira'),
+    'ghille_laider': (12970, 'GhilleLaider'),
+    'loman': (12980, 'Loman'),
+    'eh_expedition_sellsword': (11400, 'EHSellsword'),
+    'eh_mercenary_veteran': (12800, 'MercenaryVeteran'),   # generic sellsword (2nd sellsword variant), for later pools
     'hrothgar': (9900, 'Hrothgar'), 'everard': (9910, 'Everard'), 'arundel': (9920, 'Arundel'),
     'poquelin': (9930, 'Poquelin'), 'belhifet': (9940, 'Belhifet'), 'yxunomei': (9950, 'Yxunomei'),
     'kresselack': (9960, 'Kresselack'), 'conlan': (9970, 'Conlan'),
@@ -152,6 +160,7 @@ ART_IDS = {
 }
 # Generic monsters also get a left/right mirrored copy (own id) for per-instance variety. Named NPCs don't.
 FLIPS = {
+    'eh_mercenary_veteran': 12810,
     'yeti': 10310, 'yeti_varB': 10320, 'verbeeg': 10330, 'frost_giant': 10340, 'frost_giant_varB': 10350,
     'winter_wolf': 10360, 'boring_beetle': 10370, 'boring_beetle_varB': 10380, 'squirrel': 10390,
     'hook_horror': 10700,

@@ -68,9 +68,10 @@ def _arg(v):
 
 
 def entry(res):
-    e = ITEMS.get(res.lower())
-    if e is None and not _SEEN.has_key(res.lower()):
-        _SEEN[res.lower()] = 1
+    key = res.strip().lower()
+    e = ITEMS.get(key)
+    if e is None and key not in _SEEN:
+        _SEEN[key] = 1
         _log('IE_ITEM_UNMAPPED %s' % res)
     return e
 
@@ -146,11 +147,14 @@ def make(res, loc, qty=None):
 def give(res, holder, qty=None):
     o = make(res, holder.location, qty)
     if o is not None:
-        holder.item_get(o)
+        transfer(holder, o)
     return o
 
 
 def _inv(holder):
+    if holder.type == obj_t_container:
+        field = obj_f_container_inventory_list_idx
+        return [holder.obj_get_idx_obj(field, i) for i in range(holder.obj_get_idx_obj_size(field))]
     out = []
     for i in range(0, 200):
         try:
@@ -169,6 +173,28 @@ def _inv(holder):
     return out
 
 
+def matches(item, e):
+    return e and item.proto == e['p'] and (not e.get('n') or item.obj_get_int(_field('obj_f_description')) == e['n'])
+
+
+def transfer(holder, item):
+    """Keep different magical IE items on the same ToEE base prototype in separate stacks."""
+    flags = item.item_flags_get()
+    if not (flags & OIF_IS_MAGICAL and flags & OIF_IDENTIFIED):
+        return holder.item_get(item)
+    description = _field('obj_f_description')
+    if not any(other.proto == item.proto and other.obj_get_int(description) != item.obj_get_int(description)
+               for other in _inv(holder)):
+        return holder.item_get(item)
+    # Temple+ combines identified potions by prototype and spell. It would discard the incoming
+    # object's IE identity in favour of the receiving stack's name. Keep this transfer separate.
+    item.item_flag_unset(OIF_IDENTIFIED)
+    try:
+        return holder.item_get(item)
+    finally:
+        item.item_flag_set(OIF_IDENTIFIED)
+
+
 def find(holder, res):
     """The converted IE item res in holder's inventory (base proto + its own name id), or None."""
     e = entry(res)
@@ -176,7 +202,7 @@ def find(holder, res):
         return None
     for it in _inv(holder):
         try:
-            if it.proto == e['p'] and (not e.get('n') or it.obj_get_int(_field('obj_f_description')) == e['n']):
+            if matches(it, e):
                 return it
         except Exception:
             pass
@@ -192,12 +218,13 @@ def fill_containers(area, log_each=1):
             continue
         loc = location_from_axis(int(c['toee'][0]), int(c['toee'][1]))
         box = game.obj_create(c['proto'], loc)
+        box.object_flag_set(OF_NO_BLOCK)
         got = []
         for res, q in c['items']:
             it = make(res, loc, q > 1 and q or None)
             if it is not None:
                 box.item_get(it); got.append(res)
-        if c.get('lock'):
+        if c.get('locked', c.get('lock')):
             try:
                 box.container_flag_set(OCOF_LOCKED)
                 box.obj_set_int(obj_f_container_lock_dc, min(40, 10 + c['lock'] / 5))
@@ -230,6 +257,7 @@ def stock_store(npc, store):
         box = game.obj_create(s.get('container') or 1001, npc.location)
         box.object_flag_set(OF_DONTDRAW)
         box.object_flag_set(OF_CLICK_THROUGH)
+        box.object_flag_set(OF_NO_BLOCK)
         try:
             npc.substitute_inventory = box
         except Exception, ex:

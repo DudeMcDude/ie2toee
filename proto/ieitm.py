@@ -181,6 +181,7 @@ def are_container_items(data):
         first, cnt = u('<II', o + 0x40)
         out.append(dict(name=cstr(data[o:o + 32]), x=u('<H', o + 0x20)[0], y=u('<H', o + 0x22)[0],
                         type=u('<H', o + 0x24)[0], lock=u('<H', o + 0x26)[0], flags=u('<I', o + 0x28)[0],
+                        script=cstr(data[o + 0x48:o + 0x50]).lower(),
                         trapped=u('<H', o + 0x30)[0], key=cstr(data[o + 0x78:o + 0x80]).lower(),
                         items=items[first:first + cnt]))
     return out

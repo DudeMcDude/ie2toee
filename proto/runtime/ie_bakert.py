@@ -46,6 +46,7 @@ def _guid(o):
 def finalize_critter(o, d, F):
     import ie_critters
     s = d['spec']
+    ie_critters.passive_prop(o, s)
     mark = F['npc_pad_i_3']
     first = o.obj_get_int(mark) != STAMP
     if first:
@@ -118,6 +119,19 @@ def finalize_item(o, d, F):
     return 1
 
 
+def omit_placement(o, spec):
+    if not spec.get('area_spawn'):
+        return False
+    import ie_runtime
+    if ie_runtime.area_spawn_allowed(spec):
+        return False
+    if o and o != OBJ_HANDLE_NULL:
+        ie_runtime._bound.pop(o.id, None)
+        ie_runtime._bound.pop(_guid(o), None)
+        o.destroy()
+    return True
+
+
 def area_pass(area):
     """Finalize every baked object of the area that is still in the world, attach the doors."""
     m = _data(area)
@@ -126,10 +140,19 @@ def area_pass(area):
         m = _data(area)
     if m is None:
         return 0
+    import ie_runtime as rt
+    # Old saves can already contain the visible version of the palisade mobs.
+    before_siege = area == 'I2AR1200' and not any(rt.get_var(None, flag, 'GLOBAL') for flag in
+        ('Goblins_Attack_Palisade', '1200_BATTLE_SETUP', 'Goblin_Palisade_Quest'))
     F = m.FIELDS
-    n = {'npc': 0, 'item': 0, 'missing': 0, 'first': 0}
+    n = {'npc': 0, 'item': 0, 'missing': 0, 'first': 0, 'omitted': 0}
     holders = []
     for g, d in m.OBJS.items():          # items first: the wielder's status init then sees their conditions
+        if d['k'] == 'container':
+            box = game.get_obj_by_id(g)
+            if box and box != OBJ_HANDLE_NULL:
+                box.object_flag_set(OF_NO_BLOCK)
+            continue
         if d['k'] != 'item':
             continue
         o = game.get_obj_by_id(g)
@@ -141,9 +164,20 @@ def area_pass(area):
         if d['k'] != 'npc':
             continue
         o = game.get_obj_by_id(g)
+        if omit_placement(o, d['spec']):
+            n['omitted'] += 1
+            continue
+        ident = d['spec'].get('ident')
+        if ident:
+            # OF_OFF actors receive no engine heartbeat. Register the baked GUID for
+            # hidden_tick and named cutscene actions even before its sector is loaded.
+            rt._bound[g] = (ident, m.AREA)
         if o == OBJ_HANDLE_NULL or o is None:
             n['missing'] += 1; continue
         n['npc'] += 1
+        if before_siege and d['spec'].get('starts_hidden_hostile') and not (o.object_flags_get() & OF_OFF):
+            if not o.is_dead_or_destroyed():
+                o.object_flag_set(OF_OFF)
         n['first'] += finalize_critter(o, d, F) and 1 or 0
     nd = 0
     try:
@@ -151,8 +185,8 @@ def area_pass(area):
         nd = ie_doors.start(area)
     except ImportError:
         pass
-    _log('IE_BAKE %s pass: %d npcs, %d items, %d newly finalized, %d not in world, %d doors attached' % (
-        area, n['npc'], n['item'], n['first'], n['missing'], nd))
+    _log('IE_BAKE %s pass: %d npcs, %d items, %d newly finalized, %d not in world, %d doors attached, %d omitted by level' % (
+        area, n['npc'], n['item'], n['first'], n['missing'], nd, n['omitted']))
     return 1
 
 
@@ -193,6 +227,10 @@ def first_heartbeat(o, area):
     except Exception, e:
         _log('IE_BAKE intro movie failed: %s' % e)
     a = area.upper(); g = _guid(o)
+    # Sectors can load after the area pass. Apply the same gate on their first heartbeat.
+    data = _data(a) or _data('I2' + a)
+    if data and omit_placement(o, data.OBJS.get(g, {}).get('spec', {})):
+        return
     seen = _members.get(a)
     now = time.time()
     if seen is not None and (not seen.has_key(g) or now - _last[a] < 2.0):

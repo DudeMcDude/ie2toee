@@ -95,7 +95,8 @@ def set_var(c, name, scope, value):
 
 # ------------------------------------------------------------------------------------------------ context
 class Ctx(object):
-    def __init__(self, me, other=None, ident='', area='', events=None):
+    def __init__(self, me, other=None, ident='', area='', events=None, dialogue=False):
+        self.dialogue = dialogue
         self.me, self.other, self.ident, self.area = me, other, ident, area
         self.events = events or {}
         self.last_trigger = None
@@ -160,6 +161,23 @@ def bind(obj, ident, area):
     except ImportError:
         pass
 
+def area_spawn_allowed(spec):
+    """Read the encounter size for this visit from the source ARE's party-level mask."""
+    placement = spec.get('area_spawn')
+    if not placement:
+        return True
+    area, mask, second, third = placement
+    key = area + ':ie2toee_spawn_difficulty'
+    rank = ie_vars.get(key)
+    if not rank:
+        if not game.party:
+            return True
+        level = sum(pc.stat_level_get(stat_level) for pc in game.party) // len(game.party)
+        rank = 3 if third and level >= third else 2 if second and level >= second else 1
+        ie_vars.put(key, rank)
+    return bool(mask & (1 << (rank - 1)))
+
+
 def _party():
     if not IN_GAME:
         return []
@@ -182,16 +200,26 @@ def O(c, name, inner=None):
         return name
     n = name.lower()
     base = inner if inner is not None else c.me
+    if n in ('lastseenby', 'lastmarkedobject'):
+        ie_vars._check()
+        return ie_vars.SEEN_OBJECTS.get(_key(base))
     if n in ('myself',):
         return c.me
     if n in ('nothing',):
         return None
-    if n in ('protagonist', 'player1', 'lasttalkedtoby', 'lastheardby', 'lastseenby', 'lasttrigger', 'gabber'):
+    if n == 'protagonist':
+        # IWD2's CHARNAMEISGABBER rule. Player1 remains the first portrait.
+        party = _party()
+        if c.dialogue and c.other in party:
+            return c.other
+        selected = getattr(game, 'selected', ()) if IN_GAME else ()
+        return next((pc for pc in party if pc in selected), party[0] if party else _pc(c))
+    if n in ('player1', 'lasttalkedtoby', 'lastheardby', 'lasttrigger', 'gabber'):
         if n == 'lasttalkedtoby' or n == 'gabber':
             return _pc(c)
         if n in ('lasttrigger',) and c.last_trigger is not None:
             return c.last_trigger
-        if n == 'lastheardby' or n == 'lastseenby':
+        if n == 'lastheardby':
             return _pc(c)
         p = _party()
         return p[0] if p else _pc(c)
@@ -248,7 +276,8 @@ def N(c, name):
         return name
     if IN_GAME:
         for k, (ident, area) in _bound.items():
-            if ident.lower() == name.lower() or re.sub(r'^\d+', '', ident.lower()) == name.lower():   # IWD2 10hedron = "Hedron"
+            if (ident.lower() == name.lower() or re.sub(r'^\d+', '', ident.lower()) == name.lower()
+                    or (c and area == c.area and script_name(ident, area).lower() == name.lower())):   # IWD2 10hedron = "Hedron"
                 try:
                     o = game.get_obj_by_id(k)
                     if o:
@@ -284,7 +313,7 @@ def F(c, **filt):
         p = _party()
         return p[0] if p else None
     if ea in (255, 200) or ea == 'ENEMY' or ea == 'EVILCUTOFF':
-        return _nearest_enemy(c.me)
+        return _nearest_enemy(c.me, enemy_allegiance=True)
     log_once('filt:%r' % (sorted(filt.items()),), 'IE_UNSUPPORTED object filter %r' % (filt,))
     return None
 
@@ -351,15 +380,15 @@ def _hostile(me, o):
         return False
     return _kos(o if a else me)
 
-def _nearest_enemy(me):
+def _nearest_enemy(me, enemy_allegiance=False):
     if not IN_GAME or me is None:
         return None
     best = None
     try:
         for o in game.obj_list_vicinity(me.location, OLC_CRITTERS):
-            if o == me or _dead(o):
+            if o == me or _dead(o) or o.object_flags_get() & (OF_OFF | OF_DONTDRAW):
                 continue
-            hostile = _hostile(me, o)
+            hostile = _kos(o) if enemy_allegiance else _hostile(me, o)
             if hostile and (best is None or me.distance_to(o) < me.distance_to(best)):
                 best = o
     except Exception as e:
@@ -507,14 +536,25 @@ class _Triggers(object):
             return o is not None and _dead(o)
         o = N(c, name)
         return o is None or _dead(o)
-    def See(self, c, obj, *unused):   # IWD2 See(O, I:SkipHidden)
+    def See(self, c, obj, *see_dead):
+        if obj is None or (not any(see_dead) and _dead(obj)) or not self.LOS(c, obj, 0):
+            return False
+        if obj != c.me:
+            ie_vars._check()
+            ie_vars.SEEN_OBJECTS[_key(c.me)] = obj
+        return True
+    def LOS(self, c, obj, rng):
         if obj is None or c.me is None or not IN_GAME:
             return False
         try:
-            return c.me.distance_to(obj) < 40 and c.me.can_see(obj)
+            if obj.object_flags_get() & (OF_OFF | OF_DONTDRAW):
+                return False
+            if c.me.distance_to(obj) < 40 and c.me.can_see(obj):
+                c.last_trigger = obj
+                return True
         except Exception:
-            return False
-    def LOS(self, c, obj, rng): return self.See(c, obj)
+            pass
+        return False
     def Range(self, c, obj, rng=None, *unused):   # IWD2 adds a comparison arg; Range(rng) = the caller's target
         if rng is None:
             return False
@@ -542,6 +582,29 @@ class _Triggers(object):
     def HPLT(self, c, obj, hp): return _hp(obj) < hp
     def PartyGoldGT(self, c, n): return _party_gold() > n
     def PartyGoldLT(self, c, n): return _party_gold() < n
+    def OpenState(self, c, obj, state):
+        if not IN_GAME or not obj:
+            return False
+        if obj.type == obj_t_portal:
+            return bool(obj.portal_flags_get() & OPF_OPEN) == bool(state)
+        if obj.type == obj_t_container:
+            return bool(obj.container_flags_get() & OCOF_OPEN) == bool(state)
+        return False
+    def TotalItemCntExclude(self, c, res, holder, count):
+        if holder is None or ie_itemrt is None:
+            return False
+        e = ie_itemrt.entry(res)
+        return len([it for it in ie_itemrt._inv(holder) if not ie_itemrt.matches(it, e)]) == count
+    def TimeGT(self, c, hour): return IN_GAME and game.time.time_game_in_hours(game.time) > hour
+    def TimeLT(self, c, hour): return IN_GAME and game.time.time_game_in_hours(game.time) < hour
+    def ItemIsIdentified(self, c, res, obj):
+        holders = (obj,) if obj is not None else _party()
+        for holder in holders:
+            it = item_find(holder, res)
+            if it and it.obj_get_int(obj_f_item_flags) & OIF_IDENTIFIED:
+                return True
+        return False
+
     def PartyHasItem(self, c, res):
         for pc in _party():
             if item_find(pc, res):
@@ -573,9 +636,10 @@ class _Triggers(object):
             return False
         # IE range is in search-map units (~16 px); a ToEE tile is ~28 px along its axes -> about rng/2 tiles
         return (lx - u) ** 2 + (ly - v) ** 2 <= (2 + rng / 2.0) ** 2
-    def CreatureHidden(self, c, obj=None):
-        o = obj or c.me
-        return IN_GAME and o is not None and (o.object_flags_get() & OF_OFF) != 0
+    def CreatureHidden(self, c, *target):
+        # An unresolved named actor cannot be the caller's visible alternate form.
+        obj = target[0] if target else c.me
+        return obj is None or (IN_GAME and (obj == OBJ_HANDLE_NULL or bool(obj.object_flags_get() & OF_OFF)))
     def IsScriptName(self, c, name, obj=None):
         o = obj or c.me
         return o is not None and _bound.get(_key(o), ('',))[0].lower() in (name.lower(),) 
@@ -616,8 +680,8 @@ MAPS = {
     'race': {1: 0, 2: 1, 3: 6, 4: 2, 5: 4, 6: 3, 7: 5},      # IE race.ids -> ToEE race (human elf dwarf gnome halfelf halforc halfling)
     'class': {1: 'class_wizard', 2: 'class_fighter', 3: 'class_cleric', 4: 'class_rogue', 5: 'class_bard',
               6: 'class_paladin', 11: 'class_druid', 12: 'class_ranger', 20: 'class_sorcerer', 21: 'class_monk'},
-    'stat': {38: 'stat_strength', 39: 'stat_intelligence', 40: 'stat_wisdom', 41: 'stat_dexterity',
-             42: 'stat_constitution', 43: 'stat_charisma', 34: 'stat_level'},
+    'stat': {34: 'stat_level', 36: 'stat_strength', 38: 'stat_intelligence', 39: 'stat_wisdom',
+             40: 'stat_dexterity', 41: 'stat_constitution', 42: 'stat_charisma'},
 }
 
 def _cmp_stat(c, obj, kind, ieval):
@@ -628,8 +692,8 @@ def _cmp_stat(c, obj, kind, ieval):
             want = MAPS['race'].get(ieval)
             return want is not None and obj.stat_level_get(stat_race) == want
         if kind == 'class':
-            want = MAPS['class'].get(ieval)
-            return want is not None and obj.stat_level_get(globals()[want]) > 0
+            stats = CLASS_LEVELS.get(ieval, ())
+            return bool(stats) and all(obj.stat_level_get(globals()[stat]) > 0 for stat in stats)
         if kind == 'align':
             a = obj.critter_get_alignment()
             return _align_match(ieval, a)
@@ -699,7 +763,7 @@ def dlg_start(npc, pc, ident, area, states, entry):
     """Called from the generated san_dialog. `states` = [(state_line, cond_fn)] in IE evaluation order (state
     trigger table order); the first whose condition holds is the entry line. NumTimesTalkedTo counts up after."""
     ident, area = who(npc, ident, area)
-    c = Ctx(npc, pc, ident, area)
+    c = Ctx(npc, pc, ident, area, dialogue=True)
     bind(npc, ident, area)
     line = None
     for ln, cond in states:
@@ -730,7 +794,7 @@ def dlg_start(npc, pc, ident, area, states, entry):
 def dlg_cond(npc, pc, ident, area, fn):
     ident, area = who(npc, ident, area)
     try:
-        return bool(fn(Ctx(npc, pc, ident, area)))
+        return bool(fn(Ctx(npc, pc, ident, area, dialogue=True)))
     except Exception as e:
         log('IE_ERR dialog condition %s: %s' % (ident, e))
         return False
@@ -738,7 +802,7 @@ def dlg_cond(npc, pc, ident, area, fn):
 def dlg_do(npc, pc, ident, area, actions, journal=None):
     """Dialogue transition effect: run the IE actions (queued on the NPC, like the IE) and note journal text."""
     ident, area = who(npc, ident, area)
-    c = Ctx(npc, pc, ident, area)
+    c = Ctx(npc, pc, ident, area, dialogue=True)
     if journal is not None:
         journal_add(journal[0], journal[1]) if isinstance(journal, tuple) else log('JOURNAL %s' % journal)
     run_actions(c, actions)
@@ -862,6 +926,9 @@ class _Actions(object):
         log('ENEMY %s' % c.ident)
         if IN_GAME and c.me is not None:
             try:
+                # A civilian that reveals itself as an enemy no longer speaks
+                # for the town. Remove its shared faction before combat starts.
+                set_town_faction(c.me,'hostile')
                 c.me.npc_flag_set(ONF_KOS)
                 if c.me.object_flags_get() & OF_OFF:
                     return            # still hidden (IE: an ENEMY that waits hidden); attacks once shown
@@ -896,15 +963,20 @@ class _Actions(object):
         log('DESTROY %s' % c.ident)
         if IN_GAME and c.me is not None:
             c.me.destroy()
-    def AddXPVar(self, c, name, xp):
-        log('XP party %d (%s)' % (xp, name))
+    def AddXPVar(self, c, name, strref):
+        xp = XP2DA.get(name.strip().upper())
+        if xp is None:
+            log_once('xp:' + name, 'IE_XP unknown EXPTABLE entry ' + name)
+            return
+        self.AddexperienceParty(c, xp)
+    AddXpVar = AddXPVar
+    def AddexperienceParty(self, c, xp):
+        log('XP party %d' % xp)
         for pc in _party():
             try:
                 pc.award_experience(xp // max(1, len(_party())))
             except Exception:
                 pass
-    AddXpVar = AddXPVar
-    def AddexperienceParty(self, c, xp): self.AddXPVar(c, '', xp)
     def GiveItem(self, c, res, obj):
         if obj is not None and IN_GAME:
             it = item_find(c.me, res)
@@ -917,6 +989,12 @@ class _Actions(object):
         if obj is not None and IN_GAME:
             item_give(res, obj)
         log('CREATE_ITEM %s' % res)
+    def Lock(self, c, obj):
+        if IN_GAME and obj:
+            if obj.type == obj_t_container:
+                obj.container_flag_set(OCOF_LOCKED)
+            elif obj.type == obj_t_portal:
+                obj.portal_flag_set(OPF_LOCKED)
     def TakePartyItem(self, c, res):
         log('TAKE %s' % res)
         if IN_GAME:
@@ -924,6 +1002,33 @@ class _Actions(object):
                 it = item_find(pc, res)
                 if it:
                     it.destroy(); return
+    def TakePartyItemNum(self, c, res, count):
+        if not IN_GAME or c.me is None:
+            return
+        for pc in _party():
+            while count > 0:
+                item = item_find(pc, res)
+                if not item:
+                    break
+                field = None
+                if item.type == obj_t_ammo:
+                    field = obj_f_ammo_quantity
+                elif item.type == obj_t_money:
+                    field = obj_f_money_quantity
+                quantity = max(1, item.obj_get_int(field)) if field is not None else 1
+                if quantity > count:
+                    part = ie_itemrt.give(res, c.me, count)
+                    if part:
+                        item.obj_set_int(field, quantity - count)
+                    return
+                c.me.item_get(item)
+                if item_find(pc, res) == item:
+                    return
+                count -= quantity
+    def DestroyItem(self, c, res):
+        item = item_find(c.me, res) if IN_GAME and c.me is not None else None
+        if item:
+            item.destroy()
     def TakePartyGold(self, c, gp):
         log('TAKE_GOLD %d' % gp)
         if IN_GAME:
@@ -1015,7 +1120,7 @@ class _Actions(object):
         xp = XP2DA.get(row.upper())
         log('XP2DA %s -> %s' % (row, xp))
         if xp:
-            self.AddXPVar(c, row, xp)
+            self.AddexperienceParty(c, xp)
     def RevealAreaOnMap(self, c, area): log('REVEAL %s' % area)
     def StartMovie(self, c, res):
         log('MOVIE %s' % res)
@@ -1104,8 +1209,12 @@ class _Actions(object):
     def SetSavedLocation(self, c):
         if IN_GAME and c.me is not None:
             _saved[c.ident] = c.me.location
-    def SetSavedLocationPoint(self, c, pt, *args):
-        u, v = ie_to_tile(c.area, pt[0], pt[1]); _saved[c.ident] = location_from_axis(u, v)
+    def SetSavedLocationPoint(self, c, x, y=None, facing=None):
+        # IWD2 takes three integers. Older generated scripts pass a point.
+        if isinstance(x, (tuple, list)):
+            x, y = x
+        u, v = ie_to_tile(c.area, x, y)
+        _saved[c.ident] = location_from_axis(u, v)
     def JumpToSavedLocation(self, c):
         loc = _saved.get(c.ident)
         if IN_GAME and c.me is not None and loc:
@@ -1337,9 +1446,11 @@ except ImportError:
 
 # IE area -> ToEE map id (+ placements), written by the converter as ie_areas.py
 AREA_MAPS = {}
+CLASS_LEVELS = dict((code, (name.replace('class_', 'stat_level_'),)) for code, name in MAPS['class'].items())
 try:
     import ie_areas
     AREA_MAPS = ie_areas.MAPS
+    CLASS_LEVELS = getattr(ie_areas, 'CLASS_LEVELS', CLASS_LEVELS)
     for _a, _p in getattr(ie_areas, 'PLACEMENTS', {}).items():
         set_placement(_a, *_p)
 except ImportError:
@@ -1538,7 +1649,8 @@ def _hostile_npc(obj):
 
 def _in_combat(obj):
     try:
-        return game.combat_is_active() and obj.type == obj_t_npc   # rounds belong to san_start_combat
+        # Hidden waves have no combat turn. Their heartbeat still evaluates the reveal script.
+        return game.combat_is_active() and obj.type == obj_t_npc and not (obj.object_flags_get() & OF_OFF)
     except Exception:
         return False
 
@@ -1619,6 +1731,15 @@ def _ident_actor(area, ident):
                 break
             except Exception:
                 pass
+        try:
+            import ie_spawnables
+            data = ie_spawnables.INI_SPAWNS.get(re.sub('^I2', '', area), {})
+            for group in data.get('enter', []) + data.get('events', []):
+                for spawn in group.get('critters', []):
+                    if spawn.get('ident') and spawn.get('script_name'):
+                        m[spawn['ident'].lower()] = spawn['script_name']
+        except ImportError:
+            pass
         _actor_names[area] = m
     return _actor_names[area].get(ident.lower())
 

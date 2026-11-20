@@ -172,6 +172,7 @@ class Are:
         else:
             raise ValueError(f'unsupported ARE {sig!r} (PST V1.0 uses the same header but other records)')
         self.version = sig[4:].decode()
+        self.difficulty_thresholds = tuple(data[0x54:0x56]) if s else ()
         self.wed = cstr(data[8:16])
         self.flags = struct.unpack_from('<I', data, 0x14)[0]
         self.area_type = struct.unpack_from('<H', data, 0x48)[0]  # bit0 outdoor, bit1 day/night ...
@@ -194,6 +195,7 @@ class Are:
                 y=struct.unpack_from('<H', data, o + 0x22)[0],
                 dest=struct.unpack_from('<HH', data, o + 0x24),
                 flags=struct.unpack_from('<I', data, o + 0x28)[0],      # bit0: CRE not attached (resref used)
+                difficulty_mask=data[o + 0x2f] if s else 7,
                 animation=struct.unpack_from('<I', data, o + 0x30)[0],
                 orient=struct.unpack_from('<H', data, o + 0x34)[0],
                 schedule=struct.unpack_from('<I', data, o + 0x40)[0] & 0xFFFFFF,

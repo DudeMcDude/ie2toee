@@ -765,6 +765,20 @@ def icon_frame(game, ref, loader=None):
     return b.frames[best]
 
 
+def store_data(game, stores, container, log=print):
+    result = {}
+    for name in stores:
+        try:
+            store = ieitm.Sto(game.read(name.lower(), 'sto'), name)
+        except (FileNotFoundError, ValueError) as ex:
+            log('warning: store %s not converted (%s)' % (name, ex))
+            continue
+        result[name.lower()] = dict(type=store.type, sell=store.sell_markup, buy=store.buy_markup,
+            identify_price=store.id_price, allow=store.allow, cures=len(store.cures), container=container,
+            items=[[i['resref'], (5 if i['infinite'] else max(1, i['stock']))] for i in store.items])
+    return result
+
+
 def convert(game, out, toee, tp=None, options=None, areas=(), stores=(), objects=None, icons=True, log=print):
     m = ItemMapper(game, toee, tp, options)
     rep = None
@@ -831,23 +845,19 @@ def convert(game, out, toee, tp=None, options=None, areas=(), stores=(), objects
     for ar in areas:
         cl = ieitm.are_container_items(game.read(ar.lower(), 'are'))
         objs = objmap.get(ar.upper(), objmap.get(''))
-        oc = {c['name']: c for c in objs.get('containers', [])} if objs else {}
+        geometry = objs.get('containers', []) if objs else []
         lst = []
-        for c in cl:
+        for index, c in enumerate(cl):
             b = m.g['containers'].get(str(c['type']), m.g['containers']['default'])
-            lst.append(dict(name=c['name'], ie=[c['x'], c['y']], toee=(oc.get(c['name']) or {}).get('toee'),
+            shape = geometry[index] if index < len(geometry) else {}
+            if shape and (shape['name'], shape['x'], shape['y']) != (c['name'], c['x'], c['y']):
+                raise ValueError('%s: container geometry mismatch at index %d' % (ar, index))
+            lst.append(dict(name=c['name'], ie=[c['x'], c['y']], toee=shape.get('toee'), poly=shape.get('poly', []),
+                            type=c['type'], flags=c['flags'], locked=bool(c['flags'] & 1), script=c['script'],
                             proto=b[0], label=b[1], lock=c['lock'], trapped=c['trapped'], key=c['key'],
                             items=[[i['resref'], max(1, i['charges'][0])] for i in c['items']]))
         cons[ar.upper()] = lst
-    sto = {}
-    for s in stores:
-        try:
-            S_ = ieitm.Sto(game.read(s.lower(), 'sto'), s)
-        except Exception as ex:
-            log('warning: store %s not converted (%s)' % (s, ex)); continue
-        sto[s.lower()] = dict(type=S_.type, sell=S_.sell_markup, buy=S_.buy_markup, allow=S_.allow,
-                              items=[[i['resref'], (5 if i['infinite'] else max(1, i['stock']))] for i in S_.items],
-                              cures=len(S_.cures), container=m.g['store_container'][0])
+    sto = store_data(game, stores, m.g['store_container'][0], log)
     keep = ('proto', 'conds', 'worth', 'name', 'icon_id', 'ident', 'qty', 'charges', 'magic', 'kind', 'status', 'weight', 'thrown')
     short = {'proto': 'p', 'conds': 'c', 'worth': 'w', 'name': 'n', 'icon_id': 'i', 'ident': 'id', 'qty': 'q',
              'charges': 'ch', 'magic': 'm', 'kind': 'k', 'status': 's', 'weight': 'wt', 'thrown': 't'}

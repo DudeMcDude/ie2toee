@@ -12,6 +12,7 @@
   the other (IE action-queue semantics), not at the same time.
 """
 from toee import *
+from utilities import location_from_axis
 import ie_runtime as rt
 
 STATE = {'gen': 0, 'cut': 0, 'cut_since': 0, 'hook': 0}   # hook: Temple+ map_tick.on_tick drives the area scripts
@@ -100,6 +101,32 @@ def _area_step(area, gen):
     game.timeevent_add(_area_step, (area, gen), AREA_TICK_MS)   # always reschedule (an exception must not end the loop)
     return 1
 
+try:
+    from ie_container_scripts import SCRIPTS as CONTAINER_SCRIPTS
+except ImportError:                     # older conversions have no inventory scripts
+    CONTAINER_SCRIPTS = {}
+
+
+def _run_containers(area):
+    scripts = CONTAINER_SCRIPTS.get(area.upper())
+    if not scripts:
+        return
+    import ie_itemrt
+    for spec in ie_itemrt.CONTAINERS.get(area.upper(), ()):
+        module = scripts.get(spec['name'])
+        if not module or not spec.get('toee'):
+            continue
+        ident = spec['name'].lower()
+        if rt._busy.get(ident, 0) > rt._now():
+            continue
+        x, y = map(int, spec['toee'])
+        loc = location_from_axis(x, y)
+        boxes = [o for o in game.obj_list_vicinity(loc, OLC_CONTAINER) if o.location == loc and o.proto == spec['proto']]
+        if len(boxes) == 1:
+            c = rt.Ctx(boxes[0], None, ident, area, rt._events.setdefault(ident, {}))
+            rt.run_script(c, __import__(module).BLOCKS)
+
+
 def _run_area(area, mod):
     l = game.leader
     if l == OBJ_HANDLE_NULL:
@@ -109,6 +136,10 @@ def _run_area(area, mod):
         ie_spawn.tick(area)           # INI events= (timed) spawns
     except Exception as e:
         rt.log_once('spawntick', 'IE_ERR spawn tick %s: %s' % (area, e))
+    try:
+        _run_containers(area)
+    except Exception as e:
+        rt.log_once('containers:' + area, 'IE_ERR container script %s: %s' % (area, e))
     ident = 'area_' + area
     if rt._busy.get(ident, 0) <= rt._now():
         c = rt.Ctx(l, None, ident, area, rt._events.setdefault(ident, {}))

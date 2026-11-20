@@ -26,6 +26,19 @@ TOKENS = {
     'PRO_GIRLBOY': ('boy', 'girl'), 'MALEFEMALE': ('male', 'female'),
 }
 
+def class_levels(ids):
+    aliases = {'mage': 'wizard', 'thief': 'rogue'}
+    classes = set('barbarian bard cleric druid fighter monk paladin ranger rogue sorcerer wizard'.split())
+    levels = {}
+    for code, name in ids.t['class'].by_val.items():
+        parts = name.lower().split('_')
+        if parts[-1] == 'all':
+            parts.pop()
+        parts = [aliases.get(p, p) for p in parts]
+        if parts and all(p in classes for p in parts):
+            levels[code] = tuple('stat_level_' + p for p in parts)
+    return levels
+
 def subst(text, female):
     def rep(m):
         t = TOKENS.get(m.group(1).upper())
@@ -354,6 +367,18 @@ def main():
         rep['actors'].append({'ident': ident, 'area': area, 'script_id': sid, 'dlg': dlg, 'bcs': mods,
                               'lines': len([l for l in (dlg_parts[0] if dlg_parts else []) if l]),
                               'entry_states': len(dlg_parts[2]) if dlg_parts else 0, 'notes': notes})
+    # A scripted ARE container owns its BCS. Its inventory is the target of Myself / HasItem.
+    import ieitm
+    container_scripts = {}
+    for spec in a.area_map:
+        area = spec.split(':')[0].upper()
+        if not game.exists(area, 'are'):
+            continue
+        for box in ieitm.are_container_items(game.read(area, 'are')):
+            if box['script']:
+                module, _, _ = bcs(box['script'], box['name'].lower(), area)
+                container_scripts.setdefault(area, {})[box['name']] = module
+    w(os.path.join(scr, 'ie_container_scripts.py'), 'SCRIPTS = %r\n' % container_scripts)
     for spec in a.area_script:
         area, res = spec.split(':')
         m, nb, unk = bcs(res.lower(), 'area_' + area.upper(), area.upper())
@@ -441,7 +466,7 @@ def main():
             pl[f[0].upper()] = tuple(int(v) for v in f[2].split(','))
     xp = {}
     try:   # XPLIST.2DA (EE): rows used by AddXP2DA
-        rows = game.read('xplist', '2da').decode('latin-1').splitlines()
+        rows = game.read('exptable' if 'exptable' in game.list('2da') else 'xplist', '2da').decode('latin-1').splitlines()
         for ln in rows[3:]:
             f = ln.split()
             if len(f) >= 2 and f[1].lstrip('-').isdigit():
@@ -449,7 +474,7 @@ def main():
     except Exception:
         pass
     w(os.path.join(scr, 'ie_xp.py'), HEADER + 'XP = %r\n' % xp)
-    w(os.path.join(scr, 'ie_areas.py'), HEADER + 'MAPS = %r\nPLACEMENTS = %r\nSCRIPTS = %r\nNEWGAME = %r\n' % (am, pl, asc, dict((k.upper(), int(v)) for k, v in (x.split('=') for x in a.new_game))))
+    w(os.path.join(scr, 'ie_areas.py'), HEADER + 'MAPS = %r\nPLACEMENTS = %r\nSCRIPTS = %r\nCLASS_LEVELS = %r\nNEWGAME = %r\n' % (am, pl, asc, class_levels(ids), dict((k.upper(), int(v)) for k, v in (x.split('=') for x in a.new_game))))
     json.dump(rep, open(os.path.join(a.out, 'report.json'), 'w'), indent=1)
     print(json.dumps({k: v for k, v in rep.items() if k != 'unknown'}, indent=1))
     print('unknown names:', rep['unknown'])

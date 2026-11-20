@@ -94,6 +94,20 @@ if os.path.exists(os.path.join(ie, 'CHITIN.KEY')) or os.path.exists(os.path.join
     check('12SWIFTH starts hidden', iecre.Cre(g.read('12swifth', 'cre'), '12swifth').start_hidden)
     check('12SWIFT does not', not iecre.Cre(g.read('12swift', 'cre'), '12swift').start_hidden)
     check('10REIG does not', not iecre.Cre(g.read('10reig', 'cre'), '10reig').start_hidden)
+    toee = os.environ.get('TOEE_DIR')
+    if toee:
+        import ie_creatures, ieformats, toeedata
+        cv = ie_creatures.Converter(g, ie_creatures.ToEEIndex(toeedata.ToEEData(toee)))
+        actors = ieformats.Are(g.read('AR1200', 'are')).actors
+        siege = []
+        for actor in actors:
+            cre = iecre.Cre(actor['embedded_cre'] or g.read(actor['cre'], 'cre'), actor['cre'])
+            spec = cv.convert(cre, actor)
+            if spec.get('hostility') == 'hostile' and cre.start_hidden:
+                siege.append(bool(spec.get('hidden')))
+        check('AR1200 conversion preserves all 57 source-hidden siege hostiles', len(siege) == 57 and all(siege))
+    else:
+        print('SKIP palisade conversion (set TOEE_DIR to the destination game)')
 else:
     print('SKIP CRE checks (no IWD2 install at %s; set IWD2_DIR)' % ie)
 

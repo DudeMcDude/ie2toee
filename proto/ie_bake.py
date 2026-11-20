@@ -161,6 +161,8 @@ class Baker(object):
             if q and t in QTY_FIELD:
                 o.set(QTY_FIELD[t], int(q))
             f = self.proto_flags(pid, 50, OIF, 'OIF_')
+            if t == 'weapon':
+                f |= OIF['DRAW_WHEN_PARENTED']
             if e.get('m'):
                 f |= OIF['IS_MAGICAL']
             if e.get('id'):
@@ -195,6 +197,8 @@ class Baker(object):
             npc_flags |= ONF['KOS']
         else:
             npc_flags &= ~ONF['KOS']
+        if s.get('family') == 'keg':
+            npc_flags = (npc_flags & ~ONF['KOS']) | ONF['NO_ATTACK']
         if patrol:
             pts = [ie_to_tile(self.placement, x, y) for x, y in patrol]
             o.set('npc_waypoints_idx', waypoints(pts, self.a.waypoint_delay))
@@ -270,8 +274,12 @@ class Baker(object):
             if box is not None:
                 o.set('npc_substitute_inventory', box.id)
         self.mobs.append(o)
-        keep = ('ident', 'actor', 'resref', 'hp', 'conditions', 'dead', 'spells', 'ai_strategy', 'to_hit_bonus', 'difficulty', 'feats', 'skills')
+        keep = ('ident', 'actor', 'resref', 'hp', 'conditions', 'dead', 'spells', 'ai_strategy', 'to_hit_bonus', 'difficulty', 'feats', 'skills', 'area_spawn')
         self.runtime[T.guid_name(o.id)] = {'k': 'npc', 'spec': {k: s[k] for k in keep if s.get(k) not in (None, [], '')}}
+        if s.get('family') == 'keg':
+            self.runtime[T.guid_name(o.id)]['spec']['family'] = 'keg'
+        if s.get('hidden') and s.get('hostility') == 'hostile':
+            self.runtime[T.guid_name(o.id)]['spec']['starts_hidden_hostile'] = True
         self.report['npcs'] += 1
         return o
 
@@ -316,8 +324,11 @@ class Baker(object):
             self.report['unbaked'].append('container %s: no position' % c['name']); return None
         x, y = int(c['toee'][0]), int(c['toee'][1])
         o = T.GameObject(1, int(c['proto']), self.gid('container', i, c['name']))
-        o.set('location', T.location(x, y)).set('flags', CRITTER_OF | self.proto_flags(c['proto'], 20, OF, 'OF_'))
-        if c.get('lock'):
+        # The IE search map already defines collision for this painted container.
+        # A second collision radius can close an otherwise walkable street.
+        o.set('location', T.location(x, y)).set('flags', CRITTER_OF | OF['NO_BLOCK'] | self.proto_flags(c['proto'], 20, OF, 'OF_'))
+        self.runtime[T.guid_name(o.id)] = {'k': 'container'}
+        if c.get('locked', c.get('lock')):
             o.set('container_flags', self.proto_flags(c['proto'], 41, {}, '') | OCOF_LOCKED)
             o.set('container_lock_dc', min(40, 10 + int(c['lock']) // 5))
         inv = []
@@ -374,9 +385,8 @@ class Baker(object):
             def walk(o):
                 if isinstance(o, dict):
                     if 'actor' in o and isinstance(o.get('scripts'), list):
-                        # not the IWD2 'area' slot (12ATKUHP / 12PHASPN / 12SHAWF0 would turn this heuristic on for the
-                        # AR1200 goblins left visible on purpose and for Shawford); those actors' start state is the
-                        # CRE hidden flag (spec 'hidden') as before
+                        # The IWD2 area slot can be shared by initially visible and hidden actors.
+                        # Their CRE records supply the initial visibility.
                         skip = (o.get('area_script') or '').lower()
                         scr[(o['actor'] or '').lower()] = [x.lower() for x in o['scripts'] if x and x.lower() != skip]
                     for v in o.values(): walk(v)
@@ -441,6 +451,8 @@ class Baker(object):
         if os.path.isdir(mapd):
             shutil.rmtree(mapd)
         shutil.copytree(self.a.maps, mapd)
+        from ie_container_art import write_container_art
+        write_container_art(mapd, self.containers, lambda i, name: T.guid_name(self.gid('container', i, name)))
         for f in os.listdir(mapd):
             if f.lower().endswith('.mob'):
                 os.remove(os.path.join(mapd, f))

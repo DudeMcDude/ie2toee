@@ -15,6 +15,8 @@ import iefs
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import toeedata
+import json
+from ie_map_alerts import apply_map_alert_distances
 from ie_build import preview_build
 import ie_overrides
 from ie2toee_preview import (run, run_soft, copytree, mes_with, RUNTIME, install_varhooks,
@@ -38,6 +40,28 @@ LATE_AREAS = AREAS[10:]   # their journal entries get the 50 logbook slots last 
 SCRIPT_ID_MAX = 3799   # (installer: stale scripts of an earlier build in 1500..SCRIPT_ID_MAX are moved aside)
 SCRIPT_BASE = 1500  # area i's actor scripts 1500+100i.. (vanilla ToEE: <= 1374); dialogue for the actors with a DLG
 START = (450, 490)   # fallback: I2AR1000 tile of IWD2's own new-game spot (STARTARE.2DA 2390,860, the docks)
+
+
+def starting_equipment(td, rules_dir):
+    """Restore the base game's class kits where Co8 expects the player to buy gear on its shop map."""
+    rel = 'rules/start_equipment.mes'
+    effective = td.read(rel).decode('latin-1')
+    source = next((a for a in reversed(td.sources) if rel in a.files and
+                   re.fullmatch(r'toee\d*\.dat', os.path.basename(a.path), re.I)), None)
+    if source is None:
+        return
+    entry = re.compile(r'^(\s*\{(\d+)\}\s*\{)([^}\r\n]*)(\})', re.M)
+    stock = {int(m[2]): m[3] for m in entry.finditer(source.read(rel).decode('latin-1'))}
+    def kit(m):
+        key = int(m[2])
+        if key % 100 <= 10 and key < 200 and m[3].split() == ['6142'] and key in stock:
+            return m[1] + stock[key] + m[4]
+        return m[0]
+    fixed = entry.sub(kit, effective)
+    # Also stage an existing module-level override on subsequent builds.
+    if fixed != effective or os.path.isfile(os.path.join(td.root, 'modules', 'ToEE', rel)):
+        with open(os.path.join(rules_dir, 'start_equipment.mes'), 'wb') as out:
+            out.write(fixed.encode('latin-1'))
 
 
 def start_tile(ie, w):
@@ -170,8 +194,15 @@ def convert(a, stage):
     sa = os.path.join(spw, 'dialogue_actors.txt')     # spawned creatures' own scripts/dialogue: second dialogue pass
     if os.path.isfile(sa) and open(sa).read().split():
         run_soft('dialogue + spawnables', dlg_cmd + open(sa).read().split())
+    stores = set()
+    for root, _, files in os.walk(dlg):
+        for name in files:
+            if name.endswith('.py'):
+                with open(os.path.join(root, name), encoding='cp1252') as script:
+                    stores.update(st.lower() for st in re.findall(r'A\.StartStore\(c, "(\w+)"', script.read()))
     run('items', ['ie_items.py', 'convert', ie, os.path.join(w, 'items'), '--toee', toee] +
-        sum((['--area', ar, '--objects', '%s=%s' % (ar, os.path.join(w, 'I2' + ar + '_objects.json'))] for ar in ok), []) + tpa)
+        sum((['--area', ar, '--objects', '%s=%s' % (ar, os.path.join(w, 'I2' + ar + '_objects.json'))] for ar in ok), []) +
+        sum((['--store', st] for st in sorted(stores)), []) + tpa)
     bake = os.path.join(w, 'bake')
     for ar in ok:
         md = 'I2' + ar; ox, oy = json.load(open(os.path.join(w, md + '_objects.json')))['placement']['canvas_offset']
@@ -254,6 +285,7 @@ def convert(a, stage):
             if l.startswith('# '): cur = l[2:].strip(); continue
             if l.strip() and cur: sn.setdefault(cur, []).append(l)
     td = toeedata.ToEEData(toee)
+    starting_equipment(td, os.path.join(M, 'rules'))
     # vanilla town map files of the reused ids (ToEE*.dat stay loaded) would show through between ours: black them out
     from PIL import Image
     black = None
@@ -302,6 +334,9 @@ def convert(a, stage):
             if l.startswith('{%d}' % G['AR1000']['map']):
                 l = re.sub(r',\s*Flag:\s*NEW_GAME_START.*?(?=,\s*\w+:|}\s*$)', '', l.rstrip('\r'))
                 t[i] = l[:l.rindex('}')] + ', Flag: NEW_GAME_START, NewGameX: %d, NewGameY: %d}' % st
+        with open(os.path.join(HERE, 'guidance', 'map_alerts.json'), encoding='utf-8') as f:
+            alert_distances = json.load(f).get('IWD2', {})
+        t = apply_map_alert_distances('\n'.join(t), {ar: G[ar]['map'] for ar in ok}, alert_distances).split('\n')
         open(ml, 'w', encoding='latin-1', newline='').write('\n'.join(t))
         map_names(td, {G[ar]['map']: n for ar, n in names.items()}, '\n'.join(t), os.path.join(M, 'mes', 'map_names.mes'))
     else:

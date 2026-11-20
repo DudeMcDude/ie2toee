@@ -437,7 +437,35 @@ def door_cell_masks(cells, pl, sr_shape):
     return out
 
 
-def write_doors(g, are, wed, tis_for, pl, guidance, sr, bbox, outdir, name, doors_closed):
+def widen_open_door(door, radius, base_flags):
+    """Give a ToEE mover room along the threshold, preserving every closed-state blocker."""
+    rows = {(u, v): [u, v, base, opened, closed] for u, v, base, opened, closed in door['tiles']}
+    x, y = door['loc'][:2]
+    tx, ty = door['toggle_tile']
+    dx, dy = 3 * (tx-x), 3 * (ty-y)
+    length = max(abs(dx), abs(dy), 1)
+    for step in range(-length, length + 1):
+        cx = 3*x + 1 + round(dx * step / length)
+        cy = 3*y + 1 + round(dy * step / length)
+        for i in range(-radius, radius + 1):
+            for j in range(-radius, radius + 1):
+                if i*i + j*j > radius*radius:
+                    continue
+                u, sx = divmod(cx+i, 3)
+                v, sy = divmod(cy+j, 3)
+                bit = (BLOCK0 | FLY0) << (sx+3*sy)
+                row = rows.get((u, v))
+                if row is None:
+                    row = [u, v, base_flags(u, v), 0, 0]
+                removed = row[2] & bit
+                if removed:
+                    row[2] &= ~removed
+                    row[4] |= removed
+                    rows[u,v] = row
+    door['tiles'] = [rows[key] for key in sorted(rows)]
+
+
+def write_doors(g, are, wed, tis_for, pl, guidance, sr, bbox, outdir, name, doors_closed, door_clearance=None):
     """Per door: default state, ToEE position, per-tile blocking for both states (to switch at runtime), and the
     'faithful' extra: both WED tile variants as ground-overlay patches (TGA, canvas coords) for a runtime tile swap.
     Writes <AREA>_doors.json and art/ground/<AREA>_doors/*.tga (derived from the player's files: local only)."""
@@ -445,6 +473,11 @@ def write_doors(g, are, wed, tis_for, pl, guidance, sr, bbox, outdir, name, door
     U, V, flags_nod, _, _ = build_tile_grid(are.sr_nodoors, pl, guidance, bbox, are.sr_protect, are.lenient)
     u0, v0 = bbox[0], bbox[2]
     pdir = os.path.join(outdir, 'art', 'ground', name + '_doors')
+    def base_flags(u, v):
+        a, b = u - u0, v - v0
+        if 0 <= a < flags_nod.shape[0] and 0 <= b < flags_nod.shape[1]:
+            return int(flags_nod[a, b])
+        return 0
     os.makedirs(pdir, exist_ok=True)
     closed_set = {n.lower() for n in doors_closed}
     doors = []
@@ -454,9 +487,7 @@ def write_doors(g, are, wed, tis_for, pl, guidance, sr, bbox, outdir, name, door
         m_closed = door_cell_masks(d['closed_cells'], pl, sr.shape)
         tiles = []
         for (u, v) in sorted(set(m_open) | set(m_closed)):
-            a, b = u - u0, v - v0
-            base = int(flags_nod[a, b]) if 0 <= a < flags_nod.shape[0] and 0 <= b < flags_nod.shape[1] else 0
-            tiles.append([u, v, base, m_open.get((u, v), 0), m_closed.get((u, v), 0)])
+            tiles.append([u, v, base_flags(u, v), m_open.get((u, v), 0), m_closed.get((u, v), 0)])
         cells = d['closed_cells'] or d['open_cells']
         if cells:   # door object on the ground at the centre of its impeded cells
             px = np.mean([c[0] for c in cells]) * SR_CELL_W + SR_CELL_W / 2
@@ -487,6 +518,9 @@ def write_doors(g, are, wed, tis_for, pl, guidance, sr, bbox, outdir, name, door
                  round((u - math.floor(u) - 0.5) * INCH_PER_TILE, 2), round((v - math.floor(v) - 0.5) * INCH_PER_TILE, 2)],
             toggle_tile=[int(tu), int(tv)], tiles=tiles, patches=patches,
             wed_primary_closed=bool(wd['closed']) if wd else None))
+        radius = (door_clearance or {}).get(d['wed_id'].lower(), 0)
+        if radius:
+            widen_open_door(doors[-1], radius, base_flags)
     json.dump(dict(area=name, doors=doors), open(os.path.join(outdir, f'{name}_doors.json'), 'w'), indent=1)
     # Python 2.7 data module for the Temple+ runtime (ie_doors.py)
     with open(os.path.join(outdir, f'ie_doors_{name.lower()}.py'), 'w') as f:
@@ -792,7 +826,8 @@ def convert(game, area, outdir, map_id, ground_id, guidance, preview=False, clos
     open(os.path.join(mapdir, 'gmesh.gmf'), 'wb').write(struct.pack('<i', 0))
     open(os.path.join(mapdir, 'gmesh.gmi'), 'wb').write(struct.pack('<i', 0))
     open(os.path.join(mapdir, 'mapinfo.txt'), 'w').write('')
-    report['doors'] = write_doors(g, are, wed, tis_for, pl, guidance, sr, bbox, outdir, name, doors_closed)
+    report['doors'] = write_doors(g, are, wed, tis_for, pl, guidance, sr, bbox, outdir, name, doors_closed,
+                                  ag.get('door_clearance_subtiles'))
     # start = first entrance that lands on a walkable tile
     def tl(x, y):
         u, v = pl.ie_to_tile(x, y); return [round(float(u), 2), round(float(v), 2)]

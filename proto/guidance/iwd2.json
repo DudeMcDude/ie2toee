@@ -194,7 +194,8 @@
     },
     "AR1105": {
       "map": 5046,
-      "ground": 965
+      "ground": 965,
+      "door_clearance_subtiles": {"door2": 5}
     },
     "AR1106": {
       "map": 5047,

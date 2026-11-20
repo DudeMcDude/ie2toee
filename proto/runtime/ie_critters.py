@@ -56,6 +56,12 @@ def _set(o, field, v, idx=None):
     except Exception, e:
         _log('  set %s failed: %s' % (field, e))
 
+def passive_prop(o, s):
+    if s.get('family') == 'keg':
+        o.npc_flag_unset(ONF_KOS)
+        o.npc_flag_set(ONF_NO_ATTACK)
+        o.critter_flag_set(OCF_NO_FLEE)
+
 def apply(o, s):
     """Apply a converted stat block to a freshly created critter."""
     _set(o, 'obj_f_critter_inventory_source', 0)   # no random template gear on top of the converted items
@@ -102,6 +108,7 @@ def apply(o, s):
         o.npc_flag_set(ONF_KOS)
     else:
         o.npc_flag_unset(ONF_KOS)
+    passive_prop(o, s)
     if s.get('no_flee') and _c('ONF_NO_FLEE') is not None:  # not a vanilla flag; Temple+ AI reads morale elsewhere
         o.npc_flag_set(_c('ONF_NO_FLEE'))
     if s.get('invulnerable') and _c('OF_INVULNERABLE') is not None:
@@ -219,8 +226,9 @@ def spawn_area(specs, to_tile, log_path=None, filt=None):
     """to_tile(x, y) -> (tile x, tile y) for IE area pixels (ie_runtime.ie_to_tile). Returns [(spec, obj)]."""
     LOG[0] = log_path
     out = []
+    import ie_runtime
     for s in specs:
-        if filt and not filt(s):
+        if (filt and not filt(s)) or not ie_runtime.area_spawn_allowed(s):
             continue
         u, v = to_tile(s['x'], s['y'])
         try:

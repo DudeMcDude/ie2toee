@@ -1339,6 +1339,7 @@
   "overrides": {}
  },
  "resref_families": {
+  "10dop": {"id": "resref_10dop", "label": "Doppelganger", "proto": 14000, "status": "stand-in", "notes": "Human form for the disguised Targos shapechanger. Its CRE supplies the stats and initial hidden state."},
   "_doc": "cre resref -> family (beats the animation family): IWD2 summons with no or the wrong animation match",
   "00sdrat": {"label": "Dire rat", "proto": 14056, "status": "match", "id": "resref_00sdrat"},
   "00sair16": {"label": "Air elemental (huge)", "proto": 14292, "status": "match", "scale": 120, "notes": "Large air elemental scaled up; Co8 huge 14900", "id": "resref_00sair16"},
