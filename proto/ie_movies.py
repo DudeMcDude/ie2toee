@@ -11,6 +11,8 @@ Output: <out>/data/movies/IE-<GAME>-<name>.bik and <out>/modules/ToEE/movies/mov
 ids MOVIE_BASE + 5*index + part). Runtime: ie_movies_rt.play_intro() (first heartbeat of a new game).
 """
 import argparse, glob, os, re, shutil, subprocess, sys, tempfile
+import ast
+from pathlib import Path
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -44,6 +46,80 @@ def radvideo():
         if p and os.path.isfile(p):
             return p
     return None
+
+
+def movie_tool_check(flavour):
+    missing = []
+    for tool in ('ffmpeg', 'ffprobe'):
+        try:
+            subprocess.run([tool, '-version'], check=True, stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL, timeout=10)
+        except (OSError, subprocess.SubprocessError):
+            missing.append(tool)
+    if flavour == 'IWD' and not radvideo():
+        missing.append('radvideo64.exe')
+    return missing
+
+
+def _movie_warning(title, lines):
+    color = sys.stdout.isatty() and 'NO_COLOR' not in os.environ
+    if color and os.name == 'nt':
+        import ctypes
+        import msvcrt
+        handle = ctypes.c_void_p(msvcrt.get_osfhandle(sys.stdout.fileno()))
+        kernel = ctypes.windll.kernel32
+        mode = ctypes.c_ulong()
+        color = kernel.GetConsoleMode(handle, ctypes.byref(mode)) and kernel.SetConsoleMode(handle, mode.value | 4)
+    bar = '=' * 70
+    heading = '\n'.join((bar, '  WARNING - ' + title, bar))
+    if color:
+        heading = '\033[1;97;41m' + heading + '\033[0m'
+    print('\n' + heading, *lines, bar + '\n', sep='\n', flush=True)
+
+
+def report_prologue_media(flavour, missing_tools, registry=None):
+    """Report prerequisites during conversion and the actual prologue entries at the end."""
+    labels = {'intro': 'opening movie', 'chapter0': 'narrated prologue'}
+    if flavour == 'IWD':
+        labels['avalanch'] = 'avalanche movie'
+    lines = []
+    if missing_tools:
+        lines.append('Missing or unavailable: ' + ', '.join(missing_tools))
+    if registry is None:
+        if not missing_tools:
+            print('Movie setup: tools found for ' + flavour, flush=True)
+            return
+        lines.append('Conversion will continue. Some movies or narration may be missing.')
+        if flavour == 'IWD2':
+            lines.append('The Targos opening movie can still be copied from your IWD2 install.')
+        title = 'MOVIE TOOLS MISSING'
+    else:
+        try:
+            # Read the generated data as a literal without executing a Python file.
+            tree = ast.parse(Path(registry).read_text(encoding='ascii'))
+            entries = next(ast.literal_eval(node.value) for node in tree.body if isinstance(node, ast.Assign)
+                           and any(isinstance(t, ast.Name) and t.id == 'MOVIES' for t in node.targets))
+            if not isinstance(entries, dict):
+                entries = {}
+        except (OSError, ValueError, SyntaxError, StopIteration, UnicodeError):
+            entries = {}
+        available = [label for key, label in labels.items() if entries.get(key)]
+        absent = [label for key, label in labels.items() if not entries.get(key)]
+        if not missing_tools and not absent:
+            print('MOVIE SUMMARY - Ready: ' + ', '.join(available), flush=True)
+            return
+        lines.extend(('Ready: ' + (', '.join(available) or 'none'),
+                      'Missing from this conversion: ' + (', '.join(absent) or 'none')))
+        title = 'MOVIE SETUP SUMMARY'
+    if missing_tools:
+        if any(tool in missing_tools for tool in ('ffmpeg', 'ffprobe')):
+            lines.append('FFmpeg Windows builds: https://ffmpeg.org/download.html')
+        if 'radvideo64.exe' in missing_tools:
+            lines.append('RAD Video Tools: https://www.radgametools.com/bnkdown.htm')
+        lines.append('See README.txt for media-tools and PATH setup, then rerun the converter.')
+    else:
+        lines.append('Check the movie conversion messages and source game files, then rerun.')
+    _movie_warning(title, lines)
 
 
 CHUNK_S = 100   # RAD binkc stalls on uncompressed AVIs over ~2 GB: long movies are encoded as parts (queued back to back)

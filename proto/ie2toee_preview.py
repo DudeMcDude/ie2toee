@@ -26,6 +26,7 @@ from ie_map_alerts import apply_map_alert_distances
 import ie_overrides
 import ie_install
 from ie_build import preview_build
+from ie_movies import movie_tool_check, report_prologue_media
 OVERRIDES = os.path.join(HERE, 'overrides', 'iwd')   # per-map hand overrides (ie_overrides.py, overrides/README.md)
 
 AREA, MAP_ID, GROUND_ID, START = 'AR1000', 5012, 900, (482, 424)
@@ -311,7 +312,14 @@ def main():
                          'feature/pathnode-bake, given as --tp)')
     a = ap.parse_args()
     with preview_build(a.out, (a.iwd, a.toee, a.tp, a.movies_ee, HERE)) as stage:
+        if not a.no_movies:
+            missing = movie_tool_check('IWD')
+            report_prologue_media('IWD', missing)
         convert(a, stage)
+        if a.no_movies:
+            print('MOVIE SUMMARY - Skipped by request (--no-movies).', flush=True)
+        else:
+            report_prologue_media('IWD', missing, stage / 'work/movies/ie_movies_data.py')
 
 
 def convert(a, stage):
