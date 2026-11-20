@@ -49,6 +49,8 @@ def finalize_critter(o, d, F):
     mark = F['npc_pad_i_3']
     first = o.obj_get_int(mark) != STAMP
     if first:
+        if s.get('gold'):
+            o.money_adj(int(s['gold']) * 100)
         for c in s.get('conditions') or ():
             try:
                 args = list(c[1:]) + [0] * max(0, 2 - len(c[1:]))

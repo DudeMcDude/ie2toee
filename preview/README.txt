@@ -1,4 +1,4 @@
-ICEWIND DALE IN THE TEMPLE OF ELEMENTAL EVIL ENGINE - PLAYER PREVIEW (2026-11-15)
+ICEWIND DALE IN THE TEMPLE OF ELEMENTAL EVIL ENGINE - PLAYER PREVIEW (2026-11-20)
 =================================================================================
 
 IMPORTANT: PYTHON 3.9 OR NEWER MUST BE INSTALLED
@@ -6,7 +6,30 @@ IMPORTANT: PYTHON 3.9 OR NEWER MUST BE INSTALLED
   https://www.python.org/downloads/ and, in the installer, tick "Add python.exe to PATH".
   Without it convert.bat stops with a message. You also need your own Icewind Dale or Icewind Dale: EE.
 
-NEW IN THIS PREVIEW (2026-11-15)
+NEW IN THIS PREVIEW (2026-11-20)
+--------------------------------
+The Kuldahar Pass Hermit has a new portrait. More Easthaven townsfolk and squirrels use the commissioned portrait set.
+
+Small Infinity Engine loot piles now put one or two item stacks directly on the ground. On the Targos docks you can pick up dropped weapons, gold and ammunition individually. Larger piles and heaps with scripts, traps, locks or keys retain their containers.
+
+Hover over a painted barrel, chest or other container to outline its original shape. Hold Tab to outline painted containers that still have items. Click the shape to use it. Locks, traps, scripts and inventory still belong to the original container. The new engine reads these shapes from the converted maps.
+
+Extract to a fresh preview folder and rerun the converter against your own game files. Launch the included TemplePlus.exe for manual play, or use the chapter autoplayer. For the clearest comparison with an earlier conversion, enter the map in a fresh game.
+
+The Easthaven orc cave uses a 12-tile ally alert distance. The chapter autoplayer regroups and heals after the entrance fight. Reconverted weapons can be shown in the orcs' hands.
+The chapter autoplayer shows its current goals in the upper right. Dialogue and cutscene timing and combat movement have also been revised.
+
+PREVIOUS PREVIEW (2026-11-17)
+--------------------------------
+  The chapter autoplayer walks between objectives, follows the action with the camera,
+  and checks sidequest outcomes. Its PCs receive a combat boost and heal between fights.
+  The route includes six Easthaven errands on the way to Kuldahar Pass. The converter
+  fixes quest rewards and item handling used along the route.
+  Extract this preview to a fresh folder and rerun the conversion command below against
+  your own game files to pick up the converter changes. See Autoplayer\README.txt for
+  the chapter commands and combat assist setting.
+
+PREVIOUS PREVIEW (2026-11-15)
 --------------------------------
   Still an early-preview, AI-assisted experiment: not a playable or polished conversion.
   * The prologue now ends in AR2000 Kuldahar Pass (map 5051): Hrothgar greets the party in Winter's Cradle on a

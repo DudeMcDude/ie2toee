@@ -155,6 +155,10 @@ class Baker(object):
             if q and t in QTY_FIELD:
                 o.set(QTY_FIELD[t], int(q))
             f = self.proto_flags(pid, 50, OIF, 'OIF_')
+            # ToEE sets this on every weapon before parsing protos.tab. A MOB's
+            # item_flags replaces that whole field, even when only marking it identified.
+            if t == 'weapon':
+                f |= OIF['DRAW_WHEN_PARENTED']
             if e.get('m'):
                 f |= OIF['IS_MAGICAL']
             if e.get('id'):
@@ -261,7 +265,7 @@ class Baker(object):
             if box is not None:
                 o.set('npc_substitute_inventory', box.id)
         self.mobs.append(o)
-        keep = ('ident', 'actor', 'resref', 'hp', 'conditions', 'spells', 'ai_strategy', 'to_hit_bonus', 'difficulty')
+        keep = ('ident', 'actor', 'resref', 'hp', 'conditions', 'spells', 'ai_strategy', 'to_hit_bonus', 'difficulty', 'gold')
         self.runtime[T.guid_name(o.id)] = {'k': 'npc', 'spec': {k: s[k] for k in keep if s.get(k) not in (None, [], '')}}
         self.report['npcs'] += 1
         return o
@@ -300,7 +304,7 @@ class Baker(object):
         x, y = int(c['toee'][0]), int(c['toee'][1])
         o = T.GameObject(1, int(c['proto']), self.gid('container', i, c['name']))
         o.set('location', T.location(x, y)).set('flags', CRITTER_OF | self.proto_flags(c['proto'], 20, OF, 'OF_'))
-        if c.get('lock'):
+        if c.get('locked', c.get('lock')):
             o.set('container_flags', self.proto_flags(c['proto'], 41, {}, '') | OCOF_LOCKED)
             o.set('container_lock_dc', min(40, 10 + int(c['lock']) // 5))
         inv = []
@@ -420,6 +424,8 @@ class Baker(object):
         if os.path.isdir(mapd):
             shutil.rmtree(mapd)
         shutil.copytree(self.a.maps, mapd)
+        from ie_container_art import write_container_art
+        write_container_art(mapd, self.containers, lambda i, name: T.guid_name(self.gid('container', i, name)))
         for f in os.listdir(mapd):
             if f.lower().endswith('.mob'):
                 os.remove(os.path.join(mapd, f))

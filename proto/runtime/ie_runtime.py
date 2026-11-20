@@ -14,7 +14,7 @@
 # Variables: every IE GLOBAL / LOCALS / <area> / MYAREA variable (and timer: absolute script-clock stamp) lives in the
 # save-backed dict of ie_vars, keyed 'GLOBAL:name', '<AREA>:name', 'LOCALS:<ident>:name'; it is written next to every
 # save and read back on load (Temple+ savehook, chained by tpModifiers/ie_varhooks.py).
-import random, re
+import os, random, re
 try:
     _NUM = (int, long, float)
 except NameError:      # python 3 (offline tests)
@@ -201,16 +201,19 @@ def O(c, name, inner=None):
         return name
     n = name.lower()
     base = inner if inner is not None else c.me
+    if n in ('lastseenby', 'lastmarkedobject'):
+        ie_vars._check()
+        return ie_vars.SEEN_OBJECTS.get(_key(base))
     if n in ('myself',):
         return c.me
     if n in ('nothing',):
         return None
-    if n in ('protagonist', 'player1', 'lasttalkedtoby', 'lastheardby', 'lastseenby', 'lasttrigger', 'gabber'):
+    if n in ('protagonist', 'player1', 'lasttalkedtoby', 'lastheardby', 'lasttrigger', 'gabber'):
         if n == 'lasttalkedtoby' or n == 'gabber':
             return _pc(c)
         if n in ('lasttrigger',) and c.last_trigger is not None:
             return c.last_trigger
-        if n == 'lastheardby' or n == 'lastseenby':
+        if n == 'lastheardby':
             return _pc(c)
         p = _party()
         return p[0] if p else _pc(c)
@@ -298,7 +301,7 @@ def F(c, **filt):
         p = _party()
         return p[0] if p else None
     if ea in (255, 200) or ea == 'ENEMY' or ea == 'EVILCUTOFF':
-        return _nearest_enemy(c.me)
+        return _nearest_enemy(c.me, enemy_allegiance=True)
     log_once('filt:%r' % (sorted(filt.items()),), 'IE_UNSUPPORTED object filter %r' % (filt,))
     return None
 
@@ -315,15 +318,15 @@ def _hostile(me, o):
         return False
     return _kos(o if a else me)
 
-def _nearest_enemy(me):
+def _nearest_enemy(me, enemy_allegiance=False):
     if not IN_GAME or me is None:
         return None
     best = None
     try:
         for o in game.obj_list_vicinity(me.location, OLC_CRITTERS):
-            if o == me or _dead(o):
+            if o == me or _dead(o) or o.object_flags_get() & (OF_OFF | OF_DONTDRAW):
                 continue
-            hostile = _hostile(me, o)
+            hostile = _kos(o) if enemy_allegiance else _hostile(me, o)
             if hostile and (best is None or me.distance_to(o) < me.distance_to(best)):
                 best = o
     except Exception as e:
@@ -339,6 +342,15 @@ class _Triggers(object):
         return unsupported
 
     def True_(self, c): return True
+    def _difficulty(self):
+        try:
+            level = int(os.environ.get('IE2TOEE_DIFFICULTY', '3'))
+        except ValueError:
+            level = 3
+        return level if 1 <= level <= 5 else 3
+    def Difficulty(self, c, level): return self._difficulty() == level
+    def DifficultyLT(self, c, level): return self._difficulty() < level
+    def DifficultyGT(self, c, level): return self._difficulty() > level
     def InCutsceneMode(self, c):
         import ie_cutscene; return ie_cutscene.active()
     def EntirePartyOnMap(self, c): return True      # (the converted party always travels together)
@@ -428,14 +440,25 @@ class _Triggers(object):
             return o is not None and _dead(o)
         o = N(c, name)
         return o is None or _dead(o)
-    def See(self, c, obj, *unused):   # IWD2 See(O, I:SkipHidden)
+    def See(self, c, obj, *see_dead):
+        if obj is None or (not any(see_dead) and _dead(obj)) or not self.LOS(c, obj, 0):
+            return False
+        if obj != c.me:
+            ie_vars._check()
+            ie_vars.SEEN_OBJECTS[_key(c.me)] = obj
+        return True
+    def LOS(self, c, obj, rng):
         if obj is None or c.me is None or not IN_GAME:
             return False
         try:
-            return c.me.distance_to(obj) < 40 and c.me.can_see(obj)
+            if obj.object_flags_get() & (OF_OFF | OF_DONTDRAW):
+                return False
+            if c.me.distance_to(obj) < 40 and c.me.can_see(obj):
+                c.last_trigger = obj
+                return True
         except Exception:
-            return False
-    def LOS(self, c, obj, rng): return self.See(c, obj)
+            pass
+        return False
     def Range(self, c, obj, rng=None, *unused):   # IWD2 adds a comparison arg; Range(rng) = the caller's target
         if rng is None:
             return False
@@ -463,6 +486,16 @@ class _Triggers(object):
     def HPLT(self, c, obj, hp): return _hp(obj) < hp
     def PartyGoldGT(self, c, n): return _party_gold() > n
     def PartyGoldLT(self, c, n): return _party_gold() < n
+    def TimeGT(self, c, hour): return IN_GAME and game.time.time_game_in_hours(game.time) > hour
+    def TimeLT(self, c, hour): return IN_GAME and game.time.time_game_in_hours(game.time) < hour
+    def ItemIsIdentified(self, c, res, obj):
+        holders = (obj,) if obj is not None else _party()
+        for holder in holders:
+            it = item_find(holder, res)
+            if it and it.obj_get_int(obj_f_item_flags) & OIF_IDENTIFIED:
+                return True
+        return False
+
     def PartyHasItem(self, c, res):
         for pc in _party():
             if item_find(pc, res):
@@ -537,8 +570,8 @@ MAPS = {
     'race': {1: 0, 2: 1, 3: 6, 4: 2, 5: 4, 6: 3, 7: 5},      # IE race.ids -> ToEE race (human elf dwarf gnome halfelf halforc halfling)
     'class': {1: 'class_wizard', 2: 'class_fighter', 3: 'class_cleric', 4: 'class_rogue', 5: 'class_bard',
               6: 'class_paladin', 11: 'class_druid', 12: 'class_ranger', 20: 'class_sorcerer', 21: 'class_monk'},
-    'stat': {38: 'stat_strength', 39: 'stat_intelligence', 40: 'stat_wisdom', 41: 'stat_dexterity',
-             42: 'stat_constitution', 43: 'stat_charisma', 34: 'stat_level'},
+    'stat': {34: 'stat_level', 36: 'stat_strength', 38: 'stat_intelligence', 39: 'stat_wisdom',
+             40: 'stat_dexterity', 41: 'stat_constitution', 42: 'stat_charisma'},
 }
 
 def _cmp_stat(c, obj, kind, ieval):
@@ -549,8 +582,8 @@ def _cmp_stat(c, obj, kind, ieval):
             want = MAPS['race'].get(ieval)
             return want is not None and obj.stat_level_get(stat_race) == want
         if kind == 'class':
-            want = MAPS['class'].get(ieval)
-            return want is not None and obj.stat_level_get(globals()[want]) > 0
+            stats = CLASS_LEVELS.get(ieval, ())
+            return bool(stats) and all(obj.stat_level_get(globals()[stat]) > 0 for stat in stats)
         if kind == 'align':
             a = obj.critter_get_alignment()
             return _align_match(ieval, a)
@@ -837,6 +870,33 @@ class _Actions(object):
                 it = item_find(pc, res)
                 if it:
                     it.destroy(); return
+    def TakePartyItemNum(self, c, res, count):
+        if not IN_GAME or c.me is None:
+            return
+        for pc in _party():
+            while count > 0:
+                item = item_find(pc, res)
+                if not item:
+                    break
+                field = None
+                if item.type == obj_t_ammo:
+                    field = obj_f_ammo_quantity
+                elif item.type == obj_t_money:
+                    field = obj_f_money_quantity
+                quantity = max(1, item.obj_get_int(field)) if field is not None else 1
+                if quantity > count:
+                    part = ie_itemrt.give(res, c.me, count)
+                    if part:
+                        item.obj_set_int(field, quantity - count)
+                    return
+                c.me.item_get(item)
+                if item_find(pc, res) == item:
+                    return
+                count -= quantity
+    def DestroyItem(self, c, res):
+        item = item_find(c.me, res) if IN_GAME and c.me is not None else None
+        if item:
+            item.destroy()
     def TakePartyGold(self, c, gp):
         log('TAKE_GOLD %d' % gp)
         if IN_GAME:
@@ -844,6 +904,18 @@ class _Actions(object):
     def GiveGoldForce(self, c, gp):
         if IN_GAME:
             game.party[0].money_adj(gp * 100)
+    def GivePartyGold(self, c, gp):
+        party = _party()
+        if not party:
+            return
+        if c.me and not c.ident.startswith('area_'):
+            if c.me in party:
+                return
+            gp = min(gp, c.me.money_get() // 100)
+            if gp > 0:
+                c.me.money_adj(-gp * 100)
+        if gp > 0:
+            party[0].money_adj(gp * 100)
     def FloatMessage(self, c, obj, strref): return self.DisplayStringHead(c, obj, strref)
     def DisplayString(self, c, obj, strref): return self.DisplayStringHead(c, obj, strref)
     def DisplayStringHead(self, c, obj, strref):
@@ -906,7 +978,14 @@ class _Actions(object):
     def AddXP2DA(self, c, row):
         xp = XP2DA.get(row.upper())
         log('XP2DA %s -> %s' % (row, xp))
-        if xp:
+        if isinstance(xp, dict):
+            party = _party()
+            for pc in party:
+                level = pc.stat_level_get(stat_level)
+                amount, shared = xp.get(level, xp.get(0, (0, False)))
+                if amount:
+                    pc.award_experience(amount // len(party) if shared else amount)
+        elif xp:
             self.AddXPVar(c, row, xp)
     def RevealAreaOnMap(self, c, area): log('REVEAL %s' % area)
     def StartMovie(self, c, res):
@@ -1017,8 +1096,12 @@ class _Actions(object):
     def SetSavedLocation(self, c):
         if IN_GAME and c.me is not None:
             _saved[c.ident] = c.me.location
-    def SetSavedLocationPoint(self, c, pt, *args):
-        u, v = ie_to_tile(c.area, pt[0], pt[1]); _saved[c.ident] = location_from_axis(u, v)
+    def SetSavedLocationPoint(self, c, x, y=None, facing=None):
+        # IWD2 takes three integers. Older generated scripts pass a point.
+        if isinstance(x, (tuple, list)):
+            x, y = x
+        u, v = ie_to_tile(c.area, x, y)
+        _saved[c.ident] = location_from_axis(u, v)
     def JumpToSavedLocation(self, c):
         loc = _saved.get(c.ident)
         if IN_GAME and c.me is not None and loc:
@@ -1248,9 +1331,11 @@ except ImportError:
 
 # IE area -> ToEE map id (+ placements), written by the converter as ie_areas.py
 AREA_MAPS = {}
+CLASS_LEVELS = dict((code, (name.replace('class_', 'stat_level_'),)) for code, name in MAPS['class'].items())
 try:
     import ie_areas
     AREA_MAPS = ie_areas.MAPS
+    CLASS_LEVELS = getattr(ie_areas, 'CLASS_LEVELS', CLASS_LEVELS)
     for _a, _p in getattr(ie_areas, 'PLACEMENTS', {}).items():
         set_placement(_a, *_p)
 except ImportError:

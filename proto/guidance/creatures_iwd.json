@@ -1327,6 +1327,7 @@
   "overrides": {}
  },
  "resref_families": {
+  "ehbeetle": {"id": "cellar_beetle", "label": "Cellar beetle", "proto": 14089, "co8_model": 1207, "status": "match", "notes": "The installed fire beetle has the cellar beetle's single 2d4 bite. The legacy tick model is the fallback."},
   "_doc": "cre resref -> family (beats the animation family): IWD2 summons with no or the wrong animation match",
   "00sdrat": {"label": "Dire rat", "proto": 14056, "status": "match", "id": "resref_00sdrat"},
   "00sair16": {"label": "Air elemental (huge)", "proto": 14292, "status": "match", "scale": 120, "notes": "Large air elemental scaled up; Co8 huge 14900", "id": "resref_00sair16"},

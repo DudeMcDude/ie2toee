@@ -115,17 +115,12 @@ def hit_region(area_data, pts):
 
 
 def _attach_doors(area):
-    """interiors have no baked data: attach their doors on arrival (baked areas do it in ie_bakert.area_pass)"""
-    try:
-        __import__('ie_bake_' + area.lower())
-        return 0                      # baked: ie_bakert attaches the doors on the first heartbeat
-    except ImportError:
-        pass
+    """Restore each portal's saved state and collision on arrival, including empty baked rooms."""
     try:
         import ie_doors
         __import__('ie_doors_' + area.lower())
         n = ie_doors.start(area)
-        _log('%s: no baked data, attached %d doors' % (area, n))
+        _log('%s: attached %d doors' % (area, n))
         return n
     except ImportError:
         return 0
