@@ -954,6 +954,25 @@ MONSTER_FAMILY.update(dict.fromkeys('10sailrd'.split(), 'targos_sailor'))
 MONSTER_FAMILY.update(dict.fromkeys('12wolf 12wolfd'.split(), 'b8_wolf'))
 
 
+PORTRAITS.update({
+    '11jemel': 12990,
+    '11ragnib': 13000,
+    '11denham': 13010,
+    '11maxiel': 13020,
+    '11valin': 13030,
+    '11garrad': 13040,
+    '11deagle': 13050,
+    '11urbeks': 13060,
+    '10dop': 13070,
+    '12harles': 13080,
+    '12caulde': 13090,
+    '12weapon': 13100,
+    '12menon': 13110,
+    '10rukwu': 13120,
+    '10ulek': 13130,
+})
+
+
 def monster_portrait(resref, seed):
     """Per-instance portrait for a generic monster resref (None if not ours). seed: stable per spawn, e.g. 'AREA:x:y'."""
     import zlib

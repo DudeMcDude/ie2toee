@@ -53,6 +53,14 @@ Install and start a new game
    areas. Temple+ shares its configuration across installs. Switch the
    game folder and module back before playing your regular ToEE game.
 
+Portraits in Targos
+------------------
+
+Gemini contributed fifteen additional character portraits for the trade
+depot, pavilion, palisade and warehouse. Harlesford, Caulder, Menon and
+the Weapon Instructor now each have their own portrait. Reconvert and
+visit these areas in a fresh campaign to see all updated assignments.
+
 In the game
 -----------
 
@@ -64,7 +72,7 @@ The chapter autoplayer completed all sixteen sidequests, defended the
 palisade and received Ulbrec's assignment across same-party checkpoint
 replays. The opening film ran 3:06 and the narrated prologue 1:31. Some
 containers in the dock storehouse, Council Chambers and Weeping Widow are
-unreachable. Several residents share a stock portrait. Hedron's scene can
+unreachable. Hedron's scene can
 pause before returning control. A previously reported siege crash did not
 recur in this playtest. One movie test crashed during shutdown.
 

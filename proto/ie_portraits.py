@@ -12,6 +12,22 @@ ART = os.path.join(os.path.dirname(HERE), 'art', 'portraits')
 MASTERS = os.environ.get('IE_PORTRAIT_MASTERS', '/workspace/portrait-art/masters')   # ie_<key>/ie_<key>_master.png
 # key -> (portraits.mes base id, display name used in file names)
 ART_IDS = {
+    'jemeliah': (12990, 'Jemeliah'),
+    'ragni_bellows': (13000, 'RagniBellows'),
+    'denham_fisher': (13010, 'DenhamFisher'),
+    'maxiel': (13020, 'Maxiel'),
+    'valin': (13030, 'Valin'),
+    'garradun': (13040, 'Garradun'),
+    'deagle': (13050, 'Deagle'),
+    'urbek': (13060, 'Urbek'),
+    'doppelganger': (13070, 'Doppelganger'),
+    'harlesford': (13080, 'Harlesford'),
+    'caulder': (13090, 'Caulder'),
+    'weapon_instructor': (13100, 'WeaponInstructor'),
+    'menon': (13110, 'Menon'),
+    'rukwurm': (13120, 'Rukwurm'),
+    'ulek': (13130, 'Ulek'),
+
     'crandall': (12930, 'Crandall'),
     'eldgull': (12940, 'Eldgull'),
     'cahl_hyred': (12950, 'CahlHyred'),
