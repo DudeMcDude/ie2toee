@@ -95,3 +95,8 @@ See converter\LICENSE.txt for the converter license and
 TemplePlus\IE-PREVIEW-SOURCE.txt for engine changes and sources. Gemini
 contributed the commissioned portrait art. For earlier changes, see
   https://github.com/DudeMcDude/ie2toee/releases
+
+NOVEMBER 21, 2026 | PUBLIC PLAYER TEST
+The November 21 release uses the same Temple+ build for the player and chapter autoplayer.
+Targos covers sixteen tested sidequests, the palisade battle, and the assignment to Shaengarne.
+The siege defenders recognize allies, and enemies leave the practice barrels alone.

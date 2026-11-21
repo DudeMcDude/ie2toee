@@ -5,9 +5,14 @@ Converts Infinity Engine areas (Icewind Dale, Icewind Dale II, Baldur's Gate) in
 It is meant for total conversions such as the Co8 IWD / IWD2 projects. The conversion is a one-time offline step
 that each player runs on their own copy of the IE game.
 
-Status: **working prototype**. Real IWD1 areas convert and load in Temple+: art, walkability, occlusion, start
-position and doors. Actors, containers, travel regions, lighting, sound and animations are exported as data but not
-turned into ToEE objects yet. See [docs/design.md](docs/design.md).
+The Windows previews cover Easthaven through Kuldahar Pass and the defense of Targos through Ulbrec's
+assignment to Shaengarne. Each download includes its edition's converter, Temple+ build and optional
+chapter autoplayer. Use a separate copy of ToEE for each edition. [Preview downloads](https://github.com/DudeMcDude/ie2toee/releases)
+
+For narrated chapter slides, both converters need the Windows executables `ffmpeg.exe` and
+`ffprobe.exe`. IWD also needs RAD Video Tools (`radvideo64.exe`) to encode the intro and avalanche.
+IWD2 can copy its opening movie directly. The download's README explains tool setup, the conversion
+command and the final movie summary. [FFmpeg downloads](https://ffmpeg.org/download.html) · [RAD Video Tools](https://www.radgametools.com/bnkdown.htm)
 
 ## Legal model: no IE assets are distributed
 
@@ -51,7 +56,7 @@ turned into ToEE objects yet. See [docs/design.md](docs/design.md).
 Requires Python 3.9+ with `numpy` and `pillow`.
 
     cd proto
-    python3 ie2toee.py --game "<IE install>" --area AR1000 --out ../out --map-id 5900 --ground-id 900 \
+    python3 ie2toee.py --game "<IE install>" --area AR1000 --out ../out --map-id 5012 --ground-id 900 \
         [--guidance guidance/<game>.json] [--closed-doors] [--preview]
     python3 verify_toee_output.py --out ../out --area AR1000      # paints the .sec blocking over the ground art
     python3 door_debug.py --game "<IE install>" --out ../out --area AR1000   # closed/open patch + impeded cells per door
