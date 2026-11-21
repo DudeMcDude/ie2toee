@@ -12,6 +12,7 @@
 #   AREA, FIELDS {name: engine field index}, OBJS {"G_...": {"k": "npc"|"item"|"container", ...}}
 from toee import *
 import time
+import re
 
 LOG = [None]
 STAMP = 0x1E2B0001
@@ -41,6 +42,34 @@ def _guid(o):
         return str(o.id)
     except Exception:
         return ''
+
+
+_siege_raider = re.compile(r'^0[1-8]_(?:goblin(?:_archer|_elite)?_\d+|wolf_\d+|vghotan|ghotrag|phaen)$|^06_caballus$', re.I)
+
+
+# AR1200's gate defenders, training squads, and named siege allies.
+_siege_defenders = frozenset((
+    '12tarsol', '12archer', '12merc', '12drill', '12recrui', '12traine', '12weapon',
+    '12black', '12blanc', '12anson', '12kadenc', '12olap',
+))
+
+
+def mark_targos_combatant(o, data, guid):
+    if data is None or data.__name__ not in ('ie_bake_i2ar1004', 'ie_bake_i2ar1200'):
+        return
+    spec = data.OBJS.get(guid, {}).get('spec', {})
+    if data.__name__ == 'ie_bake_i2ar1004':
+        if spec.get('resref', '').lower() in ('10catf', '10firth'):
+            o.condition_add("IE Firtha Household")
+        return
+    # The other Caballus actors stage cutscenes. Only the wave 6 actor fights.
+    if spec.get('resref', '').lower() in _siege_defenders:
+        import ie_runtime as rt
+        if rt.targos_guard is not None and not o.faction_has(rt.targos_guard.FACTION):
+            o.faction_add(rt.targos_guard.FACTION)
+        o.condition_add("IE Palisade Defender")
+    elif _siege_raider.match(spec.get('actor', '')) and not o.d20_query("Dies at Zero HP"):
+        o.condition_add("IE Siege Raider")
 
 
 def finalize_critter(o, d, F):
@@ -179,6 +208,7 @@ def area_pass(area):
             if not o.is_dead_or_destroyed():
                 o.object_flag_set(OF_OFF)
         n['first'] += finalize_critter(o, d, F) and 1 or 0
+        mark_targos_combatant(o, m, g)
     nd = 0
     try:
         import ie_doors
@@ -227,6 +257,9 @@ def first_heartbeat(o, area):
     except Exception, e:
         _log('IE_BAKE intro movie failed: %s' % e)
     a = area.upper(); g = _guid(o)
+    if a in ('AR1004', 'I2AR1004', 'AR1200', 'I2AR1200'):
+        # A sector may become available after the map-wide pass.
+        mark_targos_combatant(o, _data('I2' + a[-6:]), g)
     # Sectors can load after the area pass. Apply the same gate on their first heartbeat.
     data = _data(a) or _data('I2' + a)
     if data and omit_placement(o, data.OBJS.get(g, {}).get('spec', {})):

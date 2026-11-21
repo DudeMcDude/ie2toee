@@ -50,6 +50,22 @@ def log_once(key, msg):
 
 # ------------------------------------------------------------------------------------------------ variables
 import ie_vars
+try:
+    import ie_targos_reputation as targos_guard
+except ImportError:
+    targos_guard = None
+
+
+def sync_targos_reputation():
+    if targos_guard is None or not IN_GAME or not game.party:
+        return
+    leader = game.leader
+    hostile = ie_vars.get('GLOBAL:targos_hostile') or ie_vars.get('AR1200:team_0')
+    if hostile and leader.reputation_has(targos_guard.REPUTATION):
+        leader.reputation_remove(targos_guard.REPUTATION)
+    elif not hostile and not leader.reputation_has(targos_guard.REPUTATION):
+        leader.reputation_add(targos_guard.REPUTATION)
+
 ie_vars._log[0] = log
 VARS = ie_vars.STORE     # the live dict (tests: VARS.clear())
 
@@ -91,6 +107,8 @@ def get_var(c, name, scope):
 def set_var(c, name, scope, value):
     k = var_key(c, name, scope)
     ie_vars.put(k, value)
+    if k in ('GLOBAL:targos_hostile', 'AR1200:team_0'):
+        sync_targos_reputation()
     log('SET %s = %d' % (k, int(value)))
 
 # ------------------------------------------------------------------------------------------------ context
@@ -132,11 +150,21 @@ def _key(obj):
     except Exception:
         return id(obj)
 
+def _mark_practice_target(obj, ident):
+    if not IN_GAME or not ident or ident.lower().split('#', 1)[0] not in ('12kegarc', '12kegarc_ar1200', '12kegmel'):
+        return
+    if not obj.d20_query("Combat Practice Target"):
+        obj.condition_add("IE Combat Practice Target")
+        obj.npc_flag_set(ONF_NO_ATTACK)
+        obj.npc_flag_unset(ONF_KOS)
+
+
 def who(obj, ident, area):
     """Generated script of a runtime-spawned creature (ie_spawn: CreateCreature / INI / rest / summons) carries
     AREA = "": its instance ident and area come from the binding ie_spawn made (each copy its own ident, so copies
     keep their own script round, timers and events); after a reload (bindings are not saved) the converted ident
     and the area of the map the creature stands on."""
+    _mark_practice_target(obj, ident)
     if area:
         return ident, area
     b = _bound.get(_key(obj))
@@ -154,6 +182,7 @@ def who(obj, ident, area):
     return ident, a
 
 def bind(obj, ident, area):
+    _mark_practice_target(obj, ident)
     _bound[_key(obj)] = (ident, area)
     try:      # baked maps: finalize the prefab objects + attach the doors once per map load (ie_bakert)
         import ie_bakert
@@ -894,13 +923,14 @@ class _Actions(object):
     def Dialog(self, c, obj): return self.StartDialog(c, None, obj)
     def StartDialogNoSet(self, c, obj): return self.StartDialog(c, None, obj)
     def StartDialog(self, c, dlg, obj):
-        if IN_GAME:       # a dialogue inside a cutscene needs the mouse: drop the cutscene input lock
-            try:
-                import ie_cutscene; ie_cutscene._lock(0)
-            except Exception:
-                pass
         if obj is None or not IN_GAME:
             return
+        try:
+            import ie_cutscene
+        except ImportError:     # standalone dialogue conversions have no area/cutscene runtime
+            pass
+        else:
+            ie_cutscene.handoff_to_dialogue()
         log('DIALOG %s -> %s' % (c.ident, obj))
         try:
             c.me.turn_towards(obj); obj.turn_towards(c.me)      # Co8 style: face each other, then talk

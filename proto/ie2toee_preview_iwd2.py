@@ -290,6 +290,8 @@ def convert(a, stage):
             if l.strip() and cur: sn.setdefault(cur, []).append(l)
     td = toeedata.ToEEData(toee)
     starting_equipment(td, os.path.join(M, 'rules'))
+    import ie_targos_guard
+    ie_targos_guard.install(td, inst)
     # vanilla town map files of the reused ids (ToEE*.dat stay loaded) would show through between ours: black them out
     from PIL import Image
     black = None

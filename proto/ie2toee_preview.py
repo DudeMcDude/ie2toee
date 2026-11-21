@@ -45,7 +45,8 @@ def name_base(i):
 def install_varhooks(scr):
     """IE variable store save/load hook (ie_vars): Temple+ imports scr/tpModifiers/*.py at startup."""
     d = os.path.join(scr, 'tpModifiers'); os.makedirs(d, exist_ok=True)
-    shutil.copy(os.path.join(HERE, 'runtime', 'tpModifiers', 'ie_varhooks.py'), d)
+    for module in ('ie_varhooks.py', 'ie_raider_death.py', 'ie_palisade_defender.py'):
+        shutil.copy(os.path.join(HERE, 'runtime', 'tpModifiers', module), d)
     old = os.path.join(scr, 'ie_varslots.py')          # (slot table of older builds: no longer used)
     if os.path.isfile(old):
         os.remove(old)
