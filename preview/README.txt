@@ -92,3 +92,7 @@ See converter\LICENSE.txt for the converter license and
 TemplePlus\IE-PREVIEW-SOURCE.txt for engine changes and sources. Gemini
 contributed the commissioned portrait art. For earlier changes, see
   https://github.com/DudeMcDude/ie2toee/releases
+
+NOVEMBER 21, 2026 | PUBLIC PLAYER TEST
+The November 21 release uses the same Temple+ build for the player and chapter autoplayer.
+Easthaven covers the caravan to Kuldahar Pass and six tested sidequests.
