@@ -1,0 +1,58 @@
+--- a/proto/ie2toee_preview_iwd2.py
++++ b/proto/ie2toee_preview_iwd2.py
+@@ -15,6 +15,8 @@
+ HERE = os.path.dirname(os.path.abspath(__file__))
+ sys.path.insert(0, HERE)
+ import toeedata
++import json
++from ie_map_alerts import apply_map_alert_distances
+ from ie_build import preview_build
+ import ie_overrides
+ from ie2toee_preview import (run, run_soft, copytree, mes_with, RUNTIME, install_varhooks,
+@@ -332,6 +334,9 @@
+             if l.startswith('{%d}' % G['AR1000']['map']):
+                 l = re.sub(r',\s*Flag:\s*NEW_GAME_START.*?(?=,\s*\w+:|}\s*$)', '', l.rstrip('\r'))
+                 t[i] = l[:l.rindex('}')] + ', Flag: NEW_GAME_START, NewGameX: %d, NewGameY: %d}' % st
++        with open(os.path.join(HERE, 'guidance', 'map_alerts.json'), encoding='utf-8') as f:
++            alert_distances = json.load(f).get('IWD2', {})
++        t = apply_map_alert_distances('\n'.join(t), {ar: G[ar]['map'] for ar in ok}, alert_distances).split('\n')
+         open(ml, 'w', encoding='latin-1', newline='').write('\n'.join(t))
+         map_names(td, {G[ar]['map']: n for ar, n in names.items()}, '\n'.join(t), os.path.join(M, 'mes', 'map_names.mes'))
+     else:
+--- /dev/null
++++ b/proto/ie_map_alerts.py
+@@ -0,0 +1,21 @@
++"""Apply opt-in Temple+ ally alert caps using IE area names, not fixed map IDs."""
++import re
++
++
++def apply_map_alert_distances(maplist, area_ids, distances):
++    for area, distance in distances.items():
++        if type(distance) is not int or not 0 <= distance <= 1000:
++            raise ValueError('invalid alert distance for %s: %r' % (area, distance))
++        if area not in area_ids:
++            continue  # this area was not included in the conversion
++        pattern = r'(^\{%d\}\{)([^}\r\n]*)(\})' % area_ids[area]
++
++        def update(match):
++            fields = re.sub(r',\s*AlertDistance\s*:[^,}]*', '', match.group(2))
++            return '%s%s, AlertDistance: %d%s' % (match.group(1), fields, distance, match.group(3))
++
++        maplist, count = re.subn(pattern, update, maplist, flags=re.M)
++        if count != 1:
++            raise ValueError('expected one MapList entry for %s (map %d), found %d' %
++                             (area, area_ids[area], count))
++    return maplist
+--- /dev/null
++++ b/proto/guidance/map_alerts.json
+@@ -0,0 +1,10 @@
++{
++  "IWD": {
++    "AR1201": 12
++  },
++  "IWD2": {
++    "AR1000": 18,
++    "AR1100": 18,
++    "AR1200": 18
++  }
++}

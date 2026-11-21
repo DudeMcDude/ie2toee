@@ -1,0 +1,39 @@
+--- a/proto/ie2toee_preview_iwd2.py
++++ b/proto/ie2toee_preview_iwd2.py
+@@ -38,6 +38,28 @@
+ SCRIPT_ID_MAX = 3799   # (installer: stale scripts of an earlier build in 1500..SCRIPT_ID_MAX are moved aside)
+ SCRIPT_BASE = 1500  # area i's actor scripts 1500+100i.. (vanilla ToEE: <= 1374); dialogue for the actors with a DLG
+ START = (450, 490)   # fallback: I2AR1000 tile of IWD2's own new-game spot (STARTARE.2DA 2390,860, the docks)
++
++
++def starting_equipment(td, rules_dir):
++    """Restore the base game's class kits where Co8 expects the player to buy gear on its shop map."""
++    rel = 'rules/start_equipment.mes'
++    effective = td.read(rel).decode('latin-1')
++    source = next((a for a in reversed(td.sources) if rel in a.files and
++                   re.fullmatch(r'toee\d*\.dat', os.path.basename(a.path), re.I)), None)
++    if source is None:
++        return
++    entry = re.compile(r'^(\s*\{(\d+)\}\s*\{)([^}\r\n]*)(\})', re.M)
++    stock = {int(m[2]): m[3] for m in entry.finditer(source.read(rel).decode('latin-1'))}
++    def kit(m):
++        key = int(m[2])
++        if key % 100 <= 10 and key < 200 and m[3].split() == ['6142'] and key in stock:
++            return m[1] + stock[key] + m[4]
++        return m[0]
++    fixed = entry.sub(kit, effective)
++    # Also stage an existing module-level override on subsequent builds.
++    if fixed != effective or os.path.isfile(os.path.join(td.root, 'modules', 'ToEE', rel)):
++        with open(os.path.join(rules_dir, 'start_equipment.mes'), 'wb') as out:
++            out.write(fixed.encode('latin-1'))
+ 
+ 
+ def start_tile(ie, w):
+@@ -254,6 +276,7 @@
+             if l.startswith('# '): cur = l[2:].strip(); continue
+             if l.strip() and cur: sn.setdefault(cur, []).append(l)
+     td = toeedata.ToEEData(toee)
++    starting_equipment(td, os.path.join(M, 'rules'))
+     # vanilla town map files of the reused ids (ToEE*.dat stay loaded) would show through between ours: black them out
+     from PIL import Image
+     black = None

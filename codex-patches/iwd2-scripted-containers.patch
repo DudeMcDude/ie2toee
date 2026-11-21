@@ -1,0 +1,201 @@
+--- a/proto/ieitm.py
++++ b/proto/ieitm.py
+@@ -181,6 +181,7 @@
+         first, cnt = u('<II', o + 0x40)
+         out.append(dict(name=cstr(data[o:o + 32]), x=u('<H', o + 0x20)[0], y=u('<H', o + 0x22)[0],
+                         type=u('<H', o + 0x24)[0], lock=u('<H', o + 0x26)[0], flags=u('<I', o + 0x28)[0],
++                        script=cstr(data[o + 0x48:o + 0x50]).lower(),
+                         trapped=u('<H', o + 0x30)[0], key=cstr(data[o + 0x78:o + 0x80]).lower(),
+                         items=items[first:first + cnt]))
+     return out
+--- a/proto/ie_items.py
++++ b/proto/ie_items.py
+@@ -836,7 +836,7 @@
+         for c in cl:
+             b = m.g['containers'].get(str(c['type']), m.g['containers']['default'])
+             lst.append(dict(name=c['name'], ie=[c['x'], c['y']], toee=(oc.get(c['name']) or {}).get('toee'),
+-                            proto=b[0], label=b[1], lock=c['lock'], trapped=c['trapped'], key=c['key'],
++                            proto=b[0], label=b[1], lock=c['lock'], locked=bool(c['flags'] & 1), trapped=c['trapped'], key=c['key'],
+                             items=[[i['resref'], max(1, i['charges'][0])] for i in c['items']]))
+         cons[ar.upper()] = lst
+     sto = {}
+--- a/proto/ie_dialogue.py
++++ b/proto/ie_dialogue.py
+@@ -354,6 +354,18 @@
+         rep['actors'].append({'ident': ident, 'area': area, 'script_id': sid, 'dlg': dlg, 'bcs': mods,
+                               'lines': len([l for l in (dlg_parts[0] if dlg_parts else []) if l]),
+                               'entry_states': len(dlg_parts[2]) if dlg_parts else 0, 'notes': notes})
++    # A scripted ARE container owns its BCS. Its inventory is the target of Myself / HasItem.
++    import ieitm
++    container_scripts = {}
++    for spec in a.area_map:
++        area = spec.split(':')[0].upper()
++        if not game.exists(area, 'are'):
++            continue
++        for box in ieitm.are_container_items(game.read(area, 'are')):
++            if box['script']:
++                module, _, _ = bcs(box['script'], box['name'].lower(), area)
++                container_scripts.setdefault(area, {})[box['name']] = module
++    w(os.path.join(scr, 'ie_container_scripts.py'), 'SCRIPTS = %r\n' % container_scripts)
+     for spec in a.area_script:
+         area, res = spec.split(':')
+         m, nb, unk = bcs(res.lower(), 'area_' + area.upper(), area.upper())
+--- a/proto/ie_bake.py
++++ b/proto/ie_bake.py
+@@ -317,7 +317,7 @@
+         x, y = int(c['toee'][0]), int(c['toee'][1])
+         o = T.GameObject(1, int(c['proto']), self.gid('container', i, c['name']))
+         o.set('location', T.location(x, y)).set('flags', CRITTER_OF | self.proto_flags(c['proto'], 20, OF, 'OF_'))
+-        if c.get('lock'):
++        if c.get('locked', c.get('lock')):
+             o.set('container_flags', self.proto_flags(c['proto'], 41, {}, '') | OCOF_LOCKED)
+             o.set('container_lock_dc', min(40, 10 + int(c['lock']) // 5))
+         inv = []
+--- a/proto/runtime/ie_itemrt.py
++++ b/proto/runtime/ie_itemrt.py
+@@ -68,9 +68,10 @@
+ 
+ 
+ def entry(res):
+-    e = ITEMS.get(res.lower())
+-    if e is None and not _SEEN.has_key(res.lower()):
+-        _SEEN[res.lower()] = 1
++    key = res.strip().lower()
++    e = ITEMS.get(key)
++    if e is None and key not in _SEEN:
++        _SEEN[key] = 1
+         _log('IE_ITEM_UNMAPPED %s' % res)
+     return e
+ 
+@@ -151,6 +152,9 @@
+ 
+ 
+ def _inv(holder):
++    if holder.type == obj_t_container:
++        field = obj_f_container_inventory_list_idx
++        return [holder.obj_get_idx_obj(field, i) for i in range(holder.obj_get_idx_obj_size(field))]
+     out = []
+     for i in range(0, 200):
+         try:
+@@ -167,6 +171,10 @@
+         if it != OBJ_HANDLE_NULL:
+             out.append(it)
+     return out
++
++
++def matches(item, e):
++    return e and item.proto == e['p'] and (not e.get('n') or item.obj_get_int(_field('obj_f_description')) == e['n'])
+ 
+ 
+ def find(holder, res):
+@@ -176,7 +184,7 @@
+         return None
+     for it in _inv(holder):
+         try:
+-            if it.proto == e['p'] and (not e.get('n') or it.obj_get_int(_field('obj_f_description')) == e['n']):
++            if matches(it, e):
+                 return it
+         except Exception:
+             pass
+@@ -197,7 +205,7 @@
+             it = make(res, loc, q > 1 and q or None)
+             if it is not None:
+                 box.item_get(it); got.append(res)
+-        if c.get('lock'):
++        if c.get('locked', c.get('lock')):
+             try:
+                 box.container_flag_set(OCOF_LOCKED)
+                 box.obj_set_int(obj_f_container_lock_dc, min(40, 10 + c['lock'] / 5))
+--- a/proto/runtime/ie_runtime.py
++++ b/proto/runtime/ie_runtime.py
+@@ -542,6 +542,19 @@
+     def HPLT(self, c, obj, hp): return _hp(obj) < hp
+     def PartyGoldGT(self, c, n): return _party_gold() > n
+     def PartyGoldLT(self, c, n): return _party_gold() < n
++    def OpenState(self, c, obj, state):
++        if not IN_GAME or not obj:
++            return False
++        if obj.type == obj_t_portal:
++            return bool(obj.portal_flags_get() & OPF_OPEN) == bool(state)
++        if obj.type == obj_t_container:
++            return bool(obj.container_flags_get() & OCOF_OPEN) == bool(state)
++        return False
++    def TotalItemCntExclude(self, c, res, holder, count):
++        if holder is None or ie_itemrt is None:
++            return False
++        e = ie_itemrt.entry(res)
++        return len([it for it in ie_itemrt._inv(holder) if not ie_itemrt.matches(it, e)]) == count
+     def PartyHasItem(self, c, res):
+         for pc in _party():
+             if item_find(pc, res):
+@@ -917,6 +930,16 @@
+         if obj is not None and IN_GAME:
+             item_give(res, obj)
+         log('CREATE_ITEM %s' % res)
++    def DestroyItem(self, c, res):
++        it = item_find(c.me, res)
++        if it:
++            it.destroy()
++    def Lock(self, c, obj):
++        if IN_GAME and obj:
++            if obj.type == obj_t_container:
++                obj.container_flag_set(OCOF_LOCKED)
++            elif obj.type == obj_t_portal:
++                obj.portal_flag_set(OPF_LOCKED)
+     def TakePartyItem(self, c, res):
+         log('TAKE %s' % res)
+         if IN_GAME:
+--- a/proto/runtime/ie_cutscene.py
++++ b/proto/runtime/ie_cutscene.py
+@@ -12,6 +12,7 @@
+   the other (IE action-queue semantics), not at the same time.
+ """
+ from toee import *
++from utilities import location_from_axis
+ import ie_runtime as rt
+ 
+ STATE = {'gen': 0, 'cut': 0, 'cut_since': 0, 'hook': 0}   # hook: Temple+ map_tick.on_tick drives the area scripts
+@@ -100,6 +101,32 @@
+     game.timeevent_add(_area_step, (area, gen), AREA_TICK_MS)   # always reschedule (an exception must not end the loop)
+     return 1
+ 
++try:
++    from ie_container_scripts import SCRIPTS as CONTAINER_SCRIPTS
++except ImportError:                     # older conversions have no inventory scripts
++    CONTAINER_SCRIPTS = {}
++
++
++def _run_containers(area):
++    scripts = CONTAINER_SCRIPTS.get(area.upper())
++    if not scripts:
++        return
++    import ie_itemrt
++    for spec in ie_itemrt.CONTAINERS.get(area.upper(), ()):
++        module = scripts.get(spec['name'])
++        if not module or not spec.get('toee'):
++            continue
++        ident = spec['name'].lower()
++        if rt._busy.get(ident, 0) > rt._now():
++            continue
++        x, y = map(int, spec['toee'])
++        loc = location_from_axis(x, y)
++        boxes = [o for o in game.obj_list_vicinity(loc, OLC_CONTAINER) if o.location == loc and o.proto == spec['proto']]
++        if len(boxes) == 1:
++            c = rt.Ctx(boxes[0], None, ident, area, rt._events.setdefault(ident, {}))
++            rt.run_script(c, __import__(module).BLOCKS)
++
++
+ def _run_area(area, mod):
+     l = game.leader
+     if l == OBJ_HANDLE_NULL:
+@@ -109,6 +136,10 @@
+         ie_spawn.tick(area)           # INI events= (timed) spawns
+     except Exception as e:
+         rt.log_once('spawntick', 'IE_ERR spawn tick %s: %s' % (area, e))
++    try:
++        _run_containers(area)
++    except Exception as e:
++        rt.log_once('containers:' + area, 'IE_ERR container script %s: %s' % (area, e))
+     ident = 'area_' + area
+     if rt._busy.get(ident, 0) <= rt._now():
+         c = rt.Ctx(l, None, ident, area, rt._events.setdefault(ident, {}))

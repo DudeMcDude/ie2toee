@@ -36,6 +36,8 @@ def area_start(area):
     """(Re)start the area script loop of `area` (idempotent per map load)."""
     A_ = area.upper()
     new_game_init()
+    if rt.targos_guard is not None and game.party and game.leader.map == rt.AREA_MAPS.get(A_):
+        rt.sync_targos_reputation()
     try:
         if game.leader.map == rt.AREA_MAPS.get(A_):
             import ie_spawn
@@ -191,6 +193,14 @@ def active():
 
 _SKIP_IN_DIALOG = ('Wait', 'SmallWait', 'MultiPlayerSync', 'StartCutSceneMode', 'EndCutSceneMode')
 _RUN = {'res': None, 'left': 0}     # the running cutscene and its blocks still busy (auto EndCutSceneMode)
+
+def handoff_to_dialogue():
+    if STATE['cut'] and not _RUN['res']:
+        # An ambient script can use StartCutSceneMode just to bring a speaker into dialogue.
+        mode(0)
+    elif rt.IN_GAME:
+        # A queued scene still has actions to finish; allow the player to answer.
+        _lock(0)
 
 def start(res, c):
     name = 'ie_bcs_%s_area' % res.lower()

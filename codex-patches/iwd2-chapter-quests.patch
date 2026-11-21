@@ -1,0 +1,848 @@
+--- a/proto/ie_dialogue.py
++++ b/proto/ie_dialogue.py
+@@ -25,6 +25,19 @@
+     'PRO_BROTHERSISTER': ('brother', 'sister'), 'BROTHERSISTER': ('brother', 'sister'),
+     'PRO_GIRLBOY': ('boy', 'girl'), 'MALEFEMALE': ('male', 'female'),
+ }
++
++def class_levels(ids):
++    aliases = {'mage': 'wizard', 'thief': 'rogue'}
++    classes = set('barbarian bard cleric druid fighter monk paladin ranger rogue sorcerer wizard'.split())
++    levels = {}
++    for code, name in ids.t['class'].by_val.items():
++        parts = name.lower().split('_')
++        if parts[-1] == 'all':
++            parts.pop()
++        parts = [aliases.get(p, p) for p in parts]
++        if parts and all(p in classes for p in parts):
++            levels[code] = tuple('stat_level_' + p for p in parts)
++    return levels
+ 
+ def subst(text, female):
+     def rep(m):
+@@ -453,7 +466,7 @@
+             pl[f[0].upper()] = tuple(int(v) for v in f[2].split(','))
+     xp = {}
+     try:   # XPLIST.2DA (EE): rows used by AddXP2DA
+-        rows = game.read('xplist', '2da').decode('latin-1').splitlines()
++        rows = game.read('exptable' if 'exptable' in game.list('2da') else 'xplist', '2da').decode('latin-1').splitlines()
+         for ln in rows[3:]:
+             f = ln.split()
+             if len(f) >= 2 and f[1].lstrip('-').isdigit():
+@@ -461,7 +474,7 @@
+     except Exception:
+         pass
+     w(os.path.join(scr, 'ie_xp.py'), HEADER + 'XP = %r\n' % xp)
+-    w(os.path.join(scr, 'ie_areas.py'), HEADER + 'MAPS = %r\nPLACEMENTS = %r\nSCRIPTS = %r\nNEWGAME = %r\n' % (am, pl, asc, dict((k.upper(), int(v)) for k, v in (x.split('=') for x in a.new_game))))
++    w(os.path.join(scr, 'ie_areas.py'), HEADER + 'MAPS = %r\nPLACEMENTS = %r\nSCRIPTS = %r\nCLASS_LEVELS = %r\nNEWGAME = %r\n' % (am, pl, asc, class_levels(ids), dict((k.upper(), int(v)) for k, v in (x.split('=') for x in a.new_game))))
+     json.dump(rep, open(os.path.join(a.out, 'report.json'), 'w'), indent=1)
+     print(json.dumps({k: v for k, v in rep.items() if k != 'unknown'}, indent=1))
+     print('unknown names:', rep['unknown'])
+--- a/proto/ie_bake.py
++++ b/proto/ie_bake.py
+@@ -195,6 +195,8 @@
+             npc_flags |= ONF['KOS']
+         else:
+             npc_flags &= ~ONF['KOS']
++        if s.get('family') == 'keg':
++            npc_flags = (npc_flags & ~ONF['KOS']) | ONF['NO_ATTACK']
+         if patrol:
+             pts = [ie_to_tile(self.placement, x, y) for x, y in patrol]
+             o.set('npc_waypoints_idx', waypoints(pts, self.a.waypoint_delay))
+@@ -270,8 +272,10 @@
+             if box is not None:
+                 o.set('npc_substitute_inventory', box.id)
+         self.mobs.append(o)
+-        keep = ('ident', 'actor', 'resref', 'hp', 'conditions', 'dead', 'spells', 'ai_strategy', 'to_hit_bonus', 'difficulty', 'feats', 'skills')
++        keep = ('ident', 'actor', 'resref', 'hp', 'conditions', 'dead', 'spells', 'ai_strategy', 'to_hit_bonus', 'difficulty', 'feats', 'skills', 'area_spawn')
+         self.runtime[T.guid_name(o.id)] = {'k': 'npc', 'spec': {k: s[k] for k in keep if s.get(k) not in (None, [], '')}}
++        if s.get('family') == 'keg':
++            self.runtime[T.guid_name(o.id)]['spec']['family'] = 'keg'
+         if s.get('hidden') and s.get('hostility') == 'hostile':
+             self.runtime[T.guid_name(o.id)]['spec']['starts_hidden_hostile'] = True
+         self.report['npcs'] += 1
+@@ -318,7 +322,10 @@
+             self.report['unbaked'].append('container %s: no position' % c['name']); return None
+         x, y = int(c['toee'][0]), int(c['toee'][1])
+         o = T.GameObject(1, int(c['proto']), self.gid('container', i, c['name']))
+-        o.set('location', T.location(x, y)).set('flags', CRITTER_OF | self.proto_flags(c['proto'], 20, OF, 'OF_'))
++        # The IE search map already defines collision for this painted container.
++        # A second collision radius can close an otherwise walkable street.
++        o.set('location', T.location(x, y)).set('flags', CRITTER_OF | OF['NO_BLOCK'] | self.proto_flags(c['proto'], 20, OF, 'OF_'))
++        self.runtime[T.guid_name(o.id)] = {'k': 'container'}
+         if c.get('locked', c.get('lock')):
+             o.set('container_flags', self.proto_flags(c['proto'], 41, {}, '') | OCOF_LOCKED)
+             o.set('container_lock_dc', min(40, 10 + int(c['lock']) // 5))
+--- a/proto/ieformats.py
++++ b/proto/ieformats.py
+@@ -172,6 +172,7 @@
+         else:
+             raise ValueError(f'unsupported ARE {sig!r} (PST V1.0 uses the same header but other records)')
+         self.version = sig[4:].decode()
++        self.difficulty_thresholds = tuple(data[0x54:0x56]) if s else ()
+         self.wed = cstr(data[8:16])
+         self.flags = struct.unpack_from('<I', data, 0x14)[0]
+         self.area_type = struct.unpack_from('<H', data, 0x48)[0]  # bit0 outdoor, bit1 day/night ...
+@@ -194,6 +195,7 @@
+                 y=struct.unpack_from('<H', data, o + 0x22)[0],
+                 dest=struct.unpack_from('<HH', data, o + 0x24),
+                 flags=struct.unpack_from('<I', data, o + 0x28)[0],      # bit0: CRE not attached (resref used)
++                difficulty_mask=data[o + 0x2f] if s else 7,
+                 animation=struct.unpack_from('<I', data, o + 0x30)[0],
+                 orient=struct.unpack_from('<H', data, o + 0x34)[0],
+                 schedule=struct.unpack_from('<I', data, o + 0x40)[0] & 0xFFFFFF,
+--- a/proto/ie_creatures.py
++++ b/proto/ie_creatures.py
+@@ -1002,6 +1002,8 @@
+             specs.append({'actor': act['name'], 'resref': act['cre'], 'status': 'skipped', 'reason': why}); continue
+         s = cv.convert(cre, act)
+         s.update(actor=act['name'], x=act['x'], y=act['y'], orient=act['orient'], schedule=act['schedule'])
++        if a.difficulty_thresholds and act['difficulty_mask'] not in (0, 7):
++            s['area_spawn'] = (area.upper(), act['difficulty_mask']) + a.difficulty_thresholds
+         fx = cv.gd.g.get('spawn_fix', {}).get('%s/%s/%s' % (area.upper(), act['name'], act['cre'].lower()))
+         if fx:   # guidance "spawn_fix": {"AREA/actor/cre": [x, y]} (IE pixels) moves a spawn by hand
+             s['x'], s['y'] = fx
+@@ -1043,7 +1045,7 @@
+     keep = ('actor', 'resref', 'status', 'track', 'family', 'proto', 'model', 'scale', 'x', 'y', 'orient', 'gender',
+             'alignment', 'hostility', 'abilities', 'levels', 'monster_hd', 'hp', 'natural_ac', 'bab', 'to_hit_bonus',
+             'save_bonus', 'conditions', 'dead', 'no_flee', 'invulnerable', 'ident', 'cr', 'items', 'spells', 'ai_strategy', 'name_id',
+-            'script_id', 'schedule', 'portrait', 'difficulty', 'feats', 'skills', 'mesh', 'hidden', 'area_script')
++            'script_id', 'schedule', 'portrait', 'difficulty', 'feats', 'skills', 'mesh', 'hidden', 'area_script', 'area_spawn')
+     py = ['# Generated by ie2toee ie_creatures.py from the player\'s own IE install. Do not distribute.',
+           'AREA = %r' % area.upper(), 'CREATURES = [']
+     for s in specs:
+--- a/proto/ie_items.py
++++ b/proto/ie_items.py
+@@ -765,6 +765,20 @@
+     return b.frames[best]
+ 
+ 
++def store_data(game, stores, container, log=print):
++    result = {}
++    for name in stores:
++        try:
++            store = ieitm.Sto(game.read(name.lower(), 'sto'), name)
++        except (FileNotFoundError, ValueError) as ex:
++            log('warning: store %s not converted (%s)' % (name, ex))
++            continue
++        result[name.lower()] = dict(type=store.type, sell=store.sell_markup, buy=store.buy_markup,
++            identify_price=store.id_price, allow=store.allow, cures=len(store.cures), container=container,
++            items=[[i['resref'], (5 if i['infinite'] else max(1, i['stock']))] for i in store.items])
++    return result
++
++
+ def convert(game, out, toee, tp=None, options=None, areas=(), stores=(), objects=None, icons=True, log=print):
+     m = ItemMapper(game, toee, tp, options)
+     rep = None
+@@ -839,15 +853,7 @@
+                             proto=b[0], label=b[1], lock=c['lock'], locked=bool(c['flags'] & 1), trapped=c['trapped'], key=c['key'],
+                             items=[[i['resref'], max(1, i['charges'][0])] for i in c['items']]))
+         cons[ar.upper()] = lst
+-    sto = {}
+-    for s in stores:
+-        try:
+-            S_ = ieitm.Sto(game.read(s.lower(), 'sto'), s)
+-        except Exception as ex:
+-            log('warning: store %s not converted (%s)' % (s, ex)); continue
+-        sto[s.lower()] = dict(type=S_.type, sell=S_.sell_markup, buy=S_.buy_markup, allow=S_.allow,
+-                              items=[[i['resref'], (5 if i['infinite'] else max(1, i['stock']))] for i in S_.items],
+-                              cures=len(S_.cures), container=m.g['store_container'][0])
++    sto = store_data(game, stores, m.g['store_container'][0], log)
+     keep = ('proto', 'conds', 'worth', 'name', 'icon_id', 'ident', 'qty', 'charges', 'magic', 'kind', 'status', 'weight', 'thrown')
+     short = {'proto': 'p', 'conds': 'c', 'worth': 'w', 'name': 'n', 'icon_id': 'i', 'ident': 'id', 'qty': 'q',
+              'charges': 'ch', 'magic': 'm', 'kind': 'k', 'status': 's', 'weight': 'wt', 'thrown': 't'}
+--- a/proto/ie2toee.py
++++ b/proto/ie2toee.py
+@@ -437,7 +437,35 @@
+     return out
+ 
+ 
+-def write_doors(g, are, wed, tis_for, pl, guidance, sr, bbox, outdir, name, doors_closed):
++def widen_open_door(door, radius, base_flags):
++    """Give a ToEE mover room along the threshold, preserving every closed-state blocker."""
++    rows = {(u, v): [u, v, base, opened, closed] for u, v, base, opened, closed in door['tiles']}
++    x, y = door['loc'][:2]
++    tx, ty = door['toggle_tile']
++    dx, dy = 3 * (tx-x), 3 * (ty-y)
++    length = max(abs(dx), abs(dy), 1)
++    for step in range(-length, length + 1):
++        cx = 3*x + 1 + round(dx * step / length)
++        cy = 3*y + 1 + round(dy * step / length)
++        for i in range(-radius, radius + 1):
++            for j in range(-radius, radius + 1):
++                if i*i + j*j > radius*radius:
++                    continue
++                u, sx = divmod(cx+i, 3)
++                v, sy = divmod(cy+j, 3)
++                bit = (BLOCK0 | FLY0) << (sx+3*sy)
++                row = rows.get((u, v))
++                if row is None:
++                    row = [u, v, base_flags(u, v), 0, 0]
++                removed = row[2] & bit
++                if removed:
++                    row[2] &= ~removed
++                    row[4] |= removed
++                    rows[u,v] = row
++    door['tiles'] = [rows[key] for key in sorted(rows)]
++
++
++def write_doors(g, are, wed, tis_for, pl, guidance, sr, bbox, outdir, name, doors_closed, door_clearance=None):
+     """Per door: default state, ToEE position, per-tile blocking for both states (to switch at runtime), and the
+     'faithful' extra: both WED tile variants as ground-overlay patches (TGA, canvas coords) for a runtime tile swap.
+     Writes <AREA>_doors.json and art/ground/<AREA>_doors/*.tga (derived from the player's files: local only)."""
+@@ -445,6 +473,11 @@
+     U, V, flags_nod, _, _ = build_tile_grid(are.sr_nodoors, pl, guidance, bbox, are.sr_protect, are.lenient)
+     u0, v0 = bbox[0], bbox[2]
+     pdir = os.path.join(outdir, 'art', 'ground', name + '_doors')
++    def base_flags(u, v):
++        a, b = u - u0, v - v0
++        if 0 <= a < flags_nod.shape[0] and 0 <= b < flags_nod.shape[1]:
++            return int(flags_nod[a, b])
++        return 0
+     os.makedirs(pdir, exist_ok=True)
+     closed_set = {n.lower() for n in doors_closed}
+     doors = []
+@@ -454,9 +487,7 @@
+         m_closed = door_cell_masks(d['closed_cells'], pl, sr.shape)
+         tiles = []
+         for (u, v) in sorted(set(m_open) | set(m_closed)):
+-            a, b = u - u0, v - v0
+-            base = int(flags_nod[a, b]) if 0 <= a < flags_nod.shape[0] and 0 <= b < flags_nod.shape[1] else 0
+-            tiles.append([u, v, base, m_open.get((u, v), 0), m_closed.get((u, v), 0)])
++            tiles.append([u, v, base_flags(u, v), m_open.get((u, v), 0), m_closed.get((u, v), 0)])
+         cells = d['closed_cells'] or d['open_cells']
+         if cells:   # door object on the ground at the centre of its impeded cells
+             px = np.mean([c[0] for c in cells]) * SR_CELL_W + SR_CELL_W / 2
+@@ -487,6 +518,9 @@
+                  round((u - math.floor(u) - 0.5) * INCH_PER_TILE, 2), round((v - math.floor(v) - 0.5) * INCH_PER_TILE, 2)],
+             toggle_tile=[int(tu), int(tv)], tiles=tiles, patches=patches,
+             wed_primary_closed=bool(wd['closed']) if wd else None))
++        radius = (door_clearance or {}).get(d['wed_id'].lower(), 0)
++        if radius:
++            widen_open_door(doors[-1], radius, base_flags)
+     json.dump(dict(area=name, doors=doors), open(os.path.join(outdir, f'{name}_doors.json'), 'w'), indent=1)
+     # Python 2.7 data module for the Temple+ runtime (ie_doors.py)
+     with open(os.path.join(outdir, f'ie_doors_{name.lower()}.py'), 'w') as f:
+@@ -792,7 +826,8 @@
+     open(os.path.join(mapdir, 'gmesh.gmf'), 'wb').write(struct.pack('<i', 0))
+     open(os.path.join(mapdir, 'gmesh.gmi'), 'wb').write(struct.pack('<i', 0))
+     open(os.path.join(mapdir, 'mapinfo.txt'), 'w').write('')
+-    report['doors'] = write_doors(g, are, wed, tis_for, pl, guidance, sr, bbox, outdir, name, doors_closed)
++    report['doors'] = write_doors(g, are, wed, tis_for, pl, guidance, sr, bbox, outdir, name, doors_closed,
++                                  ag.get('door_clearance_subtiles'))
+     # start = first entrance that lands on a walkable tile
+     def tl(x, y):
+         u, v = pl.ie_to_tile(x, y); return [round(float(u), 2), round(float(v), 2)]
+--- a/proto/ie2toee_preview_iwd2.py
++++ b/proto/ie2toee_preview_iwd2.py
+@@ -192,8 +192,15 @@
+     sa = os.path.join(spw, 'dialogue_actors.txt')     # spawned creatures' own scripts/dialogue: second dialogue pass
+     if os.path.isfile(sa) and open(sa).read().split():
+         run_soft('dialogue + spawnables', dlg_cmd + open(sa).read().split())
++    stores = set()
++    for root, _, files in os.walk(dlg):
++        for name in files:
++            if name.endswith('.py'):
++                with open(os.path.join(root, name), encoding='cp1252') as script:
++                    stores.update(st.lower() for st in re.findall(r'A\.StartStore\(c, "(\w+)"', script.read()))
+     run('items', ['ie_items.py', 'convert', ie, os.path.join(w, 'items'), '--toee', toee] +
+-        sum((['--area', ar, '--objects', '%s=%s' % (ar, os.path.join(w, 'I2' + ar + '_objects.json'))] for ar in ok), []) + tpa)
++        sum((['--area', ar, '--objects', '%s=%s' % (ar, os.path.join(w, 'I2' + ar + '_objects.json'))] for ar in ok), []) +
++        sum((['--store', st] for st in sorted(stores)), []) + tpa)
+     bake = os.path.join(w, 'bake')
+     for ar in ok:
+         md = 'I2' + ar; ox, oy = json.load(open(os.path.join(w, md + '_objects.json')))['placement']['canvas_offset']
+--- a/proto/guidance/iwd2.json
++++ b/proto/guidance/iwd2.json
+@@ -194,7 +194,8 @@
+     },
+     "AR1105": {
+       "map": 5046,
+-      "ground": 965
++      "ground": 965,
++      "door_clearance_subtiles": {"door2": 5}
+     },
+     "AR1106": {
+       "map": 5047,
+--- a/proto/guidance/creatures_iwd.json
++++ b/proto/guidance/creatures_iwd.json
+@@ -1339,6 +1339,7 @@
+   "overrides": {}
+  },
+  "resref_families": {
++  "10dop": {"id": "resref_10dop", "label": "Doppelganger", "proto": 14000, "status": "stand-in", "notes": "Human form for the disguised Targos shapechanger. Its CRE supplies the stats and initial hidden state."},
+   "_doc": "cre resref -> family (beats the animation family): IWD2 summons with no or the wrong animation match",
+   "00sdrat": {"label": "Dire rat", "proto": 14056, "status": "match", "id": "resref_00sdrat"},
+   "00sair16": {"label": "Air elemental (huge)", "proto": 14292, "status": "match", "scale": 120, "notes": "Large air elemental scaled up; Co8 huge 14900", "id": "resref_00sair16"},
+--- a/proto/runtime/ie_runtime.py
++++ b/proto/runtime/ie_runtime.py
+@@ -95,7 +95,8 @@
+ 
+ # ------------------------------------------------------------------------------------------------ context
+ class Ctx(object):
+-    def __init__(self, me, other=None, ident='', area='', events=None):
++    def __init__(self, me, other=None, ident='', area='', events=None, dialogue=False):
++        self.dialogue = dialogue
+         self.me, self.other, self.ident, self.area = me, other, ident, area
+         self.events = events or {}
+         self.last_trigger = None
+@@ -160,6 +161,23 @@
+     except ImportError:
+         pass
+ 
++def area_spawn_allowed(spec):
++    """Read the encounter size for this visit from the source ARE's party-level mask."""
++    placement = spec.get('area_spawn')
++    if not placement:
++        return True
++    area, mask, second, third = placement
++    key = area + ':ie2toee_spawn_difficulty'
++    rank = ie_vars.get(key)
++    if not rank:
++        if not game.party:
++            return True
++        level = sum(pc.stat_level_get(stat_level) for pc in game.party) // len(game.party)
++        rank = 3 if third and level >= third else 2 if second and level >= second else 1
++        ie_vars.put(key, rank)
++    return bool(mask & (1 << (rank - 1)))
++
++
+ def _party():
+     if not IN_GAME:
+         return []
+@@ -182,16 +200,26 @@
+         return name
+     n = name.lower()
+     base = inner if inner is not None else c.me
++    if n in ('lastseenby', 'lastmarkedobject'):
++        ie_vars._check()
++        return ie_vars.SEEN_OBJECTS.get(_key(base))
+     if n in ('myself',):
+         return c.me
+     if n in ('nothing',):
+         return None
+-    if n in ('protagonist', 'player1', 'lasttalkedtoby', 'lastheardby', 'lastseenby', 'lasttrigger', 'gabber'):
++    if n == 'protagonist':
++        # IWD2's CHARNAMEISGABBER rule. Player1 remains the first portrait.
++        party = _party()
++        if c.dialogue and c.other in party:
++            return c.other
++        selected = getattr(game, 'selected', ()) if IN_GAME else ()
++        return next((pc for pc in party if pc in selected), party[0] if party else _pc(c))
++    if n in ('player1', 'lasttalkedtoby', 'lastheardby', 'lasttrigger', 'gabber'):
+         if n == 'lasttalkedtoby' or n == 'gabber':
+             return _pc(c)
+         if n in ('lasttrigger',) and c.last_trigger is not None:
+             return c.last_trigger
+-        if n == 'lastheardby' or n == 'lastseenby':
++        if n == 'lastheardby':
+             return _pc(c)
+         p = _party()
+         return p[0] if p else _pc(c)
+@@ -248,7 +276,8 @@
+         return name
+     if IN_GAME:
+         for k, (ident, area) in _bound.items():
+-            if ident.lower() == name.lower() or re.sub(r'^\d+', '', ident.lower()) == name.lower():   # IWD2 10hedron = "Hedron"
++            if (ident.lower() == name.lower() or re.sub(r'^\d+', '', ident.lower()) == name.lower()
++                    or (c and area == c.area and script_name(ident, area).lower() == name.lower())):   # IWD2 10hedron = "Hedron"
+                 try:
+                     o = game.get_obj_by_id(k)
+                     if o:
+@@ -284,7 +313,7 @@
+         p = _party()
+         return p[0] if p else None
+     if ea in (255, 200) or ea == 'ENEMY' or ea == 'EVILCUTOFF':
+-        return _nearest_enemy(c.me)
++        return _nearest_enemy(c.me, enemy_allegiance=True)
+     log_once('filt:%r' % (sorted(filt.items()),), 'IE_UNSUPPORTED object filter %r' % (filt,))
+     return None
+ 
+@@ -351,15 +380,15 @@
+         return False
+     return _kos(o if a else me)
+ 
+-def _nearest_enemy(me):
++def _nearest_enemy(me, enemy_allegiance=False):
+     if not IN_GAME or me is None:
+         return None
+     best = None
+     try:
+         for o in game.obj_list_vicinity(me.location, OLC_CRITTERS):
+-            if o == me or _dead(o):
++            if o == me or _dead(o) or o.object_flags_get() & (OF_OFF | OF_DONTDRAW):
+                 continue
+-            hostile = _hostile(me, o)
++            hostile = _kos(o) if enemy_allegiance else _hostile(me, o)
+             if hostile and (best is None or me.distance_to(o) < me.distance_to(best)):
+                 best = o
+     except Exception as e:
+@@ -507,14 +536,25 @@
+             return o is not None and _dead(o)
+         o = N(c, name)
+         return o is None or _dead(o)
+-    def See(self, c, obj, *unused):   # IWD2 See(O, I:SkipHidden)
++    def See(self, c, obj, *see_dead):
++        if obj is None or (not any(see_dead) and _dead(obj)) or not self.LOS(c, obj, 0):
++            return False
++        if obj != c.me:
++            ie_vars._check()
++            ie_vars.SEEN_OBJECTS[_key(c.me)] = obj
++        return True
++    def LOS(self, c, obj, rng):
+         if obj is None or c.me is None or not IN_GAME:
+             return False
+         try:
+-            return c.me.distance_to(obj) < 40 and c.me.can_see(obj)
++            if obj.object_flags_get() & (OF_OFF | OF_DONTDRAW):
++                return False
++            if c.me.distance_to(obj) < 40 and c.me.can_see(obj):
++                c.last_trigger = obj
++                return True
+         except Exception:
+-            return False
+-    def LOS(self, c, obj, rng): return self.See(c, obj)
++            pass
++        return False
+     def Range(self, c, obj, rng=None, *unused):   # IWD2 adds a comparison arg; Range(rng) = the caller's target
+         if rng is None:
+             return False
+@@ -555,6 +595,16 @@
+             return False
+         e = ie_itemrt.entry(res)
+         return len([it for it in ie_itemrt._inv(holder) if not ie_itemrt.matches(it, e)]) == count
++    def TimeGT(self, c, hour): return IN_GAME and game.time.time_game_in_hours(game.time) > hour
++    def TimeLT(self, c, hour): return IN_GAME and game.time.time_game_in_hours(game.time) < hour
++    def ItemIsIdentified(self, c, res, obj):
++        holders = (obj,) if obj is not None else _party()
++        for holder in holders:
++            it = item_find(holder, res)
++            if it and it.obj_get_int(obj_f_item_flags) & OIF_IDENTIFIED:
++                return True
++        return False
++
+     def PartyHasItem(self, c, res):
+         for pc in _party():
+             if item_find(pc, res):
+@@ -586,9 +636,10 @@
+             return False
+         # IE range is in search-map units (~16 px); a ToEE tile is ~28 px along its axes -> about rng/2 tiles
+         return (lx - u) ** 2 + (ly - v) ** 2 <= (2 + rng / 2.0) ** 2
+-    def CreatureHidden(self, c, obj=None):
+-        o = obj or c.me
+-        return IN_GAME and o is not None and (o.object_flags_get() & OF_OFF) != 0
++    def CreatureHidden(self, c, *target):
++        # An unresolved named actor cannot be the caller's visible alternate form.
++        obj = target[0] if target else c.me
++        return obj is None or (IN_GAME and (obj == OBJ_HANDLE_NULL or bool(obj.object_flags_get() & OF_OFF)))
+     def IsScriptName(self, c, name, obj=None):
+         o = obj or c.me
+         return o is not None and _bound.get(_key(o), ('',))[0].lower() in (name.lower(),) 
+@@ -629,8 +680,8 @@
+     'race': {1: 0, 2: 1, 3: 6, 4: 2, 5: 4, 6: 3, 7: 5},      # IE race.ids -> ToEE race (human elf dwarf gnome halfelf halforc halfling)
+     'class': {1: 'class_wizard', 2: 'class_fighter', 3: 'class_cleric', 4: 'class_rogue', 5: 'class_bard',
+               6: 'class_paladin', 11: 'class_druid', 12: 'class_ranger', 20: 'class_sorcerer', 21: 'class_monk'},
+-    'stat': {38: 'stat_strength', 39: 'stat_intelligence', 40: 'stat_wisdom', 41: 'stat_dexterity',
+-             42: 'stat_constitution', 43: 'stat_charisma', 34: 'stat_level'},
++    'stat': {34: 'stat_level', 36: 'stat_strength', 38: 'stat_intelligence', 39: 'stat_wisdom',
++             40: 'stat_dexterity', 41: 'stat_constitution', 42: 'stat_charisma'},
+ }
+ 
+ def _cmp_stat(c, obj, kind, ieval):
+@@ -641,8 +692,8 @@
+             want = MAPS['race'].get(ieval)
+             return want is not None and obj.stat_level_get(stat_race) == want
+         if kind == 'class':
+-            want = MAPS['class'].get(ieval)
+-            return want is not None and obj.stat_level_get(globals()[want]) > 0
++            stats = CLASS_LEVELS.get(ieval, ())
++            return bool(stats) and all(obj.stat_level_get(globals()[stat]) > 0 for stat in stats)
+         if kind == 'align':
+             a = obj.critter_get_alignment()
+             return _align_match(ieval, a)
+@@ -712,7 +763,7 @@
+     """Called from the generated san_dialog. `states` = [(state_line, cond_fn)] in IE evaluation order (state
+     trigger table order); the first whose condition holds is the entry line. NumTimesTalkedTo counts up after."""
+     ident, area = who(npc, ident, area)
+-    c = Ctx(npc, pc, ident, area)
++    c = Ctx(npc, pc, ident, area, dialogue=True)
+     bind(npc, ident, area)
+     line = None
+     for ln, cond in states:
+@@ -743,7 +794,7 @@
+ def dlg_cond(npc, pc, ident, area, fn):
+     ident, area = who(npc, ident, area)
+     try:
+-        return bool(fn(Ctx(npc, pc, ident, area)))
++        return bool(fn(Ctx(npc, pc, ident, area, dialogue=True)))
+     except Exception as e:
+         log('IE_ERR dialog condition %s: %s' % (ident, e))
+         return False
+@@ -751,7 +802,7 @@
+ def dlg_do(npc, pc, ident, area, actions, journal=None):
+     """Dialogue transition effect: run the IE actions (queued on the NPC, like the IE) and note journal text."""
+     ident, area = who(npc, ident, area)
+-    c = Ctx(npc, pc, ident, area)
++    c = Ctx(npc, pc, ident, area, dialogue=True)
+     if journal is not None:
+         journal_add(journal[0], journal[1]) if isinstance(journal, tuple) else log('JOURNAL %s' % journal)
+     run_actions(c, actions)
+@@ -875,6 +926,9 @@
+         log('ENEMY %s' % c.ident)
+         if IN_GAME and c.me is not None:
+             try:
++                # A civilian that reveals itself as an enemy no longer speaks
++                # for the town. Remove its shared faction before combat starts.
++                set_town_faction(c.me,'hostile')
+                 c.me.npc_flag_set(ONF_KOS)
+                 if c.me.object_flags_get() & OF_OFF:
+                     return            # still hidden (IE: an ENEMY that waits hidden); attacks once shown
+@@ -909,15 +963,20 @@
+         log('DESTROY %s' % c.ident)
+         if IN_GAME and c.me is not None:
+             c.me.destroy()
+-    def AddXPVar(self, c, name, xp):
+-        log('XP party %d (%s)' % (xp, name))
++    def AddXPVar(self, c, name, strref):
++        xp = XP2DA.get(name.strip().upper())
++        if xp is None:
++            log_once('xp:' + name, 'IE_XP unknown EXPTABLE entry ' + name)
++            return
++        self.AddexperienceParty(c, xp)
++    AddXpVar = AddXPVar
++    def AddexperienceParty(self, c, xp):
++        log('XP party %d' % xp)
+         for pc in _party():
+             try:
+                 pc.award_experience(xp // max(1, len(_party())))
+             except Exception:
+                 pass
+-    AddXpVar = AddXPVar
+-    def AddexperienceParty(self, c, xp): self.AddXPVar(c, '', xp)
+     def GiveItem(self, c, res, obj):
+         if obj is not None and IN_GAME:
+             it = item_find(c.me, res)
+@@ -930,10 +989,6 @@
+         if obj is not None and IN_GAME:
+             item_give(res, obj)
+         log('CREATE_ITEM %s' % res)
+-    def DestroyItem(self, c, res):
+-        it = item_find(c.me, res)
+-        if it:
+-            it.destroy()
+     def Lock(self, c, obj):
+         if IN_GAME and obj:
+             if obj.type == obj_t_container:
+@@ -947,6 +1002,33 @@
+                 it = item_find(pc, res)
+                 if it:
+                     it.destroy(); return
++    def TakePartyItemNum(self, c, res, count):
++        if not IN_GAME or c.me is None:
++            return
++        for pc in _party():
++            while count > 0:
++                item = item_find(pc, res)
++                if not item:
++                    break
++                field = None
++                if item.type == obj_t_ammo:
++                    field = obj_f_ammo_quantity
++                elif item.type == obj_t_money:
++                    field = obj_f_money_quantity
++                quantity = max(1, item.obj_get_int(field)) if field is not None else 1
++                if quantity > count:
++                    part = ie_itemrt.give(res, c.me, count)
++                    if part:
++                        item.obj_set_int(field, quantity - count)
++                    return
++                c.me.item_get(item)
++                if item_find(pc, res) == item:
++                    return
++                count -= quantity
++    def DestroyItem(self, c, res):
++        item = item_find(c.me, res) if IN_GAME and c.me is not None else None
++        if item:
++            item.destroy()
+     def TakePartyGold(self, c, gp):
+         log('TAKE_GOLD %d' % gp)
+         if IN_GAME:
+@@ -1038,7 +1120,7 @@
+         xp = XP2DA.get(row.upper())
+         log('XP2DA %s -> %s' % (row, xp))
+         if xp:
+-            self.AddXPVar(c, row, xp)
++            self.AddexperienceParty(c, xp)
+     def RevealAreaOnMap(self, c, area): log('REVEAL %s' % area)
+     def StartMovie(self, c, res):
+         log('MOVIE %s' % res)
+@@ -1127,8 +1209,12 @@
+     def SetSavedLocation(self, c):
+         if IN_GAME and c.me is not None:
+             _saved[c.ident] = c.me.location
+-    def SetSavedLocationPoint(self, c, pt, *args):
+-        u, v = ie_to_tile(c.area, pt[0], pt[1]); _saved[c.ident] = location_from_axis(u, v)
++    def SetSavedLocationPoint(self, c, x, y=None, facing=None):
++        # IWD2 takes three integers. Older generated scripts pass a point.
++        if isinstance(x, (tuple, list)):
++            x, y = x
++        u, v = ie_to_tile(c.area, x, y)
++        _saved[c.ident] = location_from_axis(u, v)
+     def JumpToSavedLocation(self, c):
+         loc = _saved.get(c.ident)
+         if IN_GAME and c.me is not None and loc:
+@@ -1360,9 +1446,11 @@
+ 
+ # IE area -> ToEE map id (+ placements), written by the converter as ie_areas.py
+ AREA_MAPS = {}
++CLASS_LEVELS = dict((code, (name.replace('class_', 'stat_level_'),)) for code, name in MAPS['class'].items())
+ try:
+     import ie_areas
+     AREA_MAPS = ie_areas.MAPS
++    CLASS_LEVELS = getattr(ie_areas, 'CLASS_LEVELS', CLASS_LEVELS)
+     for _a, _p in getattr(ie_areas, 'PLACEMENTS', {}).items():
+         set_placement(_a, *_p)
+ except ImportError:
+@@ -1643,6 +1731,15 @@
+                 break
+             except Exception:
+                 pass
++        try:
++            import ie_spawnables
++            data = ie_spawnables.INI_SPAWNS.get(re.sub('^I2', '', area), {})
++            for group in data.get('enter', []) + data.get('events', []):
++                for spawn in group.get('critters', []):
++                    if spawn.get('ident') and spawn.get('script_name'):
++                        m[spawn['ident'].lower()] = spawn['script_name']
++        except ImportError:
++            pass
+         _actor_names[area] = m
+     return _actor_names[area].get(ident.lower())
+ 
+--- a/proto/runtime/ie_vars.py
++++ b/proto/runtime/ie_vars.py
+@@ -18,6 +18,7 @@
+ EXT = '.iev'
+ 
+ STORE = {}
++SEEN_OBJECTS = {}  # Transient actor handles, cleared on new game and load.
+ _state = {'token': None, 'hooked': False, 'last_file': None}
+ _log = [None]          # optional logger (ie_runtime.log)
+ 
+@@ -52,6 +53,7 @@
+         return None
+ 
+ def clear(reason=''):
++    SEEN_OBJECTS.clear()
+     STORE.clear(); _state['token'] = None
+     if reason:
+         _say('clear (%s)' % reason)
+@@ -68,6 +70,7 @@
+         return
+     if STORE:
+         _say('store of another game/save dropped (token %r, game %r): %d vars' % (_state['token'], t, len(STORE)))
++    SEEN_OBJECTS.clear()
+     STORE.clear()
+     nt = random.randint(1, 0x7fffffff)
+     _state['token'] = nt; _gv(g, nt)
+@@ -100,6 +103,7 @@
+     import json
+     d = json.loads(text)
+     vs = d.get('vars') or {}
++    SEEN_OBJECTS.clear()
+     STORE.clear()
+     for k, v in vs.items():
+         STORE[str(k)] = int(v)
+--- a/proto/runtime/ie_critters.py
++++ b/proto/runtime/ie_critters.py
+@@ -55,6 +55,12 @@
+             o.obj_set_idx_int(f, idx, v)
+     except Exception, e:
+         _log('  set %s failed: %s' % (field, e))
++
++def passive_prop(o, s):
++    if s.get('family') == 'keg':
++        o.npc_flag_unset(ONF_KOS)
++        o.npc_flag_set(ONF_NO_ATTACK)
++        o.critter_flag_set(OCF_NO_FLEE)
+ 
+ def apply(o, s):
+     """Apply a converted stat block to a freshly created critter."""
+@@ -102,6 +108,7 @@
+         o.npc_flag_set(ONF_KOS)
+     else:
+         o.npc_flag_unset(ONF_KOS)
++    passive_prop(o, s)
+     if s.get('no_flee') and _c('ONF_NO_FLEE') is not None:  # not a vanilla flag; Temple+ AI reads morale elsewhere
+         o.npc_flag_set(_c('ONF_NO_FLEE'))
+     if s.get('invulnerable') and _c('OF_INVULNERABLE') is not None:
+@@ -219,8 +226,9 @@
+     """to_tile(x, y) -> (tile x, tile y) for IE area pixels (ie_runtime.ie_to_tile). Returns [(spec, obj)]."""
+     LOG[0] = log_path
+     out = []
++    import ie_runtime
+     for s in specs:
+-        if filt and not filt(s):
++        if (filt and not filt(s)) or not ie_runtime.area_spawn_allowed(s):
+             continue
+         u, v = to_tile(s['x'], s['y'])
+         try:
+--- a/proto/runtime/ie_bakert.py
++++ b/proto/runtime/ie_bakert.py
+@@ -46,6 +46,7 @@
+ def finalize_critter(o, d, F):
+     import ie_critters
+     s = d['spec']
++    ie_critters.passive_prop(o, s)
+     mark = F['npc_pad_i_3']
+     first = o.obj_get_int(mark) != STAMP
+     if first:
+@@ -118,6 +119,19 @@
+     return 1
+ 
+ 
++def omit_placement(o, spec):
++    if not spec.get('area_spawn'):
++        return False
++    import ie_runtime
++    if ie_runtime.area_spawn_allowed(spec):
++        return False
++    if o and o != OBJ_HANDLE_NULL:
++        ie_runtime._bound.pop(o.id, None)
++        ie_runtime._bound.pop(_guid(o), None)
++        o.destroy()
++    return True
++
++
+ def area_pass(area):
+     """Finalize every baked object of the area that is still in the world, attach the doors."""
+     m = _data(area)
+@@ -131,9 +145,14 @@
+     before_siege = area == 'I2AR1200' and not any(rt.get_var(None, flag, 'GLOBAL') for flag in
+         ('Goblins_Attack_Palisade', '1200_BATTLE_SETUP', 'Goblin_Palisade_Quest'))
+     F = m.FIELDS
+-    n = {'npc': 0, 'item': 0, 'missing': 0, 'first': 0}
++    n = {'npc': 0, 'item': 0, 'missing': 0, 'first': 0, 'omitted': 0}
+     holders = []
+     for g, d in m.OBJS.items():          # items first: the wielder's status init then sees their conditions
++        if d['k'] == 'container':
++            box = game.get_obj_by_id(g)
++            if box and box != OBJ_HANDLE_NULL:
++                box.object_flag_set(OF_NO_BLOCK)
++            continue
+         if d['k'] != 'item':
+             continue
+         o = game.get_obj_by_id(g)
+@@ -144,12 +163,15 @@
+     for g, d in m.OBJS.items():
+         if d['k'] != 'npc':
+             continue
++        o = game.get_obj_by_id(g)
++        if omit_placement(o, d['spec']):
++            n['omitted'] += 1
++            continue
+         ident = d['spec'].get('ident')
+         if ident:
+             # OF_OFF actors receive no engine heartbeat. Register the baked GUID for
+             # hidden_tick and named cutscene actions even before its sector is loaded.
+             rt._bound[g] = (ident, m.AREA)
+-        o = game.get_obj_by_id(g)
+         if o == OBJ_HANDLE_NULL or o is None:
+             n['missing'] += 1; continue
+         n['npc'] += 1
+@@ -163,8 +185,8 @@
+         nd = ie_doors.start(area)
+     except ImportError:
+         pass
+-    _log('IE_BAKE %s pass: %d npcs, %d items, %d newly finalized, %d not in world, %d doors attached' % (
+-        area, n['npc'], n['item'], n['first'], n['missing'], nd))
++    _log('IE_BAKE %s pass: %d npcs, %d items, %d newly finalized, %d not in world, %d doors attached, %d omitted by level' % (
++        area, n['npc'], n['item'], n['first'], n['missing'], nd, n['omitted']))
+     return 1
+ 
+ 
+@@ -205,6 +227,10 @@
+     except Exception, e:
+         _log('IE_BAKE intro movie failed: %s' % e)
+     a = area.upper(); g = _guid(o)
++    # Sectors can load after the area pass. Apply the same gate on their first heartbeat.
++    data = _data(a) or _data('I2' + a)
++    if data and omit_placement(o, data.OBJS.get(g, {}).get('spec', {})):
++        return
+     seen = _members.get(a)
+     now = time.time()
+     if seen is not None and (not seen.has_key(g) or now - _last[a] < 2.0):
+--- a/proto/runtime/ie_itemrt.py
++++ b/proto/runtime/ie_itemrt.py
+@@ -147,7 +147,7 @@
+ def give(res, holder, qty=None):
+     o = make(res, holder.location, qty)
+     if o is not None:
+-        holder.item_get(o)
++        transfer(holder, o)
+     return o
+ 
+ 
+@@ -175,6 +175,24 @@
+ 
+ def matches(item, e):
+     return e and item.proto == e['p'] and (not e.get('n') or item.obj_get_int(_field('obj_f_description')) == e['n'])
++
++
++def transfer(holder, item):
++    """Keep different magical IE items on the same ToEE base prototype in separate stacks."""
++    flags = item.item_flags_get()
++    if not (flags & OIF_IS_MAGICAL and flags & OIF_IDENTIFIED):
++        return holder.item_get(item)
++    description = _field('obj_f_description')
++    if not any(other.proto == item.proto and other.obj_get_int(description) != item.obj_get_int(description)
++               for other in _inv(holder)):
++        return holder.item_get(item)
++    # Temple+ combines identified potions by prototype and spell. It would discard the incoming
++    # object's IE identity in favour of the receiving stack's name. Keep this transfer separate.
++    item.item_flag_unset(OIF_IDENTIFIED)
++    try:
++        return holder.item_get(item)
++    finally:
++        item.item_flag_set(OIF_IDENTIFIED)
+ 
+ 
+ def find(holder, res):
+@@ -200,6 +218,7 @@
+             continue
+         loc = location_from_axis(int(c['toee'][0]), int(c['toee'][1]))
+         box = game.obj_create(c['proto'], loc)
++        box.object_flag_set(OF_NO_BLOCK)
+         got = []
+         for res, q in c['items']:
+             it = make(res, loc, q > 1 and q or None)
+@@ -238,6 +257,7 @@
+         box = game.obj_create(s.get('container') or 1001, npc.location)
+         box.object_flag_set(OF_DONTDRAW)
+         box.object_flag_set(OF_CLICK_THROUGH)
++        box.object_flag_set(OF_NO_BLOCK)
+         try:
+             npc.substitute_inventory = box
+         except Exception, ex:
+--- a/proto/runtime/ie_travel.py
++++ b/proto/runtime/ie_travel.py
+@@ -115,17 +115,12 @@
+ 
+ 
+ def _attach_doors(area):
+-    """interiors have no baked data: attach their doors on arrival (baked areas do it in ie_bakert.area_pass)"""
+-    try:
+-        __import__('ie_bake_' + area.lower())
+-        return 0                      # baked: ie_bakert attaches the doors on the first heartbeat
+-    except ImportError:
+-        pass
++    """Restore each portal's saved state and collision on arrival, including empty baked rooms."""
+     try:
+         import ie_doors
+         __import__('ie_doors_' + area.lower())
+         n = ie_doors.start(area)
+-        _log('%s: no baked data, attached %d doors' % (area, n))
++        _log('%s: attached %d doors' % (area, n))
+         return n
+     except ImportError:
+         return 0

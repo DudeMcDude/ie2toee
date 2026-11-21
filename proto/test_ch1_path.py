@@ -15,88 +15,31 @@ raises it). Every dialogue is walked through the generated .dlg / py scripts wit
 layer (ie_itemrt) and the engine are mocked. Also checks the install has one script per id (stale-file clash) and
 that Hrothgar's conversations open with each quest state."""
 import os, re, sys, types, glob
+sys.dont_write_bytecode = True
 HERE = os.path.dirname(os.path.abspath(__file__))
 INST = sys.argv[1] if len(sys.argv) > 1 else None
 SCR = DLG = None
 if INST:
-    core = next((d for d in glob.glob(os.path.join(INST, 'modules', '*_core')) if os.path.isdir(os.path.join(d, 'scr'))), None)
-    if not core:
-        sys.exit('%s: no modules/<module>_core/scr' % INST)
+    cores = [d for d in glob.glob(os.path.join(INST, 'modules', '*_core'))
+             if os.path.isfile(os.path.join(d, 'scr', 'ie_areas.py'))]
+    iwd = os.path.join(INST, 'modules', 'IWD_core')
+    if iwd in cores:
+        core = iwd
+    elif len(cores) == 1:
+        core = cores[0]
+    else:
+        sys.exit('%s: could not identify the converted IWD module among %r' % (INST, cores))
     SCR, DLG = os.path.join(core, 'scr'), os.path.join(core, 'dlg')
 sys.path[:0] = [os.path.join(HERE, 'runtime')] + ([SCR] if SCR else [])   # the repo runtime + the generated modules
 
 # ---- mock Temple+ ---------------------------------------------------------------------------------------------
-def location_from_axis(x, y): return x | (y << 32)
-def location_to_axis(l): return l & 0xFFFFFFFF, l >> 32
+from offline_game import install, location_from_axis, location_to_axis
 
-class Obj(object):
-    _n = [0]
-    def __init__(self, name, mp=5018):
-        Obj._n[0] += 1
-        self.id, self.name, self.map, self.location, self.inv = Obj._n[0], name, mp, location_from_axis(480, 470), {}
-        self.dialog = None
-    def begin_dialog(self, npc, line): self.dialog = (npc, line)
-    def turn_towards(self, o): pass
-    def float_text_line(self, *a): pass
-    def float_line(self, *a): pass
-    def distance_to(self, o): return 1.0
-    def object_script_execute(self, other, evt):      # (only san_dialog is used: Dialogue/StartDialog)
-        mod = getattr(self, 'script_mod', None)
-        if mod is not None:
-            mod.san_dialog(self, other)
-        elif getattr(other, 'script_mod', None) is not None:
-            other.script_mod.san_dialog(other, self)
-    def __repr__(self): return 'Obj(%s)' % self.name
-REG = {}
-
-class Game(object):
-    def __init__(self):
-        self.party, self.events, self.teleports, self.movies, self.played = [], [], [], [], []
-        self.global_vars = {}
-    @property
-    def leader(self): return self.party[0]
-    def timeevent_add(self, fn, args, ms, real=0): self.events.append((fn, args))
-    def fade_and_teleport(self, t, tb, mv, mp, x, y):
-        self.teleports.append((mp, x, y))
-        for o in self.party:
-            o.map, o.location = mp, location_from_axis(x, y)
-    def fade(self, *a): pass
-    def moviequeue_add(self, m): self.movies.append(m)
-    def moviequeue_play(self): self.played.append(list(self.movies)); del self.movies[:]
-    def obj_list_vicinity(self, *a): return []
-    def scroll_to(self, *a): pass
-    def get_obj_by_id(self, g): return REG.get(g)
-
-class Clock(object):
-    t = 1000
-    def time_game_in_seconds(self, x): return self.t
-
-class GV(dict):
-    def __getitem__(self, k): return dict.get(self, k, 0)
-
-game = Game(); game.global_vars = GV(); game.time = Clock()
-toee = types.ModuleType('toee')
-for k, v in dict(game=game, OBJ_HANDLE_NULL=None, OLC_CRITTERS=0, OLC_NPC=0, RUN_DEFAULT=1, SKIP_DEFAULT=0, san_dialog=9,
-                 location_from_axis=location_from_axis, location_to_axis=location_to_axis).items():
-    setattr(toee, k, v)
-sys.modules['toee'] = toee
-ut = types.ModuleType('utilities'); ut.location_from_axis, ut.location_to_axis = location_from_axis, location_to_axis
-sys.modules['utilities'] = ut
-class _Tok(object):
-    def __init__(self, holder, res): self.h, self.r = holder, res
-    def destroy(self): self.h.inv.pop(self.r, None)
-itemrt = types.ModuleType('ie_itemrt')                      # (py2-only engine modules: item layer mocked)
-itemrt.find = lambda h, res: _Tok(h, res.lower()) if res.lower() in h.inv else None
-itemrt.give = lambda res, h: h.inv.__setitem__(res.lower(), 1)
-sys.modules['ie_itemrt'] = itemrt
-bakert = types.ModuleType('ie_bakert'); bakert.first_heartbeat = lambda o, area: None
-sys.modules['ie_bakert'] = bakert
-spawn = types.ModuleType('ie_spawn'); spawn.hook_rest = spawn.area_spawns = spawn.tick = lambda *a: None
-sys.modules['ie_spawn'] = spawn
-
+game = install()
 import ie_runtime as rt
 from ie_runtime import T, A
 import ie_cutscene
+rt._real = lambda: game.t
 
 fails = []
 def check(name, ok, info=''):
@@ -104,25 +47,18 @@ def check(name, ok, info=''):
     if not ok:
         fails.append(name)
 
-def flush(n=50):
-    """run the queued time events (IE waits / queued actions), like the game clock would"""
+def flush(n=500):
+    """Advance simulated time until the script queue empties or the tick budget is spent."""
     for _ in range(n):
-        game.time.t += 10
         if not game.events:
             return
-        ev = list(game.events); del game.events[:]
-        for fn, args in ev:
-            try:
-                fn(*args)
-            except Exception as e:
-                print('  (time event %s: %s)' % (getattr(fn, '__name__', fn), e))
+        game.tick()
 
 def reset(maps=None):
-    game.global_vars.clear(); rt.VARS.clear(); game.teleports[:] = []; game.played[:] = []
-    rt._leave[:] = [None, 0.0]
+    game.reset()
     if maps:
         rt.AREA_MAPS.update(maps)
-    game.party[:] = [Obj('pc1'), Obj('pc2'), Obj('pc3')]
+    game.party.extend(game.spawn(name) for name in ('pc1', 'pc2', 'pc3'))
 
 # ---- runtime part (no IE data) ---------------------------------------------------------------------------------
 mv = types.ModuleType('ie_movies_data')
@@ -137,6 +73,37 @@ if not SCR:
     sys.modules['ie_travel_data'] = tvd
 reset({'AR2000': 5051, 'AR1006': 5018})
 c = rt.Ctx(game.party[0], None, 'area_AR1006', 'AR1006')
+from unittest.mock import patch
+from ie_dialogue import xplist_rewards
+class QuestXPTable:
+    def read(self, name, ext):
+        assert (name, ext) == ('xplist', '2da')
+        return b'2DA V1.0\n0\nCOMMENT 0 1 2\nexample cmt P_300 P_600 350\nfixed cmt P_900 P_900 P_900'
+
+with patch.dict(rt.XP2DA, xplist_rewards(QuestXPTable()), clear=True):
+    game.party[1].abilities['level_fighter'] = 2
+    A.AddXP2DA(c, 'example')
+    A.AddXP2DA(c, 'FIXED')
+    A.AddXP2DA(c, 'missing')
+    check('shared and personal XP by level, including fixed rows and unknown labels',
+          [pc.experience for pc in game.party] == [500, 650, 500])
+    rt.XP2DA['LEGACY'] = 60
+    A.AddXP2DA(c, 'legacy')
+    check('existing scalar XP tables remain readable', game.party[0].experience == 520)
+giver = game.spawn('reward giver')
+giver.money_adj(700)
+reward_context = rt.Ctx(giver, game.party[0])
+A.GivePartyGold(reward_context, 5)
+A.GivePartyGold(reward_context, 5)
+check('quest giver pays from available gold once', (giver.money_get(), game.party[0].money_get()) == (0, 700))
+A.GivePartyGold(rt.Ctx(game.party[0]), 2)
+A.GivePartyGold(rt.Ctx(None, None, 'area_AR1000'), 3)
+check('area rewards and party-owned gold use the party purse once', game.party[0].money_get() == 1000)
+for difficulty in range(1, 6):
+    with patch.dict(os.environ, IE2TOEE_DIFFICULTY=str(difficulty)):
+        check('difficulty %d, Normal and Hard encounter gates' % difficulty,
+              T.Difficulty(c, difficulty) and T.DifficultyLT(c, 4) == (difficulty < 4)
+              and T.DifficultyGT(c, 2) == (difficulty > 2))
 A.IncrementChapter(c, 'CHPTXT1'); A.SetGlobal(c, 'CHAPTER_BREAK_0', 'GLOBAL', 1)     # classic AR1006
 check('IWD prologue break (classic CHPTXT1): CHAPTER stays 0', rt.get_var(c, 'CHAPTER', 'GLOBAL') == 0)
 check('prologue screen: intro movie then the prologue slide, one queue',
@@ -187,13 +154,17 @@ class Actor(object):
         self.path = path; self.sid = int(os.path.basename(path)[2:7])
         self.mod = __import__(os.path.basename(path)[:-3])
         self.dlg = load_dlg(os.path.join(DLG, os.path.basename(path)[2:-3] + '.dlg'))    # py01187ie_x.py -> 01187ie_x.dlg
-        self.obj = Obj(self.mod.IDENT, rt.AREA_MAPS.get(self.mod.AREA, 0))
-        self.obj.script_mod = self.mod; REG[self.obj.id] = self.obj
+        self.obj = game.spawn(self.mod.IDENT, rt.AREA_MAPS.get(self.mod.AREA, 0))
+        self.obj.script_mod = self.mod
     def _ev(self, expr):
         if not expr:
             return True
         return eval(expr, vars(self.mod), {'npc': self.obj, 'pc': game.leader})
     def start(self):
+        game.objects[self.obj.id] = self.obj
+        if game.area_scripts and self.obj.map and self.obj.map != game.leader.map:
+            game.fade_and_teleport(0, 0, 0, self.obj.map, *location_to_axis(self.obj.location))
+            game.tick()
         pc = game.leader; pc.dialog = None
         self.mod.san_dialog(self.obj, pc)
         return pc.dialog and pc.dialog[1]
@@ -231,18 +202,20 @@ class Actor(object):
 if SCR:
     import ie_areas
     rt.AREA_MAPS.update(ie_areas.MAPS)
-    try:
-        rt._placement.update(dict((k.lower(), v + (1.0, 8428, -4366)) for k, v in ie_areas.PLACEMENTS.items()))
-    except Exception:
-        pass
     reset()
-    ids = {}
-    for f in os.listdir(SCR):
-        m = re.match(r'py(\d{5})', f)
-        if m:
-            ids.setdefault(m.group(1), []).append(f)
-    clash = dict((k, v) for k, v in ids.items() if len(v) > 1)
-    check('one script per id in the install (no stale-file clash)', not clash, clash)
+    ambiguous = False
+    for directory, pattern, kind in ((SCR, r'py(\d{5}).*\.py', 'script'), (DLG, r'(\d{5}).*\.dlg', 'dialogue')):
+        ids = {}
+        for filename in sorted(os.listdir(directory)):
+            match = re.fullmatch(pattern, filename, re.I)
+            if match and os.path.isfile(os.path.join(directory, filename)):
+                ids.setdefault(match[1], []).append(filename)
+        clashes = {key: names for key, names in ids.items() if len(names) > 1}
+        check('one %s per id in %s' % (kind, directory), not clashes, clashes)
+        if clashes:
+            ambiguous = True
+    if ambiguous:
+        sys.exit('Chapter path requires unambiguous numbered scripts and dialogues.')
     hroths = sorted(glob.glob(os.path.join(SCR, 'py*ie_hroth*.py')))
     pomabs = sorted(glob.glob(os.path.join(SCR, 'py*ie_pomab*.py')))
     check('Hrothgar and Pomab converted', hroths and pomabs, (hroths, pomabs))
@@ -270,19 +243,19 @@ if SCR:
     cradle = next((h for h in H if h.mod.AREA == 'AR1006'), None)
     for o in game.party:
         o.map = rt.AREA_MAPS.get('AR1006')
-    rt._bound.clear(); REG.clear()                    # only the Winter's Cradle Hrothgar is on the map
     if cradle:
-        REG[cradle.obj.id] = cradle.obj
+        game.objects[cradle.obj.id] = cradle.obj
         rt.bind(cradle.obj, cradle.mod.IDENT, 'AR1006')
-    ie_cutscene.STATE['hook'] = 1; ie_cutscene._area.clear(); ie_cutscene.mode(0)
+    game.enable_area_scripts()
     for i in range(8):
-        ie_cutscene.map_tick(rt.AREA_MAPS.get('AR1006'), 1000); flush()
+        game.tick(); flush()
         if cradle and hasattr(cradle.mod, 'san_heartbeat') and not game.leader.dialog:
             try:
                 cradle.mod.san_heartbeat(cradle.obj, None); flush()
             except Exception as e:
                 print('  (Hrothgar heartbeat: %r)' % e)
-        game.time.t += 10
+        for _ in range(10):
+            game.tick()
     check('new game: AR1006 area script ran the prologue break (CHAPTER_BREAK_0 = 1, CHAPTER 0)',
           rt.get_var(None, 'CHAPTER_BREAK_0', 'GLOBAL') == 1 and rt.get_var(None, 'CHAPTER', 'GLOBAL') == 0)
     check('new game: intro movie + prologue slide played first (skippable: Temple+ movie player)',
@@ -295,6 +268,7 @@ if SCR:
 
     # -- the critical path, from a new game
     reset()
+    game.enable_area_scripts()
     steps = []
     for i in range(6):                                       # Know_Hrothgar -> Join_Posse 3 (may take a few talks)
         if rt.get_var(None, 'Caravan_Quest', 'GLOBAL') == 1:
@@ -309,14 +283,19 @@ if SCR:
     check('no List before the caravan is found (Hrothgar line 400 -> 401 "No news")', r and r[1] is None
           and rt.get_var(None, 'Supply_Quest', 'GLOBAL') == 0, r)
     # the caravan: AR1200's trigger region CARATRG1 (Caravan_Quest 2; no fight), entered as runtime/ie_travel does
-    import ie_travel
     tv = __import__('ie_travel_data').AREAS
     trig = [t for a_ in tv.values() for t in a_.get('triggers', []) if t.get('module') == 'ie_bcs_caratrg1_area']
     check('AR1200 caravan trigger region converted (CARATRG1)', trig, sorted(tv))
     if trig:
         xs, ys = zip(*trig[0]['poly'])
-        ie_travel._inside.clear()
-        ie_travel._triggers('AR1200', trig[:1], [game.leader], [(sum(xs) / float(len(xs)), sum(ys) / float(len(ys)))])
+        start = (int(min(xs)) - 5, int(min(ys)) - 5)
+        dest = (round(sum(xs) / len(xs)), round(sum(ys) / len(ys)))
+        game.fade_and_teleport(0, 0, 0, rt.AREA_MAPS['AR1200'], *start)
+        game.tick()
+        check('caravan stays undiscovered outside the trigger', rt.get_var(None, 'Caravan_Quest', 'GLOBAL') == 1)
+        game.leader.run_to(location_from_axis(*dest))
+        for _ in range(max(abs(dest[0] - start[0]), abs(dest[1] - start[1]))):
+            game.tick()
     check('entering the caravan site: Caravan_Quest = 2', rt.get_var(None, 'Caravan_Quest', 'GLOBAL') == 2)
     r = home.talk(r'GiveItemCreate\(c, "List"'); steps.append(('hrothgar list', r))
     check('Hrothgar gives the List, Supply_Quest = 1', rt.get_var(None, 'Supply_Quest', 'GLOBAL') == 1
@@ -325,7 +304,11 @@ if SCR:
     r = P.talk(r'TakePartyItem\(c, "List"'); steps.append(('pomab', r))
     check('Pomab takes the List, Supply_Quest = 2', rt.get_var(None, 'Supply_Quest', 'GLOBAL') == 2
           and not T.PartyHasItem(rt.Ctx(game.leader), 'List'), r)
+    # Stage the journey from Pomab's shop back to Hrothgar's house.
+    game.fade_and_teleport(0, 0, 0, home.obj.map, *location_to_axis(home.obj.location))
+    game.tick()
     game.teleports[:] = []
+    game.played[:] = []
     r = home.talk(r'StartCutScene\(c, "EHHrothM"'); steps.append(('hrothgar depart', r))
     check('Hrothgar state 210 -> "Let us be off" -> EHHROTHM', r is not None and r[0] == 210 and r[1], r)
     flush()
@@ -334,16 +317,14 @@ if SCR:
           [t[0] for t in tp] == [rt.AREA_MAPS.get('AR2000')], tp)
     check('cutscene mode ended after the jump', not ie_cutscene.active())
     # arrival: AR2000's area script (first map tick on the new map)
-    game.played[:] = []
-    ie_cutscene.STATE['hook'] = 1; ie_cutscene._area.clear()
-    ie_cutscene.map_tick(rt.AREA_MAPS.get('AR2000'), 1000); flush()
+    game.tick(); flush()
     first = list(game.played)
-    ie_cutscene.map_tick(rt.AREA_MAPS.get('AR2000'), 1000); flush()
+    game.tick(); flush()
     av = MOV.get('avalanch')
     if 'ie_bcs_ar2000_area' in ie_areas.SCRIPTS.values():
         src = open(os.path.join(SCR, 'ie_bcs_ar2000_area.py'), encoding='cp1252').read()
         if 'AVALANCH' in src:      # classic IWD (IWD:EE plays it in EHHROTHM before the jump)
-            check('AR2000 first entry plays AVALANCH once', av and first == [av] and game.played == first, game.played)
+            check('AR2000 first entry plays AVALANCH once', av and first.count(av) == 1 and game.played == first, game.played)
         check('AR2000_INIT / AR2000_visited set by the area script', rt.get_var(None, 'AR2000_INIT', 'GLOBAL') == 1
               or rt.get_var(None, 'AR2000_visited', 'GLOBAL') == 1)
     else:

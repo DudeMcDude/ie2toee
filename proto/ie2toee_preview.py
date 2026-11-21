@@ -16,14 +16,16 @@ engine bake), so they win.
 The result is <out>/install: copy its contents into the ToEE folder (or pass --install to do that).
 Nothing of the IE game is shipped with the converter: everything is read from the install you point it at.
 """
-import argparse, os, re, shutil, subprocess, sys
+import argparse, json, os, re, shutil, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import toeedata
 import ie_overrides
 import ie_install
+from ie_map_alerts import apply_map_alert_distances
 from ie_build import preview_build
+from ie_movies import movie_tool_check, report_prologue_media
 OVERRIDES = os.path.join(HERE, 'overrides', 'iwd')   # per-map hand overrides (ie_overrides.py, overrides/README.md)
 
 AREA, MAP_ID, GROUND_ID, START = 'AR1000', 5012, 900, (482, 424)
@@ -79,7 +81,8 @@ def name_base(i):
 def install_varhooks(scr):
     """IE variable store save/load hook (ie_vars): Temple+ imports scr/tpModifiers/*.py at startup."""
     d = os.path.join(scr, 'tpModifiers'); os.makedirs(d, exist_ok=True)
-    shutil.copy(os.path.join(HERE, 'runtime', 'tpModifiers', 'ie_varhooks.py'), d)
+    for module in ('ie_varhooks.py', 'ie_raider_death.py', 'ie_palisade_defender.py'):
+        shutil.copy(os.path.join(HERE, 'runtime', 'tpModifiers', module), d)
     old = os.path.join(scr, 'ie_varslots.py')          # (slot table of older builds: no longer used)
     if os.path.isfile(old):
         os.remove(old)
@@ -267,6 +270,31 @@ def map_names(td, names, maplist, dest):
             f.write('{%d}{%s}\n' % (k, d.get(k) or ml.get(k) or 'Map %d' % k))
 
 
+def starting_equipment(root, module, rules_dir):
+    """Keep custom kits; restore the stock class kit when Co8 expects its shop map."""
+    td = toeedata.ToEEData(root, module)
+    rel = 'rules/start_equipment.mes'
+    try:
+        effective = td.read(rel).decode('latin-1')
+    except FileNotFoundError:
+        return
+    source = next((a for a in reversed(td.sources) if rel in a.files and
+                   re.fullmatch(r'toee\d*\.dat', os.path.basename(a.path), re.I)), None)
+    if source is None:
+        return
+    entry = re.compile(r'^(\s*\{(\d+)\}\s*\{)([^}\r\n]*)(\})', re.M)
+    stock = {int(m[2]): m[3] for m in entry.finditer(source.read(rel).decode('latin-1'))}
+    def kit(m):
+        key = int(m[2])
+        if key < 200 and key % 100 <= 10 and m[3].split() == ['6142'] and key in stock:
+            return m[1] + stock[key] + m[4]
+        return m[0]
+    fixed = entry.sub(kit, effective)
+    if fixed != effective or os.path.isfile(os.path.join(root, 'modules', module, rel)):
+        with open(os.path.join(rules_dir, 'start_equipment.mes'), 'wb') as out:
+            out.write(fixed.encode('latin-1'))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--iwd', required=True, help='your Icewind Dale or Icewind Dale: Enhanced Edition folder')
@@ -284,7 +312,14 @@ def main():
                          'feature/pathnode-bake, given as --tp)')
     a = ap.parse_args()
     with preview_build(a.out, (a.iwd, a.toee, a.tp, a.movies_ee, HERE)) as stage:
+        if not a.no_movies:
+            missing = movie_tool_check('IWD')
+            report_prologue_media('IWD', missing)
         convert(a, stage)
+        if a.no_movies:
+            print('MOVIE SUMMARY - Skipped by request (--no-movies).', flush=True)
+        else:
+            report_prologue_media('IWD', missing, stage / 'work/movies/ie_movies_data.py')
 
 
 def convert(a, stage):
@@ -472,8 +507,13 @@ def convert(a, stage):
             if l.strip() and cur:
                 sn.setdefault(cur, []).append(l)
     td = toeedata.ToEEData(toee)
+    starting_equipment(toee, MODULE, os.path.join(M, 'rules'))
     specs = {AREA: os.path.join(cre, 'ie_creatures_%s.py' % a1)}
     specs.update({ar: os.path.join(icre[ar], 'ie_creatures_%s.py' % ar.lower()) if ar in icre else None for ar in interiors})
+    # Scripted actors resolve their IE death variables and shared counters through this table.
+    for spec in specs.values():
+        if spec and os.path.isfile(spec):
+            shutil.copy2(spec, os.path.join(C, 'scr'))
     ids = dict(interiors, **{AREA: MAP_ID})
     names = area_names(ie, w, specs, area_shops)
     # vanilla town map files of the reused ids (ToEE*.dat stay loaded) would show through between ours: black them out
@@ -510,6 +550,9 @@ def convert(a, stage):
             found = True
     if not found:
         raise SystemExit('MapList.mes: no entry for map %d' % smap)
+    with open(os.path.join(HERE, 'guidance', 'map_alerts.json'), encoding='utf-8') as f:
+        alert_distances = json.load(f).get(MODULE, {})
+    t = apply_map_alert_distances('\n'.join(t), ids, alert_distances).split('\n')
     open(ml, 'w', encoding='latin-1', newline='').write('\n'.join(t))
     map_names(td, {ids[ar]: n for ar, n in names.items()}, '\n'.join(t), os.path.join(M, 'mes', 'map_names.mes'))
     try:      # vanilla scroll limits of the reused ids would clip our maps (no entry = no limit)
