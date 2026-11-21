@@ -162,6 +162,33 @@ ART_IDS = {
     'pool_reghed_warrior_m': (11630, 'ReghedWarriorM'),
     'pool_sage': (11680, 'Sage'),
     'quimby': (11330, 'Quimby'),
+    # batch 9A: IWD Kuldahar Pass Hermit + IWD2 Targos Docks & Weeping Widow
+    'hermit': (12920, 'Hermit'),
+    'crandall': (12930, 'Crandall'),
+    'eldgull': (12940, 'Eldgull'),
+    'cahl_hyred': (12950, 'CahlHyred'),
+    'veira': (12960, 'Veira'),
+    # batch 9B: IWD2 Targos Palisade Gate & Gallaway Trade Depot
+    'ghille_laider': (12970, 'GhilleLaider'),
+    'loman': (12980, 'Loman'),
+    # batch 9C: IWD2 Trade Depot & Targos Pavilion
+    'jemeliah': (12990, 'Jemeliah'),
+    'ragni_bellows': (13000, 'RagniBellows'),
+    'denham_fisher': (13010, 'DenhamFisher'),
+    'maxiel': (13020, 'Maxiel'),
+    # batch 9D: IWD2 Targos Pavilion (Valin & Garradun)
+    'valin': (13030, 'Valin'),
+    'garradun': (13040, 'Garradun'),
+    # batch 9E: remaining IWD2 Targos Pavilion, Palisade & Warehouse bosses
+    'deagle': (13050, 'Deagle'),
+    'urbek': (13060, 'Urbek'),
+    'doppelganger': (13070, 'Doppelganger'),
+    'harlesford': (13080, 'Harlesford'),
+    'caulder': (13090, 'Caulder'),
+    'weapon_instructor': (13100, 'WeaponInstructor'),
+    'menon': (13110, 'Menon'),
+    'rukwurm': (13120, 'Rukwurm'),
+    'ulek': (13130, 'Ulek'),
 }
 # Generic monsters also get a left/right mirrored copy (own id) for per-instance variety. Named NPCs don't.
 FLIPS = {

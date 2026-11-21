@@ -451,6 +451,8 @@ class Converter(object):
                 notes.append('IE STR %s > template %d: keep IE' % (spec['ie']['str'], tab[0])); tab[0] = st
             abil = tab
             conm = R.mod(abil[2])
+        if cre.gold:
+            spec['gold'] = cre.gold
         hpmode = o['hp']
         hp = cre.max_hp if hpmode == 'ie' else (max(cre.max_hp, avg) if hpmode == 'max_ie_3e' else avg)
         spec['hp'] = max(1, hp); spec['hp_3e_avg'] = avg; spec['hd_total'] = hd
@@ -723,8 +725,8 @@ PORTRAITS = {
 PORTRAIT_TODO = ()   # batch 4 covered the children and the squirrel
 ORC_PORTRAITS = (6470, 6480)   # ToEE's half-orc NPCs Pintark (14207) and Tuelk (14206)
 ORC_FAMILIES = ('orc', 'orog')
-TOWNSMEN = (7830, 6620, 6700, 7660, 10210)            # + commissioned old townsman
-TOWNSWOMEN = (7840, 7670, 7910, 7920, 7690, 10200)     # + commissioned fisherwoman
+TOWNSMEN = (10210,)                                   # commissioned IWD townsfolk (vanilla ToEE villagers removed)
+TOWNSWOMEN = (10200,)                                 # commissioned IWD townsfolk (vanilla ToEE villagers removed)
 # Commissioned children / critters (batch 4), IWD + IWD2 resrefs.
 PORTRAITS.update({
     'damien': 10140, 'damien2': 10140, 'eboy1': 10150, '50childm': 10150, 'eboy2': 10160, 'kukid': 10160,
@@ -781,7 +783,7 @@ for _fam, _rs in {
     'winter_wolf': 'as3wint wolfwint winwolf winwolfp rwtwwolf 00swtwlf 41swtwlf 30wwlf 40rwolfw 40wolfwi 50wfwh 50wlfwi '
                    '50wlfwir druidww 50wfwgh 50wlfwg 50wlfwgr',
     'boring_beetle': 'beetbor beetleb mbbr druidbb gisborb ms3borb psborbtl 40rbetbo 40betbor 00sbtl13',
-    'squirrel': 'squirel squirel2 eesquirl',
+    'squirrel': 'squirel squirel2 eesquirl squirl',
     # batch 6 (CRE name based, both games: placed, rest-table, 00s/41s spawnables)
     'dire_wolf': '00sdwlf 41sdwlf 50wfdfh 50wfdh 50wlfdf 50wlfdfr 50wlfdi 50wlfdir as2dire',
     'rhino_beetle': '00sbtl15 41sbtl15 beetrhin mbrh',
@@ -873,6 +875,28 @@ MONSTER_FAMILY.update(dict.fromkeys('golemiro'.split(), 'iwd_iron_golem'))
 MONSTER_UPGRADED |= set('as2dire bon8005 bon8013 bonegard giantfg gobehq1 goboeaxe goboebow lm2hwla lm2hwlay lm2hwna lm2hwnay lm2hwte lm2hwtey lmsham1 lmsham2 lmsham3 lmshkid mgo3 mor3 mor4 mor5 ms2gobb ms2gobe ms3tliz ms6yuan ms7bgrd ms7umbh mskb msmyuan orcewaxe orcewbow orcsham rdecwig rdeliztl rdeyuane sdgobtrn skelblad skelblaz skelblst skelbong skelserr slizman ss2gob1 ss2gob2 ss2gob3 ss2liz5 ss2liz6 ss2liz7 tlizman udorc wightcld wtyeti yuaewax yuaewbl yuaewbo yuaewsw yuantie yuantip yuchamp'.split())
 PORTRAITS.update({'biknight': 12130, 'gobline': 12030, 'goblinsp': 12030, 'rkpgobe': 12030, 'rwtgice': 12060, 'wticetr1': 12060, 'wticetrl': 12060, 'mummyg': 12100, 'ktwgti1': 12170, 'wightimb': 12170, 'giantfs': 12150, 'neoorogc': 12040, 'lizking': 12070, 'myrkuls': 12120, 'sdelfof1': 12160, 'sdelfof2': 12160, 'sdelfof3': 12160, 'spknight': 12110, 'talonaf': 12090, 'wyrm': 12140, 'wtcyeti': 12050, 'vscyeti': 12050, 'deadvil': 11670, 'deadvilf': 12400})   # batch 8 elites (own art) + captive villagers
 TOWNSMEN = TOWNSMEN + (12900, 12910)   # batch 8 extra: Kuldahar elder (man)
+# batch 9A+9B: IWD Kuldahar Pass Hermit + IWD2 Targos Docks, Town, Trade Depot, Weeping Widow & Generic Defenders
+PORTRAITS.update({
+    'hermit': 12920,
+    '10cranda': 12930, '10eldgul': 12940, '11cahlhy': 12950, '11veira': 12960,
+    '11ghille': 12970, '11loman': 12980,
+    '11jemel': 12990, '11ragnib': 13000, '11denham': 13010, '11maxiel': 13020,
+    '11valin': 13030, '11garrad': 13040,
+    '11deagle': 13050, '11urbeks': 13060, '10dop': 13070,
+    '12harles': 13080, '12caulde': 13090, '12weapon': 13100, '12menon': 13110,
+    '10rukwu': 13120, '10ulek': 13130,
+})
+MONSTER_POOLS['targos_soldier'] = ((11540, 12270), ())
+MONSTER_FAMILY.update(dict.fromkeys('12tarsol 12mess 12soldsp 10soldrd'.split(), 'targos_soldier'))
+MONSTER_POOLS['targos_archer'] = ((11650, 12380), ())
+MONSTER_FAMILY.update(dict.fromkeys('12archer 12archd'.split(), 'targos_archer'))
+MONSTER_POOLS['targos_recruit'] = ((11540, 12270, 11460, 12200, 11490, 12230, 11600, 12330), ())
+MONSTER_FAMILY.update(dict.fromkeys('12recrui 12recrud 12traine 12traind'.split(), 'targos_recruit'))
+MONSTER_POOLS['targos_merc'] = ((12800, 12810, 11400), ())
+MONSTER_FAMILY.update(dict.fromkeys('12merc 12mercd'.split(), 'targos_merc'))
+MONSTER_POOLS['targos_sailor'] = ((11460, 12200, 11470, 12210, 11490, 12230), ())
+MONSTER_FAMILY.update(dict.fromkeys('10sailrd'.split(), 'targos_sailor'))
+MONSTER_FAMILY.update(dict.fromkeys('12wolf 12wolfd'.split(), 'iwd_wolf'))
 
 
 def monster_portrait(resref, seed):
@@ -959,7 +983,7 @@ def convert_area(game, toee_root, out, area, name_base=27000, options=None, scri
     keep = ('actor', 'resref', 'status', 'track', 'family', 'proto', 'model', 'scale', 'x', 'y', 'orient', 'gender',
             'alignment', 'hostility', 'abilities', 'levels', 'monster_hd', 'hp', 'natural_ac', 'bab', 'to_hit_bonus',
             'save_bonus', 'conditions', 'no_flee', 'invulnerable', 'ident', 'cr', 'items', 'spells', 'ai_strategy', 'name_id',
-            'script_id', 'schedule', 'portrait', 'difficulty')
+            'script_id', 'schedule', 'portrait', 'difficulty', 'gold')
     py = ['# Generated by ie2toee ie_creatures.py from the player\'s own IE install. Do not distribute.',
           'AREA = %r' % area.upper(), 'CREATURES = [']
     for s in specs:
@@ -1063,7 +1087,7 @@ def convert_spawnables(game, toee_root, out, areas, scr_dirs=(), name_base=20300
     keep = ('resref', 'family', 'proto', 'model', 'scale', 'gender', 'alignment', 'hostility', 'abilities', 'levels',
             'monster_hd', 'hp', 'natural_ac', 'bab', 'to_hit_bonus', 'save_bonus', 'conditions', 'no_flee', 'cr', 'items',
             'spells', 'ai_strategy', 'name_id', 'portrait', 'portrait_pool', 'difficulty', 'feats', 'skills', 'mesh', 'ident',
-            'script_id')
+            'script_id', 'gold')
     specs, names, dlg_args, used, cre_dlg = {}, {}, [], set(), {}
     for i, r in enumerate(sorted(refs)):
         try:

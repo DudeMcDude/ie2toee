@@ -2,6 +2,7 @@
 rem Icewind Dale in ToEE - preview converter. Usage:
 rem   convert.bat "C:\path\to\Icewind Dale (or Icewind Dale Enhanced Edition)" "C:\path\to\ToEE copy"
 setlocal
+if exist "%~dp0media-tools\" set "PATH=%~dp0media-tools;%PATH%"
 cd /d "%~dp0"
 if "%~2"=="" (
   echo Usage: convert.bat "C:\path\to\Icewind Dale" "C:\path\to\ToEE"

@@ -140,7 +140,7 @@ def make(res, loc, qty=None):
 def give(res, holder, qty=None):
     o = make(res, holder.location, qty)
     if o is not None:
-        holder.item_get(o)
+        transfer(holder, o)
     return o
 
 
@@ -161,6 +161,24 @@ def _inv(holder):
         if it != OBJ_HANDLE_NULL:
             out.append(it)
     return out
+
+
+def transfer(holder, item):
+    """Keep different magical IE items on the same ToEE base prototype in separate stacks."""
+    flags = item.item_flags_get()
+    if not (flags & OIF_IS_MAGICAL and flags & OIF_IDENTIFIED):
+        return holder.item_get(item)
+    description = _field('obj_f_description')
+    if not any(other.proto == item.proto and other.obj_get_int(description) != item.obj_get_int(description)
+               for other in _inv(holder)):
+        return holder.item_get(item)
+    # Temple+ combines identified potions by prototype and spell. It would discard the incoming
+    # object's IE identity in favour of the receiving stack's name. Keep this transfer separate.
+    item.item_flag_unset(OIF_IDENTIFIED)
+    try:
+        return holder.item_get(item)
+    finally:
+        item.item_flag_set(OIF_IDENTIFIED)
 
 
 def find(holder, res):

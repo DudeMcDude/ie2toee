@@ -53,6 +53,8 @@ def _set(o, field, v, idx=None):
 
 def apply(o, s):
     """Apply a converted stat block to a freshly created critter."""
+    if s.get('gold'):
+        o.money_adj(int(s['gold']) * 100)
     _set(o, 'obj_f_critter_inventory_source', 0)   # no random template gear on top of the converted items
     ab = s.get('abilities')
     if ab:

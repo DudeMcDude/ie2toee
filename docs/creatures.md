@@ -248,7 +248,8 @@ tiny scripts in the actor's script slots that destroy the actor below/at a level
 that ends in DestroySelf and has Difficulty/DifficultyLT/DifficultyGT triggers (negation handled) and stores
 `spec['difficulty'] = {'levels': [allowed levels], 'script': <resref>, 'cond': <trigger text>}` (absent = all levels).
 It is kept in `ie_creatures_<area>.py`, `<AREA>_creatures.json` and the runtime `OBJS[guid]['spec']['difficulty']`
-(ie_bake_<area>.py). The runtime does not yet filter: those triggers are unsupported and evaluate False, so every
-actor spawns (= hardest). Heart of Fury is a game mode (stat boost), not an actor gate.
+(ie_bake_<area>.py). The converted BCS scripts evaluate `Difficulty`, `DifficultyLT`, and `DifficultyGT` alongside
+their original visibility and local-variable conditions. The default is Normal (3). Set `IE2TOEE_DIFFICULTY` to
+a value from 1 through 5 before launching TemplePlus to choose another setting for these triggers.
 AR1201 (Orc Cave): 8 of 45 actors gated (classic IWD has the other 37): EFDELHRD (4-5): Ogre 2, an Orc Elite
 (ORCEWBOW), Orc Archer 10; EFDELINS (5): Ogre 3, Ogre 4, 3 Orc Elites (ORCEWBOW). AR1200: none.

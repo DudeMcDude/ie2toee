@@ -818,11 +818,15 @@ def convert(game, out, toee, tp=None, options=None, areas=(), stores=(), objects
     for ar in areas:
         cl = ieitm.are_container_items(game.read(ar.lower(), 'are'))
         objs = objmap.get(ar.upper(), objmap.get(''))
-        oc = {c['name']: c for c in objs.get('containers', [])} if objs else {}
+        geometry = objs.get('containers', []) if objs else []
         lst = []
-        for c in cl:
+        for index, c in enumerate(cl):
             b = m.g['containers'].get(str(c['type']), m.g['containers']['default'])
-            lst.append(dict(name=c['name'], ie=[c['x'], c['y']], toee=(oc.get(c['name']) or {}).get('toee'),
+            shape = geometry[index] if index < len(geometry) else {}
+            if shape and (shape['name'], shape['x'], shape['y']) != (c['name'], c['x'], c['y']):
+                raise ValueError('%s: container geometry mismatch at index %d' % (ar, index))
+            lst.append(dict(name=c['name'], ie=[c['x'], c['y']], toee=shape.get('toee'), poly=shape.get('poly', []),
+                            type=c['type'], flags=c['flags'], locked=bool(c['flags'] & 1), script=c['script'],
                             proto=b[0], label=b[1], lock=c['lock'], trapped=c['trapped'], key=c['key'],
                             items=[[i['resref'], max(1, i['charges'][0])] for i in c['items']]))
         cons[ar.upper()] = lst

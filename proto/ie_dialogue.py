@@ -26,6 +26,19 @@ TOKENS = {
     'PRO_GIRLBOY': ('boy', 'girl'), 'MALEFEMALE': ('male', 'female'),
 }
 
+def class_levels(ids):
+    aliases = {'mage': 'wizard', 'thief': 'rogue'}
+    classes = set('barbarian bard cleric druid fighter monk paladin ranger rogue sorcerer wizard'.split())
+    levels = {}
+    for code, name in ids.t['class'].by_val.items():
+        parts = name.lower().split('_')
+        if parts[-1] == 'all':
+            parts.pop()
+        parts = [aliases.get(p, p) for p in parts]
+        if parts and all(p in classes for p in parts):
+            levels[code] = tuple('stat_level_' + p for p in parts)
+    return levels
+
 def subst(text, female):
     def rep(m):
         t = TOKENS.get(m.group(1).upper())
@@ -291,6 +304,33 @@ def actor_script(sid, ident, area, dlg_parts, bcs_mods):
                '    return RUN_DEFAULT\n')
     return '\n'.join(src)
 
+def xplist_rewards(game):
+    try:
+        lines = [line.split() for line in game.read('xplist', '2da').decode('latin-1').splitlines() if line.strip()]
+    except FileNotFoundError:
+        return {}
+    if len(lines) < 3:
+        return {}
+    columns = [(i + 1, int(label)) for i, label in enumerate(lines[2]) if label.isdigit()]
+    if not columns:
+        return {row[0].upper(): int(row[1]) for row in lines[3:]
+                if len(row) > 1 and row[1].lstrip('-').isdigit()}
+    rewards = {}
+    for row in lines[3:]:
+        amounts = {}
+        for index, level in columns:
+            if index >= len(row):
+                continue
+            shared = row[index].upper().startswith('P_')
+            value = row[index][2:] if shared else row[index]
+            amounts[level] = (int(value), shared) if value.lstrip('-').isdigit() else (0, False)
+        if amounts:
+            if 0 in amounts and len(set(amounts.values())) == 1:
+                amounts = {0: amounts[0]}
+            rewards[row[0].upper()] = amounts
+    return rewards
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('game'); ap.add_argument('out')
@@ -435,17 +475,9 @@ def main():
         am[f[0].upper()] = int(f[1])
         if len(f) > 2:
             pl[f[0].upper()] = tuple(int(v) for v in f[2].split(','))
-    xp = {}
-    try:   # XPLIST.2DA (EE): rows used by AddXP2DA
-        rows = game.read('xplist', '2da').decode('latin-1').splitlines()
-        for ln in rows[3:]:
-            f = ln.split()
-            if len(f) >= 2 and f[1].lstrip('-').isdigit():
-                xp[f[0].upper()] = int(f[1])
-    except Exception:
-        pass
+    xp = xplist_rewards(game)
     w(os.path.join(scr, 'ie_xp.py'), HEADER + 'XP = %r\n' % xp)
-    w(os.path.join(scr, 'ie_areas.py'), HEADER + 'MAPS = %r\nPLACEMENTS = %r\nSCRIPTS = %r\nNEWGAME = %r\n' % (am, pl, asc, dict((k.upper(), int(v)) for k, v in (x.split('=') for x in a.new_game))))
+    w(os.path.join(scr, 'ie_areas.py'), HEADER + 'MAPS = %r\nPLACEMENTS = %r\nSCRIPTS = %r\nCLASS_LEVELS = %r\nNEWGAME = %r\n' % (am, pl, asc, class_levels(ids), dict((k.upper(), int(v)) for k, v in (x.split('=') for x in a.new_game))))
     json.dump(rep, open(os.path.join(a.out, 'report.json'), 'w'), indent=1)
     print(json.dumps({k: v for k, v in rep.items() if k != 'unknown'}, indent=1))
     print('unknown names:', rep['unknown'])
