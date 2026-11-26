@@ -25,12 +25,18 @@ def location_to_axis(location):
 
 class Item:
     def __init__(self, res, entry, quantity):
+        self.id = id(self)
         self.res, self.proto, self.description = res, entry['p'], entry.get('n')
         self.quantity = quantity
         self.type = entry.get('type', 'item')
         self.holder = None
         self.destroyed = False
         self.flags = int(bool(entry.get('id')))
+
+    def obj_get_obj(self, field):
+        if field != 'item_parent':
+            raise KeyError(field)
+        return self.holder
 
     def obj_get_int(self, field):
         if field in ('ammo_quantity', 'money_quantity'):
@@ -117,6 +123,20 @@ class Container(InventoryHolder):
 
 
 class Actor(InventoryHolder):
+    @property
+    def type(self):
+        return 'pc' if self in self.game.party else 'npc'
+
+    def obj_get_idx_obj_size(self, field):
+        if field != 'critter_inventory':
+            raise KeyError(field)
+        return len(self.inventory)
+
+    def obj_get_idx_obj(self, field, index):
+        if field != 'critter_inventory':
+            raise KeyError(field)
+        return self.inventory[index]
+
     def __init__(self, ident, name, map_id, tile, hp, damage, hostile, game):
         super().__init__()
         self.id, self.name, self.map = ident, name, map_id
@@ -428,6 +448,8 @@ def install():
     for cls in 'barbarian bard cleric druid fighter monk paladin ranger rogue sorcerer wizard'.split():
         setattr(toee, 'stat_level_' + cls, 'level_' + cls)
     toee.obj_t_ammo, toee.obj_t_money = 'ammo', 'money'
+    toee.obj_t_npc = 'npc'
+    toee.obj_f_critter_inventory_list_idx, toee.obj_f_item_parent = 'critter_inventory', 'item_parent'
     toee.OF_OFF, toee.OF_DONTDRAW = 2, 0x100
     toee.obj_f_ammo_quantity, toee.obj_f_money_quantity = 'ammo_quantity', 'money_quantity'
     toee.obj_f_item_flags, toee.OIF_IDENTIFIED = 'item_flags', 1

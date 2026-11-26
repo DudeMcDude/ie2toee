@@ -156,7 +156,11 @@ class Gen(object):
     def trigger(self, call):
         name, sig = self._canon('T', call.name)
         self._note_var(call, 'T')
-        e = 'T.%s(%s)' % (PY_RENAME.get(name, name), ', '.join(['c'] + self._args(call, sig)))
+        args = self._args(call, sig)
+        if name == 'Dead' and call.args and isinstance(call.args[0], S.Obj) and call.args[0].name:
+            # Retain the death-variable name even before its map object has loaded.
+            args[0] = pystr(call.args[0].name)
+        e = 'T.%s(%s)' % (PY_RENAME.get(name, name), ', '.join(['c'] + args))
         return ('not ' + e) if call.neg else e
 
     def condition(self, calls):

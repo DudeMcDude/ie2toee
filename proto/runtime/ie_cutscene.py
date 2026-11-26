@@ -246,8 +246,10 @@ def start(res, c):
         return _dialog_start(res, c, mod)
     mode(1)
     blocks = []
+    party_transfers = set()
     for i, (cond, resps) in enumerate(mod.BLOCKS):
         c2 = rt.Ctx(c.me, c.other, 'cs_%s_%d' % (res.lower(), i), c.area, {})
+        c2.party_transfers = party_transfers
         try:
             ok = cond(c2)
         except Exception as e:

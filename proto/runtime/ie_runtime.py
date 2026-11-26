@@ -127,6 +127,7 @@ _queues = {}         # ident -> [pending action thunks]
 _busy = {}           # ident -> game-seconds until which the actor is busy
 _events = {}         # ident -> {event name: other object}
 _placement = {}      # area -> (canvas_x, canvas_y, scale, cal_x, cal_y)
+_follow_position = {}  # last tile on which each moving escort received a movement order
 DIALOG_RANGE = {}
 
 def set_placement(area, cx, cy, scale=1.0, calx=8428, caly=-4366):
@@ -182,6 +183,10 @@ def who(obj, ident, area):
     return ident, a
 
 def bind(obj, ident, area):
+    # Arte and Kaitlin's sole IE combat response is to escape when a PC attacks.
+    # Let their scripts handle this instead of joining the mill fight as defenders.
+    if IN_GAME and area == 'AR2001' and (ident or '').split('#', 1)[0] in ('20arte', '20kaitln'):
+        obj.npc_flag_set(ONF_NO_ATTACK)
     _mark_practice_target(obj, ident)
     _bound[_key(obj)] = (ident, area)
     try:      # baked maps: finalize the prefab objects + attach the doors once per map load (ie_bakert)
@@ -272,15 +277,18 @@ def O(c, name, inner=None):
     return None
 
 _aliases = {}   # area -> {ARE actor name (lower): ident}
+_named_spawns = {}   # difficulty-limited placements, indexed by ARE actor name
 
-def _actor_ident(c, name):
-    area = ((c and c.area) or '').upper()
+def _actor_ident(area, name):
     if area not in _aliases:
         m = {}
+        _named_spawns[area] = {}
         try:
             for s_ in __import__('ie_creatures_' + area.lower()).CREATURES:
                 if s_.get('ident') and s_.get('actor'):
                     m[s_['actor'].lower()] = s_['ident']
+                    if s_.get('area_spawn'):
+                        _named_spawns[area][s_['actor'].lower()] = s_
         except Exception:
             pass
         try:   # the baked area actors: names an ARE actor like the IE engine resolves it (from main f0052ef)
@@ -303,6 +311,25 @@ def N(c, name):
     """Object by IE script name / death variable (an object or None passes through: Dead(N("x")) style calls)."""
     if not isinstance(name, str):
         return name
+    if IN_GAME and c and c.area:
+        # ARE names identify a placement on this map. An omitted placement
+        # cannot be satisfied by a binding left over from another map.
+        area = re.sub('^I2(?=AR)', '', c.area.upper())
+        idt = _actor_ident(area, name)
+        if idt:
+            spec = _named_spawns.get(area, {}).get(name.lower())
+            if spec and not area_spawn_allowed(spec):
+                return None
+            for key, (ident, bound_area) in _bound.items():
+                if ident != idt or (bound_area or '').upper() not in (area, 'I2' + area):
+                    continue
+                try:
+                    obj = game.get_obj_by_id(key)
+                    if obj and obj.map == AREA_MAPS.get(area):
+                        return obj
+                except Exception:
+                    pass
+            return None
     if IN_GAME:
         for k, (ident, area) in _bound.items():
             if (ident.lower() == name.lower() or re.sub(r'^\d+', '', ident.lower()) == name.lower()
@@ -313,17 +340,6 @@ def N(c, name):
                         return o
                 except Exception:
                     pass
-    if IN_GAME:      # an ARE actor name (IWD2 cutscenes: CutSceneId("05_Ghotrag")) -> the converted ident
-        idt = _actor_ident(c, name)
-        if idt:
-            for k, (ident, area) in _bound.items():
-                if ident == idt:
-                    try:
-                        o = game.get_obj_by_id(k)
-                        if o:
-                            return o
-                    except Exception:
-                        pass
     if IN_GAME:
         try:   # a door/wall by its ARE name (OpenDoor(N("AR1200_Door4_WallNE")))
             import ie_doors
@@ -474,6 +490,11 @@ class _Triggers(object):
     NumberOfTimesTalkedToGT = NumTimesTalkedToGT
     NumberOfTimesTalkedToLT = NumTimesTalkedToLT
     def ActionListEmpty(self, c): return _busy.get(c.ident, 0) <= _now() and c.ident not in _queues
+    def IsCreatureAreaFlag(self, c, obj, mask):
+        if obj is None:
+            return False
+        actor = c if obj == c.me else ctx_for(obj)
+        return bool(get_var(actor, '#creature_area_flags', 'LOCALS') & mask)
     def RandomNum(self, c, rng, n): return random.randint(1, max(1, rng)) == n
     def RandomNumGT(self, c, rng, n): return random.randint(1, max(1, rng)) > n
     def RandomNumLT(self, c, rng, n): return random.randint(1, max(1, rng)) < n
@@ -538,6 +559,15 @@ class _Triggers(object):
         return ok
     def Die(self, c): return self._event(c, 'Die')
     def Entered(self, c, obj=None): return self._event(c, 'Entered')
+    def Clicked(self, c, obj=None):
+        who = c.events.get('Clicked')
+        return who is not None and (who == obj or (who in _party() and obj in _party())) and self._event(c, 'Clicked')
+    def CheckDoorFlags(self, c, door, mask):
+        if not door or not IN_GAME or door.type != obj_t_portal or mask & ~3:
+            return False
+        native = door.portal_flags_get()
+        flags = (1 if native & OPF_OPEN else 0) | (2 if native & OPF_LOCKED else 0)
+        return flags & mask == mask
     def Opened(self, c, obj=None): return self._event(c, 'Opened')
     def Unlocked(self, c, obj=None): return self._event(c, 'Unlocked')
     def _event(self, c, ev):
@@ -562,9 +592,14 @@ class _Triggers(object):
             if any(get_var(c, k, 'GLOBAL') > 0 for k in ('SPRITE_IS_DEAD' + n, '_DEAD' + n, n + '_DEAD')):
                 return True
             o = N(c, name)
+            # The Old Orc waits for his four guards, but on lower encounter tiers
+            # the ARE omits the last two. Only waive guards omitted on this visit.
+            if o is None and c and c.area == 'AR3101' and c.ident == '31orcold' and n in ('06_bug_03', '06_bug_04'):
+                spec = _named_spawns.get(c.area, {}).get(n)
+                return bool(spec and not area_spawn_allowed(spec))
             return o is not None and _dead(o)
         o = N(c, name)
-        return o is None or _dead(o)
+        return o is not None and _dead(o)
     def See(self, c, obj, *see_dead):
         if obj is None or (not any(see_dead) and _dead(obj)) or not self.LOS(c, obj, 0):
             return False
@@ -578,7 +613,11 @@ class _Triggers(object):
         try:
             if obj.object_flags_get() & (OF_OFF | OF_DONTDRAW):
                 return False
-            if c.me.distance_to(obj) < 40 and c.me.can_see(obj):
+            distance = c.me.distance_to(obj)
+            # The IE can put an invisible speaker on the door's interaction
+            # tile. Temple+'s visibility ray can fail when the two radii overlap.
+            touching_speaker = distance <= 0 and obj in _party() and c.me.object_flags_get() & OF_OFF
+            if distance < 40 and (touching_speaker or c.me.can_see(obj)):
                 c.last_trigger = obj
                 return True
         except Exception:
@@ -639,6 +678,15 @@ class _Triggers(object):
             if item_find(pc, res):
                 return True
         return False
+    def NumItemsParty(self, c, res, count):
+        import ie_itemrt
+        return ie_itemrt.count_items(_party(), res) == count
+    def NumItemsPartyGT(self, c, res, count):
+        import ie_itemrt
+        return ie_itemrt.count_items(_party(), res) > count
+    def NumItemsPartyLT(self, c, res, count):
+        import ie_itemrt
+        return ie_itemrt.count_items(_party(), res) < count
     def HasItem(self, c, res, obj=None):
         o = obj if obj is not None else c.me
         return bool(item_find(o, res))
@@ -788,6 +836,18 @@ def item_give(res, holder):
 def times_talked(c):
     return get_var(c, '#talked', 'LOCALS')
 
+def _hide_dialogue_speaker(npc, added_flags):
+    try:
+        import gamedialog
+        if gamedialog.is_engaged():
+            game.timeevent_add(_hide_dialogue_speaker, (npc, added_flags), 300, 1)
+        elif npc and not npc.is_dead_or_destroyed():
+            npc.object_flag_set(OF_OFF)
+            if added_flags:
+                npc.object_flag_unset(added_flags)
+    except RuntimeError:
+        pass  # the speaker's map unloaded
+
 def dlg_start(npc, pc, ident, area, states, entry):
     """Called from the generated san_dialog. `states` = [(state_line, cond_fn)] in IE evaluation order (state
     trigger table order); the first whose condition holds is the entry line. NumTimesTalkedTo counts up after."""
@@ -804,7 +864,6 @@ def dlg_start(npc, pc, ident, area, states, entry):
             line = ln; break
     if line is None:
         line = entry
-    set_var(c, '#talked', 'LOCALS', times_talked(c) + 1)
     if line is None:
         log('DLG %s: no valid start state' % ident)
         try:
@@ -812,11 +871,25 @@ def dlg_start(npc, pc, ident, area, states, entry):
         except Exception:
             pass
         return SKIP_DEFAULT if IN_GAME else None
+    # Some stock monster prototypes (including the bugbear captain) are mute.
+    # A converted IE dialogue with a valid line explicitly gives this NPC speech.
+    # Clear the prototype flag on the instance. D20 silence effects still apply.
+    if IN_GAME and npc.critter_flags_get() & OCF_MUTE:
+        npc.critter_flag_unset(OCF_MUTE)
+    set_var(c, '#talked', 'LOCALS', times_talked(c) + 1)
     log('DLG %s start line %d (talked %d)' % (ident, line, times_talked(c) - 1))
     try:
         npc.turn_towards(pc)
     except Exception:
         pass
+    if IN_GAME and ident in DIALOG_RANGE and npc.object_flags_get() & OF_OFF:
+        # IE can speak through a hidden creature. Temple+'s queued dialogue
+        # needs an active handle; keep the speaker invisible and unpickable.
+        flags = OF_DONTDRAW | OF_CLICK_THROUGH | OF_NO_BLOCK
+        added = flags & ~npc.object_flags_get()
+        npc.object_flag_set(flags)
+        npc.object_flag_unset(OF_OFF)
+        game.timeevent_add(_hide_dialogue_speaker, (npc, added), 500, 1)
     pc.begin_dialog(npc, line)
     return SKIP_DEFAULT if IN_GAME else None
 
@@ -896,9 +969,17 @@ class _Actions(object):
 
     def Continue(self, c): return CONTINUE
     def NoAction(self, c): return None
+    def Kill(self, c, target):
+        if IN_GAME and target and not _dead(target):
+            target.critter_kill_by_effect()
     def MultiPlayerSync(self, c): return None
     def SetGlobal(self, c, name, scope, v): set_var(c, name, scope, v)
     def IncrementGlobal(self, c, name, scope, v): set_var(c, name, scope, get_var(c, name, scope) + v)
+    def SetCreatureAreaFlag(self, c, obj, mask, enabled):
+        if obj is not None:
+            actor = c if obj == c.me else ctx_for(obj)
+            flags = get_var(actor, '#creature_area_flags', 'LOCALS')
+            set_var(actor, '#creature_area_flags', 'LOCALS', flags | mask if enabled else flags & ~mask)
     def BitGlobal(self, c, name, scope, bits, mode):
         v = get_var(c, name, scope)
         v = {0: bits, 1: v & bits, 2: v | bits, 3: v ^ bits, 4: v & ~bits}.get(mode, v)   # GemRB BM_SET/AND/OR/XOR/NAND (BITMODE.IDS 1-3)
@@ -992,7 +1073,7 @@ class _Actions(object):
     def DestroySelf(self, c):
         log('DESTROY %s' % c.ident)
         if IN_GAME and c.me is not None:
-            c.me.destroy()
+            _destroy_with_inventory(c.me)
     def AddXPVar(self, c, name, strref):
         xp = XP2DA.get(name.strip().upper())
         if xp is None:
@@ -1105,6 +1186,32 @@ class _Actions(object):
             except Exception:
                 pass
         return 2
+    def MoveToObjectFollow(self, c, obj):
+        if IN_GAME and c.me is not None and obj is not None and c.me.distance_to(obj) > 5:
+            import debug
+            x, y = location_to_axis(obj.location)
+            sx, sy = location_to_axis(c.me.location)
+            # A party member occupies their own tile. Aim for reachable ground
+            # beside them, including when the rest of the party crowds a door.
+            nearby = [(x+dx,y+dy) for dx in range(-2,3) for dy in range(-2,3) if dx or dy]
+            nearby.sort(key=lambda p: ((p[0]-x)**2+(p[1]-y)**2, (p[0]-sx)**2+(p[1]-sy)**2))
+            point = next((p for p in nearby if p != (sx,sy) and debug.pathto(c.me,*p)), None)
+            if point is None:
+                return 2
+            dest = location_from_axis(*point)
+            for standpoint in (STANDPOINT_DAY, STANDPOINT_NIGHT):
+                c.me.standpoint_set(standpoint, -1, dest, obj.map, 0.0, 0.0)
+            key = _key(c.me)
+            previous = _follow_position.get(key)
+            _follow_position[key] = (sx, sy)
+            if previous == (sx, sy) and not c.me.is_performing():
+                try:
+                    c.me.action_perform(D20A_UNSPECIFIED_MOVE, OBJ_HANDLE_NULL, dest)
+                    return 2
+                except RuntimeError:
+                    pass
+            c.me.run_to(dest)
+        return 2
     def SetInterrupt(self, c, flag): return None
     def ChangeCurrentScript(self, c, res):
         """Replace the script being evaluated for this actor; "" removes it (12ATKHID / 12ATKUHP / 12SHAWF0 drop themselves
@@ -1178,8 +1285,15 @@ class _Actions(object):
         m = AREA_MAPS.get(area.upper())
         log('LEAVE_AREA %s -> map %s' % (area, m))
         if m and IN_GAME:
+            # IE queues one departure per portrait in parallel. Temple+ moves
+            # the whole party on the first one, including at Oswald's takeoff.
+            transfers = getattr(c, 'party_transfers', None)
+            if transfers is not None and m in transfers:
+                return
             u, v = ie_to_tile(area, pt[0], pt[1])
             game.fade_and_teleport(0, 0, 0, m, u, v)
+            if transfers is not None:
+                transfers.add(m)
     LeaveArea = LeaveAreaLUA
     def StartCutSceneMode(self, c):
         import ie_cutscene; ie_cutscene.mode(1)
@@ -1292,6 +1406,8 @@ class _Actions(object):
     def ChangeEnemyAlly(self, c, obj, ea):
         if ea in (255, 200):
             self.Enemy(Ctx(obj, c.other, c.ident, c.area))
+        elif ea == 128 and IN_GAME and obj and obj.type == obj_t_npc:
+            obj.npc_flag_unset(ONF_KOS)
 
     # ---- spells (ie_spellrt: IE resref / SPELL.IDS -> Temple+ spell via the converter's ie_spellmap). A cast takes
     # one IE round (6 s); Temple+ runs it as a normal cast action of the caster.
@@ -1452,9 +1568,23 @@ def _walk(o, u, v):
     except Exception:
         o.move(loc)
 
+def _destroy_with_inventory(o):
+    # IE despawns the creature together with what it is still carrying. Its
+    # baked equipment has independent map files that otherwise reappear on load.
+    if o.type == obj_t_npc:
+        field = obj_f_critter_inventory_list_idx
+        carried = {}
+        for i in range(o.obj_get_idx_obj_size(field)):
+            item = o.obj_get_idx_obj(field, i)
+            if item and item.obj_get_obj(obj_f_item_parent) == o:
+                carried[item.id] = item
+        for item in carried.values():
+            item.destroy()
+    o.destroy()
+
 def _destroy(o):
     try:
-        o.destroy()
+        _destroy_with_inventory(o)
     except Exception:
         pass
     return 1
@@ -1706,6 +1836,20 @@ def _foes(me):
         pass
     return out
 
+def scriptless_combat_turn(obj, area):
+    # Temple+ starts its ordinary monster AI if a turn script returns RUN_DEFAULT.
+    # Destructible kegs can be attacked, but have no turn actions of their own.
+    if area:
+        try:
+            data = __import__('ie_bake_i2' + area.lower())
+        except ImportError:
+            return RUN_DEFAULT
+        spec = data.OBJS.get(str(obj.id), {}).get('spec', {})
+        if spec.get('family') == 'keg':
+            return SKIP_DEFAULT
+    return RUN_DEFAULT
+
+
 def combat_round(obj, ident, area, scripts):
     """san_start_combat, every turn of the critter: one IE script round with feasibility checks (ie_combat). The
     first feasible block's Spell/Attack becomes this round's Temple+ strategy; with no feasible block the converted
@@ -1730,7 +1874,10 @@ def event(ident, name, other=None):
     """Hook helper for san_* handlers: record an IE event trigger (AttackedBy, HitBy, Die, Entered...)."""
     _events.setdefault(ident, {})[name] = other
     if name == 'Die' and ident:
-        death_vars(script_name(ident))
+        area = next((ar for idt, ar in _bound.values() if idt == ident), '')
+        base = re.sub(r'#\d+$', '', str(ident)).lower()
+        name = script_name(ident, area)
+        death_vars(name, _death_counters.get((area.upper(), base), ()))
 
 def script_name(ident, area=None):
     """IE script name of a converted creature: the ARE actor name for an area actor (IWD / IWD2 copy it over the CRE's
@@ -1758,6 +1905,8 @@ def _ident_actor(area, ident):
                 for s_ in __import__('ie_creatures_' + a_.lower()).CREATURES:
                     if s_.get('ident') and s_.get('actor'):
                         m[s_['ident'].lower()] = s_['actor']
+                        if s_.get('death_counters'):
+                            _death_counters[area, s_['ident'].lower()] = s_['death_counters']
                 break
             except Exception:
                 pass
@@ -1774,17 +1923,22 @@ def _ident_actor(area, ident):
     return _actor_names[area].get(ident.lower())
 
 _actor_names = {}   # area -> {ident (lower): ARE actor name}
+_death_counters = {}
 
-def death_vars(name):
+def death_vars(name, counters=()):
     """What the IE engine does when a creature with script name `name` dies (GemRB Actor::Die): GLOBAL
     "SPRITE_IS_DEAD<name>" += 1 (IWD, BG) and "_DEAD<name>" += 1 (IWD2), counted, so 'four beetles dead' checks
     work; plus "<name>_DEAD" = 1 (BG2 SetDeathVar style). (Both counters: the var store has no slot limit.)"""
     n = re.sub(r'\s+', '', str(name or '').lower())
+    explicit = [str(v).strip().lower() for v in counters if v and str(v).strip().lower() != 'none']
+    for var in explicit:
+        _bump('GLOBAL:' + var, 1)
     if not n or n == 'none':
         return
     for k in ('GLOBAL:sprite_is_dead' + n, 'GLOBAL:_dead' + n):
         _bump(k, 1)
-    _bump('GLOBAL:%s_dead' % n, 0)
+    if n + '_dead' not in explicit:
+        _bump('GLOBAL:%s_dead' % n, 0)
 
 def _bump(k, inc):
     """inc 1: += 1; inc 0: = 1"""

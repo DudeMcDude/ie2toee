@@ -103,8 +103,13 @@ def build(areas):
             if not r.get('dest_map'):
                 skipped.append('%s %s -> %s (not converted)' % (area, r['name'], r['dest_area'])); continue
             u, v, _o = areas[r['dest_area']]['entrances'][r['dest_entrance']]
-            jp = JP_BASE + n; n += 1
+            jp = r.get('world_jump')
+            if jp is None:
+                jp = JP_BASE + n
+                n += 1
             rows.append((jp, '%s-%s-to-%s' % (area, r['name'], r['dest_area']), r['dest_map'], int(u), int(v)))
+            if r.get('requires_global') or r.get('world_icon', jp) != jp:
+                continue  # ie_travel creates this icon when its destination is revealed
             iu, iv = r['anchor'] if r.get('anchor') else icon_tile(r['poly'])
             icons.setdefault(area, []).append((iu, iv, jp))
     return icons, rows, skipped
@@ -152,6 +157,8 @@ def main():
             o.set('location', T.location(u, v)).set('offset_x', 0.0).set('offset_y', 0.0)
             o.set('flags', ICON_FLAGS).set('radius', ICON_RADIUS).set('3d_render_height', ICON_HEIGHT)
             o.set('scenery_teleport_to', jp)
+            if any(r.get('world_jump') == jp for r in areas[area]['regions']):
+                o.set('scripts_idx', T.script_array({1: (0, 0, 1099)}))  # san_use, shared baked script
             sec.objects.append(o)
             # The engine writes a sector's save diffs in tile order (row by row) and reads them back in file order,
             # so a static object appended out of tile order breaks the map on reload ("Cannot read diff footer").

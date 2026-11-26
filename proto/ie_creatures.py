@@ -418,6 +418,9 @@ class Converter(object):
                     'class': cls_name, 'race': race_name, 'str': '%d/%02d' % (cre.str, cre.str_bonus) if cre.str_bonus else cre.str,
                     'saves': cre.saves if r3 is None else [r3['fort'], r3['ref'], r3['will']], 'bab': None if r3 is None else r3['bab'], 'xp': cre.xp_value, 'morale': cre.morale, 'morale_break': cre.morale_break,
                     'resist': res, 'mr': mr}}
+        counters = [v for v in (getattr(cre, 'death_var_secondary', ''), getattr(cre, 'death_var_tertiary', '')) if v]
+        if counters:
+            spec['death_counters'] = counters
         if r3 is not None and getattr(cre, 'spells_v22', None):   # IWD2: 2DA-index spell lists -> resrefs
             self.v22_spells(cre)
         if r3 is not None:   # IWD2: feats + skill ranks -> Temple+ (iwd2_rules), unmapped ones listed in the notes
@@ -800,6 +803,8 @@ PORTRAITS = {
     '41nate': 10020, '60nate': 10020, '60nateh': 10020, '50isair': 10030, '60isair': 10030, '63isair': 10030,
     '63isair2': 10030, '31madae': 10040, '50madae': 10040, '60madae': 10040, '63madae': 10040, '63madae2': 10040,
     '30enneli': 10050,
+    # The visible warren guard and his invisible speaking actor represent one NPC.
+    '30hobdgu': 10680, '30hobdg2': 10680,
     # batch 3
     '11elytha': 10060, '11deird': 10070, '11koluhm': 10080, '11phaen': 10090, '12phaen': 10090,
     '10reig': 10100, '12reig': 10100, '10guthe': 10110, '60iselor': 10120, '10kicksh': 10130, '12kicksh': 10130,
@@ -970,7 +975,70 @@ PORTRAITS.update({
     '12menon': 13110,
     '10rukwu': 13120,
     '10ulek': 13130,
+    # batch 10A + Chapter 1 zero-art aliases
+    'orrick': 13140, 'oswald': 10010, 'kaarund': 9920,
+    '20dedvm': 11670, '20dedvf': 12400,
+    # batch 10B: Chapter 1 named NPCs / bosses
+    'hjollder': 13150, 'calliana': 13160, 'weenog': 13170, 'ferg': 13180, 'gus': 13190,
+    'aldwin': 13200, 'amelia': 13210, 'whitcomb': 13220, 'gerth': 13230, 'urnst': 13240,
+    'kumirek': 13250, 'nate': 13260, 'sheemish': 13270, 'jermsy': 13280, 'ghereg': 13290,
+    'uligar': 13300, 'lysanbar': 13310, 'lysan': 13320, 'therik': 13330, 'mytos': 13340,
+    '20dereth': 13370, '20derhid': 13370, '20sabrin': 13380, '20emma': 13390,
+    '20kaitln': 13400, '20arte': 13410, '20kris': 13420, '20kntvir': 13430,
+    '20orcchf': 13440, '20vrek': 13450, '21gaernt': 13460, '21orccom': 13470, '31buggut': 13470,
+    '21xuki': 13480,
+    'talodead': 11670, '00humded': 11670,
+    # batch 11: IWD2 Horde Fortress named bosses, captains & NPCs
+    '31sherin': 13750, '31brasto': 13760, '31brastd': 13760, '30yquogg': 13770,
+    '30gobvun': 13780, '30gobkru': 13790, '30gobpon': 13800, '30gobpoh': 13800,
+    '30ilquag': 13810, '30tequag': 13820, '30ogrgar': 13830, '30ogrga2': 13830,
+    '30orotas': 13840, '30orctru': 13850, '30gobmok': 13860, '30gobogr': 13870,
+    '30hobgum': 13880, '30orcgot': 13890, '30oropus': 13900,
 })
+# Chapter 1 generic monster aliases + batch 10B pools
+MONSTER_FAMILY['21anivil'] = 'b8_zombie'
+MONSTER_FAMILY['ktsk1h'] = 'b8_skeleton'
+MONSTER_FAMILY['vsshadoh'] = 'b8_shadow'
+MONSTER_FAMILY.update(dict.fromkeys('vsyetii vsyetii2'.split(), 'yeti'))
+MONSTER_POOLS['spectral_guard'] = ((13350, 13360), ())
+MONSTER_FAMILY['spguard'] = 'spectral_guard'
+MONSTER_POOLS['cave_bear'] = ((13490, 13500), ())
+MONSTER_FAMILY['kubear'] = 'cave_bear'
+MONSTER_POOLS['carrion_crawler'] = ((13510, 13520), ())
+MONSTER_FAMILY.update(dict.fromkeys('mcar 20carcwl'.split(), 'carrion_crawler'))
+MONSTER_POOLS['skeletal_mage'] = ((13530, 13540), ())
+MONSTER_FAMILY['ktsmg2'] = 'skeletal_mage'
+MONSTER_POOLS['green_slime'] = ((13550, 13560), ())
+MONSTER_FAMILY.update(dict.fromkeys('20grnslm 20olvslm'.split(), 'green_slime'))
+MONSTER_POOLS['ochre_jelly'] = ((13570, 13580), ())
+MONSTER_FAMILY['20ocrjel'] = 'ochre_jelly'
+MONSTER_POOLS['arctic_boar'] = ((13590, 13600), ())
+MONSTER_FAMILY['20borarc'] = 'arctic_boar'
+MONSTER_POOLS['snow_leopard'] = ((13610, 13620), ())
+MONSTER_FAMILY.update(dict.fromkeys('20snolep 20madlep 20strlep 20hghcat 20rndcat'.split(), 'snow_leopard'))
+MONSTER_POOLS['highland_snake'] = ((13630, 13640), ())
+MONSTER_FAMILY.update(dict.fromkeys('21hghsnk 20rndsnk'.split(), 'highland_snake'))
+MONSTER_POOLS['wererat'] = ((13650, 13660), ())
+MONSTER_FAMILY['21werrat'] = 'wererat'
+MONSTER_POOLS['werebadger'] = ((13670, 13680), ())
+MONSTER_FAMILY['21werbgr'] = 'werebadger'
+MONSTER_POOLS['bugbear'] = ((13690, 13700), ())
+MONSTER_FAMILY.update(dict.fromkeys('21bugcpt 00bug 31bugb00 31bugb01 31bugjai'.split(), 'bugbear'))
+MONSTER_POOLS['legion_mage'] = ((13710, 13720), ())
+MONSTER_FAMILY['21elfmge'] = 'legion_mage'
+MONSTER_POOLS['phase_spider'] = ((13730, 13740), ())
+MONSTER_FAMILY['21spdqn'] = 'phase_spider'
+# batch 11: Horde Fortress monsters
+MONSTER_POOLS['otyugh'] = ((13910, 13920), ())
+MONSTER_FAMILY['30oty'] = 'otyugh'
+MONSTER_POOLS['drowned_dead'] = ((13930, 13940), ())
+MONSTER_FAMILY['30dfdnd'] = 'drowned_dead'
+MONSTER_POOLS['barghest_whelp'] = ((13950, 13960), ())
+MONSTER_FAMILY['00welp'] = 'barghest_whelp'
+MONSTER_POOLS['worg'] = ((13970, 13980), ())
+MONSTER_FAMILY.update(dict.fromkeys('30wolwor 30wolwos'.split(), 'worg'))
+MONSTER_POOLS['fire_beetle_queen'] = ((13990, 14000), ())
+MONSTER_FAMILY['30beetq'] = 'fire_beetle_queen'
 
 
 def monster_portrait(resref, seed):
@@ -989,8 +1057,8 @@ def pick_portrait(resref, gender, n):
     r = (resref or '').lower()
     if r in PORTRAITS:
         return PORTRAITS[r]
-    if r.startswith(('towniem', 'townief', 'stoolm', 'chairm')):
-        pool = TOWNSWOMEN if gender == 'female' else TOWNSMEN
+    if r.startswith(('towniem', 'townief', 'stoolm', 'chairm', 'katown', '20pesm', '20pesf')) or r == 'geezer':
+        pool = TOWNSWOMEN if (gender == 'female' or r.startswith(('townief', '20pesf'))) else TOWNSMEN
         return pool[n % len(pool)]
     return None
 
@@ -1058,7 +1126,9 @@ def convert_area(game, toee_root, out, area, name_base=27000, options=None, scri
         nm = VARIANT_NAMES.get(act['cre'].lower(), {}).get(nm.strip(), nm) or act['name']
         names[nid] = nm.replace('{', '(').replace('}', ')')
         s['name_id'] = nid
-        if script_base and s.get('status') == 'ok' and (s.get('dialog') or s.get('scripts')):
+        # The bridge area script targets each support by its ARE name. The
+        # supports have no BCS of their own but still need identity and death hooks.
+        if script_base and s.get('status') == 'ok' and (s.get('dialog') or s.get('scripts') or s.get('family') == 'bridge_support'):
             dv = re.sub(r'\W', '', (cre.death_var or '').lower())
             an = re.sub(r'\W', '', act['name'].lower())[:16]
             # IWD reuses death variables across creature types (Easthaven goblins carry 'ghast'): only trust one that
@@ -1078,10 +1148,10 @@ def convert_area(game, toee_root, out, area, name_base=27000, options=None, scri
             ''.join('{%d}{%s}\n' % kv for kv in sorted(names.items())))
     elif os.path.exists(os.path.join(mesd, 'ie2toee_%s.mes' % area.lower())):
         os.remove(os.path.join(mesd, 'ie2toee_%s.mes' % area.lower()))
-    keep = ('actor', 'resref', 'status', 'track', 'family', 'proto', 'model', 'scale', 'x', 'y', 'orient', 'gender',
+    keep = ('actor', 'resref', 'status', 'track', 'family', 'anim', 'proto', 'model', 'scale', 'x', 'y', 'orient', 'gender',
             'alignment', 'hostility', 'abilities', 'levels', 'monster_hd', 'hp', 'natural_ac', 'bab', 'to_hit_bonus',
             'save_bonus', 'conditions', 'dead', 'no_flee', 'invulnerable', 'ident', 'cr', 'items', 'spells', 'ai_strategy', 'name_id',
-            'script_id', 'schedule', 'portrait', 'difficulty', 'feats', 'skills', 'mesh', 'hidden', 'area_script', 'area_spawn')
+            'script_id', 'schedule', 'portrait', 'difficulty', 'feats', 'skills', 'mesh', 'hidden', 'area_script', 'area_spawn', 'death_counters')
     py = ['# Generated by ie2toee ie_creatures.py from the player\'s own IE install. Do not distribute.',
           'AREA = %r' % area.upper(), 'CREATURES = [']
     for s in specs:
@@ -1139,7 +1209,7 @@ def _actor_have(game, a):
 
 
 def convert_spawnables(game, toee_root, out, areas, scr_dirs=(), name_base=20300, options=None, tp_root=None, whole_game=False,
-                       script_base=None, script_max=None):
+                       script_base=None, script_max=None, append_areas=()):
     """Creatures that appear at runtime: CreateCreature("cre", ...) in the converted scripts/dialogs (scanned in
     scr_dirs), plus the area .INI spawns and ARE rest-encounter tables of `areas`. Writes <out>/ie_spawnables.py
     (SPECS: cre -> spawn spec, INI_SPAWNS, REST) and <out>/modules/ToEE/mes/description/ie2toee_spawn.mes."""
@@ -1163,7 +1233,9 @@ def convert_spawnables(game, toee_root, out, areas, scr_dirs=(), name_base=20300
         refs.update(c[2] for b in ie_spells.summon_table(game).values() for _, l in b for c in l)
     except Exception as e:
         print('warning: summon spells: %s' % e)
-    for ar in areas:
+    appended = []
+    for ar in list(areas) + list(append_areas):
+        existing = refs.copy() if ar in append_areas else None
         try:
             a = F.Are(game.read(ar, 'are'))
         except Exception:
@@ -1182,12 +1254,16 @@ def convert_spawnables(game, toee_root, out, areas, scr_dirs=(), name_base=20300
         if r_ and r_['creatures'] and r_['enabled']:
             rest[ar.upper()] = dict(r_, creatures=[c.lower() for c in r_['creatures']])
             refs.update(rest[ar.upper()]['creatures'])
+        if existing is not None:
+            # Save files contain numeric description and script IDs. Give CREs
+            # introduced by later maps slots after the original sorted block.
+            appended.extend(sorted(refs - existing))
     keep = ('resref', 'family', 'proto', 'model', 'scale', 'gender', 'alignment', 'hostility', 'abilities', 'levels',
             'monster_hd', 'hp', 'natural_ac', 'bab', 'to_hit_bonus', 'save_bonus', 'conditions', 'no_flee', 'cr', 'items',
             'spells', 'ai_strategy', 'name_id', 'portrait', 'portrait_pool', 'difficulty', 'feats', 'skills', 'mesh', 'ident',
             'script_id', 'dead')
     specs, names, dlg_args, used, cre_dlg = {}, {}, [], set(), {}
-    for i, r in enumerate(sorted(refs)):
+    for i, r in enumerate(sorted(refs.difference(appended)) + appended):
         try:
             cre = iecre.Cre(game.read(r, 'cre'), r)
             s = cv.convert(cre, {'cre': r, 'name': r, 'x': 0, 'y': 0, 'orient': 0, 'schedule': 0xFFFFFF,
@@ -1272,6 +1348,7 @@ def main():
     s2.add_argument('--tp', help='Temple+ install (tpdata/*.dat) for the Temple+ spell list')
     s3 = sub.add_parser('spawnables'); s3.add_argument('game'); s3.add_argument('toee'); s3.add_argument('out')
     s3.add_argument('--area', action='append', default=[]); s3.add_argument('--scr', action='append', default=[])
+    s3.add_argument('--append-area', action='append', default=[], help='add later encounters after existing spawn IDs')
     s3.add_argument('--name-base', type=int, default=20300); s3.add_argument('--tp'); s3.add_argument('--whole-game', action='store_true')
     s3.add_argument('--option', action='append', default=[])
     s3.add_argument('--script-base', type=int, help='script ids base.. for spawnables with a dialog/scripts (dialogue_actors.txt)')
@@ -1280,7 +1357,7 @@ def main():
     if a.cmd == 'spawnables':
         convert_spawnables(iefs.IEGame(a.game), a.toee, a.out, a.area, a.scr, a.name_base,
                            dict(kv.split('=', 1) for kv in a.option), a.tp, a.whole_game,
-                           a.script_base, a.script_max)
+                           a.script_base, a.script_max, a.append_area)
         return
     if a.cmd == 'survey':
         reps = [survey(iefs.IEGame(g)) for g in a.games]

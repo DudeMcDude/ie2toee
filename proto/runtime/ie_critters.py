@@ -57,7 +57,7 @@ def _set(o, field, v, idx=None):
         _log('  set %s failed: %s' % (field, e))
 
 def passive_prop(o, s):
-    if s.get('family') == 'keg':
+    if s.get('family') in ('keg', 'bridge_support'):
         o.npc_flag_unset(ONF_KOS)
         o.npc_flag_set(ONF_NO_ATTACK)
         o.critter_flag_set(OCF_NO_FLEE)

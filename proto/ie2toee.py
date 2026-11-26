@@ -465,7 +465,7 @@ def widen_open_door(door, radius, base_flags):
     door['tiles'] = [rows[key] for key in sorted(rows)]
 
 
-def write_doors(g, are, wed, tis_for, pl, guidance, sr, bbox, outdir, name, doors_closed, door_clearance=None):
+def write_doors(g, are, wed, tis_for, pl, guidance, sr, bbox, outdir, name, doors_closed, door_clearance=None, use_toggle_point=()):
     """Per door: default state, ToEE position, per-tile blocking for both states (to switch at runtime), and the
     'faithful' extra: both WED tile variants as ground-overlay patches (TGA, canvas coords) for a runtime tile swap.
     Writes <AREA>_doors.json and art/ground/<AREA>_doors/*.tga (derived from the player's files: local only)."""
@@ -521,6 +521,13 @@ def write_doors(g, are, wed, tis_for, pl, guidance, sr, bbox, outdir, name, door
         radius = (door_clearance or {}).get(d['wed_id'].lower(), 0)
         if radius:
             widen_open_door(doors[-1], radius, base_flags)
+        if d['wed_id'].lower() in use_toggle_point:
+            # For deep gates, put the clickable portal at the original use point.
+            # The WED art and both collision masks remain in their native positions.
+            door = doors[-1]
+            door['previous_loc'] = door['loc']
+            door['loc'] = [int(tu), int(tv), round((tu % 1 - 0.5) * INCH_PER_TILE, 2),
+                           round((tv % 1 - 0.5) * INCH_PER_TILE, 2)]
     json.dump(dict(area=name, doors=doors), open(os.path.join(outdir, f'{name}_doors.json'), 'w'), indent=1)
     # Python 2.7 data module for the Temple+ runtime (ie_doors.py)
     with open(os.path.join(outdir, f'ie_doors_{name.lower()}.py'), 'w') as f:
@@ -827,7 +834,7 @@ def convert(game, area, outdir, map_id, ground_id, guidance, preview=False, clos
     open(os.path.join(mapdir, 'gmesh.gmi'), 'wb').write(struct.pack('<i', 0))
     open(os.path.join(mapdir, 'mapinfo.txt'), 'w').write('')
     report['doors'] = write_doors(g, are, wed, tis_for, pl, guidance, sr, bbox, outdir, name, doors_closed,
-                                  ag.get('door_clearance_subtiles'))
+                                  ag.get('door_clearance_subtiles'), ag.get('doors_at_toggle_point', ()))
     # start = first entrance that lands on a walkable tile
     def tl(x, y):
         u, v = pl.ie_to_tile(x, y); return [round(float(u), 2), round(float(v), 2)]

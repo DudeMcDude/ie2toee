@@ -17,6 +17,9 @@ sys.modules['ie_creatures_ar1015'] = m
 m = types.ModuleType('ie_creatures_ar1000')
 m.CREATURES = [{'actor': 'Goblin Archer 1', 'ident': 'goblinarcher1'}, {'actor': 'Townsperson', 'ident': 'townsperson_8'}]
 sys.modules['ie_creatures_ar1000'] = m
+m = types.ModuleType('ie_creatures_ar3101')
+m.CREATURES = [{'actor': '05_BugGut', 'ident': '31buggut', 'death_counters': ['31BugGut_Dead', 'KeepKills']}]
+sys.modules[m.__name__] = m
 import ie_runtime as rt
 from ie_runtime import T
 
@@ -48,6 +51,11 @@ check('script name: ident -> ARE actor name', rt.script_name('townsperson_8', 'A
 check('script name: spawn copy veira#2 -> veira', rt.script_name('veira#2') == 'veira')
 
 rt.death_vars('Pomab'); rt.death_vars('Pomab')
+rt.bind(object(), '31buggut', 'AR3101')
+rt.event('31buggut', 'Die')
+rt.death_vars('Keep Guard', ['KeepKills'])
+check('CRE death counters retain their exact variable names and count kills',
+      T.Global(c, '31BugGut_Dead', 'GLOBAL', 1) and T.Global(c, 'KeepKills', 'GLOBAL', 2))
 check('death_vars counts (IE increments SPRITE_IS_DEAD)', T.Global(c, 'SPRITE_IS_DEADPomab', 'GLOBAL', 2))
 rt.death_vars('Hedron')
 check('IWD2 _DEAD<name> counted too', rt.VARS.get('GLOBAL:_deadhedron') == 1 and rt.VARS.get('GLOBAL:hedron_dead') == 1)

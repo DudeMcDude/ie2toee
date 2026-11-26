@@ -10,9 +10,10 @@ arrival tile: ie2toee moved it onto walkable ground). Exits whose destination ar
 Output is Python 2.7-compatible (it is imported inside Temple+) and derived from the player's own install.
 """
 import argparse, json, os, sys
+from ie_world_routes import SHAENGARNE
 
 
-def collect(workdir, areas, text=None):
+def collect(workdir, areas, text=None, game=None):
     """areas: {AREA: map_id}; text: strref -> str (info point texts). Returns (data dict, [problem strings])."""
     data, problems = {}, []
     for area, mid in sorted(areas.items()):
@@ -21,8 +22,13 @@ def collect(workdir, areas, text=None):
         for e in o['entrances']:
             au, av = e.get('arrival') or [int(e['toee'][0]), int(e['toee'][1])]
             ents[e['name'].upper()] = [au, av, e.get('orient', 0)]
-        regs, infos = [], []
+        regs, infos, triggers = [], [], []
         for r in o['regions']:
+            if area.startswith('I2') and area[2:] in SHAENGARNE and r['type'] != 'travel' and r.get('script') and game and game.exists(r['script'], 'bcs'):
+                trigger = dict(name=r['name'], poly=r['poly'], module='ie_bcs_%s_area' % r['script'].lower())
+                if r['type'] == 'trap' and r.get('trapped') and not r.get('flags', 0) & 2:
+                    trigger['one_shot'] = True
+                triggers.append(trigger)
             if r['type'] == 'info' and text and r.get('info') not in (None, 0, 0xFFFFFFFF):
                 t = text(r['info'])
                 if t and not t.startswith('[strref'):
@@ -36,7 +42,7 @@ def collect(workdir, areas, text=None):
             extra = dict((k, r[k]) for k in ('anchor',) if r.get(k))
             regs.append(dict(extra, name=r['name'], poly=[[round(float(x), 2), round(float(y), 2)] for x, y in r['poly']],
                              dest_area=dest, dest_entrance=r_ent))
-        data[area] = dict(map=mid, entrances=ents, regions=regs, infos=infos)
+        data[area] = dict(map=mid, entrances=ents, regions=regs, infos=infos, triggers=triggers)
     for area, d in sorted(data.items()):
         for r in d['regions']:
             dst = data.get(r['dest_area'])
@@ -86,7 +92,12 @@ def main():
         p = S.find_tlk(a.ie)
         text = S.StrrefText(S.Tlk.load(p)) if p else None
     areas = {x.split(':')[0].upper(): int(x.split(':')[1]) for x in a.area}
-    data, problems = collect(a.workdir, areas, text)
+    import iefs
+    game = iefs.IEGame(a.ie) if a.ie else None
+    data, problems = collect(a.workdir, areas, text, game)
+    if game:
+        from ie_world_routes import add_world_routes
+        add_world_routes(data, game)
     write(data, a.out)
     if a.info_regions:
         print('ie_exits: %d info regions -> %s' % (write_info_regions(data, a.info_regions), a.info_regions))

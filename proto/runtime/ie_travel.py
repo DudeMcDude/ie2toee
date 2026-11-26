@@ -2,8 +2,8 @@
 # valid Python 3 so proto/test_travel.py can run it against a mock game). docs/travel.md has the design.
 #
 # Travel between converted areas uses ToEE's own clickable exit icons (map-change scenery + rules/jumppoint.tab,
-# written by proto/ie_exiticons.py), so nothing here moves the party any more: a polled walk-in trigger could fire
-# right after combat when a PC stood near an exit. travel() stays for scripts/tests. This module still polls the
+# written by proto/ie_exiticons.py). Regional icons open the campaign atlas and its destination callback calls
+# travel(). Walking near a travel icon never activates it. This module polls the
 # party every POLL_MS for:
 #   * info points (IE Trigger Points): their text floats over the leader when a party member steps in;
 #   * on arrival in a converted area that has no baked data (interiors), its doors are attached (ie_doors.start).
@@ -142,17 +142,69 @@ def _note_unconverted(r):
         pass
 
 
-def travel(r):
+def travel(r, hours=None):
     """move the whole party to the destination entrance of region r (a data dict)"""
     global _armed, _busy_until
     d = _data()
+    if r.get('requires_global'):
+        import ie_runtime
+        if not ie_runtime.get_var(None, r['requires_global'], 'GLOBAL'):
+            return
     dst = d.AREAS[r['dest_area']]
     u, v, orient = dst['entrances'][r['dest_entrance']]
     _armed = False
     _busy_until = time.time() + BUSY_S
     _travels[0] += 1
     _log('%s -> %s %s (map %d tile %d,%d)' % (r['name'], r['dest_area'], r['dest_entrance'], dst['map'], u, v))
-    game.fade_and_teleport(0, 0, 0, dst['map'], u, v)
+    game.fade_and_teleport(3600 * (r.get('travel_hours', 0) if hours is None else hours), 0, 0, dst['map'], u, v)
+
+
+def use_world_exit(icon, user):
+    data = _data()
+    source = data.BY_MAP.get(icon.map)
+    jump = icon.obj_get_int(obj_f_scenery_teleport_to)
+    if not source or not any(r.get('world_jump') == jump for r in data.AREAS[source]['regions']):
+        return RUN_DEFAULT
+    if user in game.party and user.map == game.leader.map == icon.map and not game.combat_is_active():
+        import ie_atlas
+        ie_atlas.show(source)
+    return SKIP_DEFAULT
+
+
+def _revealed_exits(area, now):
+    """Supply world exits missing from a previously saved sector, once unlocked."""
+    global _next_exit_check
+    if now < _next_exit_check:
+        return
+    _next_exit_check = now + 2.0
+    import ie_runtime
+    for route in area['regions']:
+        if not route.get('world_jump'):
+            continue
+        jump = route.get('world_icon', route['world_jump'])
+        gate = route.get('requires_global')
+        unlocked = not gate or ie_runtime.get_var(None, gate, 'GLOBAL')
+        if not unlocked and jump == route['world_jump']:
+            continue
+        loc = location_from_axis(*route['anchor'])
+        nearby = game.obj_list_range(loc, 36, OLC_SCENERY)
+        if jump != route['world_jump']:
+            # Older saves have separate scenery icons for routes that share the same IE exit.
+            for old in nearby:
+                if old.obj_get_int(obj_f_scenery_teleport_to) == route['world_jump']:
+                    old.object_flag_set(OF_OFF)
+        if not unlocked:
+            continue
+        icon = next((o for o in nearby if o.obj_get_int(obj_f_scenery_teleport_to) == jump), None)
+        if not icon:
+            icon = game.obj_create(2011, loc)
+            if icon:
+                icon.obj_set_int(obj_f_scenery_teleport_to, jump)
+        if icon and icon.scripts[1] != 1099:
+            icon.scripts[1] = 1099  # upgrade the existing regional exit in saved sectors
+
+
+_next_exit_check = 0
 
 
 def tick(gen):
@@ -176,7 +228,12 @@ def tick(gen):
     except Exception:
         return 1
     d = _data()
+    import sys
+    atlas = sys.modules.get('ie_atlas')
+    if atlas and atlas.active() and (cur != _map or game.combat_is_active()):
+        atlas.close()
     if cur != _map:
+        _inside.clear()
         _map = cur
         _armed = False                # (re)arm only after leaving every region on this map
         area = d.BY_MAP.get(cur)
@@ -187,9 +244,47 @@ def tick(gen):
     area = d.BY_MAP.get(cur)
     if not area:
         return 1
+    _revealed_exits(d.AREAS[area], now)
     pts = [_pos(p) for p in party]
+    _triggers(area, d.AREAS[area].get('triggers') or (), party, pts)
     # (travel itself is no longer polled: the converter places clickable ToEE exit icons, ie_exiticons.py)
     return 1
+
+
+_inside = {}   # (area, region name) -> party member inside last poll
+
+
+def _triggers(area, trigs, party, pts):
+    """ARE trigger regions: when a party member steps in, run the region's script once with Entered = that member
+    (IE fires Entered on entry; the scripts gate themselves on globals, e.g. CARATRG1/2 for Caravan_Quest)"""
+    for r in trigs:
+        k = (area, r['name'])
+        who = None
+        for p, (px, py) in zip(party, pts):
+            if near_region(px, py, r['poly']):
+                who = p
+                break
+        was = _inside.get(k)
+        _inside[k] = who
+        if who is None or was is not None:
+            continue
+        try:
+            import ie_runtime as rt
+            mod = __import__(r['module'])
+            source_area = area[2:] if area.startswith('I2') else area
+            ident = 'area_' + source_area.upper()
+            ctx = rt.Ctx(None, who, ident, source_area.upper(), {'Entered': who})
+            # A trapped IE proximity region without the reset flag disarms on entry.
+            # Keep its state across map visits and saves, even if a follower arrives later.
+            used = '__ie_region_fired_' + r['name']
+            if r.get('one_shot') and rt.get_var(ctx, used, 'MYAREA'):
+                continue
+            rt.run_script(ctx, mod.BLOCKS)
+            if r.get('one_shot'):
+                rt.set_var(ctx, used, 'MYAREA', 1)
+            _log('%s: %s entered (%s)' % (area, r['name'], r['module']))
+        except Exception as e:
+            _log('trigger %s %s failed: %s' % (area, r['name'], e))
 
 
 def poll(gen=0):

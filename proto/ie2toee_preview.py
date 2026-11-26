@@ -13,7 +13,7 @@ Pipeline (each step is one of the converter scripts in this folder, run in order
 The result is <out>/install: copy its contents into the ToEE folder (or pass --install to do that).
 Nothing of the IE game is shipped with the converter: everything is read from the install you point it at.
 """
-import argparse, os, re, shutil, subprocess, sys
+import argparse, json, os, re, shutil, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -51,7 +51,7 @@ def install_varhooks(scr):
     if os.path.isfile(old):
         os.remove(old)
 
-RUNTIME = ['ie_runtime', 'ie_critters', 'ie_spellrt', 'ie_combat', 'ie_doors', 'ie_bakert', 'ie_itemrt', 'ie_travel', 'ie_movies_rt', 'ie_cutscene', 'map_tick', 'ie_spawn', 'ie_vars']
+RUNTIME = ['ie_runtime', 'ie_critters', 'ie_spellrt', 'ie_combat', 'ie_doors', 'ie_bakert', 'ie_itemrt', 'ie_travel', 'ie_atlas', 'ie_movies_rt', 'ie_cutscene', 'map_tick', 'ie_spawn', 'ie_vars']
 
 
 def flavour(ie):
@@ -63,18 +63,25 @@ def flavour(ie):
     sys.exit('%s does not look like an Icewind Dale install (no chitin.key / dialog.tlk / lang folder)' % ie)
 
 
+def run_tool(args):
+    cmd = [sys.executable, os.path.join(HERE, args[0])]
+    if args[0] == 'ie_dialogue.py':
+        # Whole chapters exceed the Windows process command-line length limit.
+        return subprocess.run(cmd + ['--args-from-stdin'], input=json.dumps(args[1:]).encode('ascii'), cwd=HERE)
+    return subprocess.run(cmd + args[1:], cwd=HERE)
+
+
 def run(step, args):
     print('== %s' % step, flush=True)
-    cmd = [sys.executable, os.path.join(HERE, args[0])] + args[1:]
-    r = subprocess.run(cmd, cwd=HERE)
+    r = run_tool(args)
     if r.returncode:
-        sys.exit('step "%s" failed (exit %d): %s' % (step, r.returncode, ' '.join(cmd)))
+        sys.exit('step "%s" failed (exit %d): %s' % (step, r.returncode, args[0]))
 
 
 def run_soft(step, args):
     """like run(), but a failing step only returns False (one broken interior must not stop the whole preview)"""
     print('== %s' % step, flush=True)
-    r = subprocess.run([sys.executable, os.path.join(HERE, args[0])] + args[1:], cwd=HERE)
+    r = run_tool(args)
     return r.returncode == 0
 
 
@@ -145,6 +152,15 @@ def area_names(ie, w, specs, shops, start_area='AR1000', prefix=''):
     except Exception as ex:
         print('warning: worldmap names: %s' % ex)
     town = wmp.get(start_area) or start_area
+    def region_name(area):
+        seen = set()
+        while area and area not in seen:
+            if wmp.get(area):
+                return wmp[area]
+            seen.add(area)
+            area = parent.get(area)
+        return town
+
     out = {}
     for ar, spec in specs.items():
         key = _bare_area(ar, prefix)
@@ -161,7 +177,7 @@ def area_names(ie, w, specs, shops, start_area='AR1000', prefix=''):
             for c in gl.get('CREATURES', []):
                 if (c.get('resref') or '').lower() in ie_creatures.PORTRAITS:
                     try:
-                        name = '%s - %s' % (wmp.get(parent.get(key)) or town, t.get(iecre.Cre(g.read(c['resref'], 'cre'), c['resref']).as_dict()['name_strref']))
+                        name = '%s - %s' % (region_name(key), t.get(iecre.Cre(g.read(c['resref'], 'cre'), c['resref']).as_dict()['name_strref']))
                         break
                     except Exception:
                         pass
@@ -179,8 +195,8 @@ def area_names(ie, w, specs, shops, start_area='AR1000', prefix=''):
         pa = parent.get(key)
         # look up the parent's display name under either the prefixed or bare key
         pname = next((out[k] for k in out if _bare_area(k, prefix) == pa and out[k]), None)
-        ptown = wmp.get(pa) or town   # an interior off another outdoor area (IWD2 Targos AR1100) is named after that area
-        out[ar] = ('%s - Outskirts' % town if at & 1 else '%s - Cave' % town if at & 0x20 else
+        ptown = region_name(key)   # an interior off another outdoor area (IWD2 Targos AR1100) is named after that area
+        out[ar] = ('%s - Outskirts' % ptown if at & 1 else '%s - Cave' % ptown if at & 0x20 else
                    '%s - Side Room' % pname if pa not in (None, start_area) and pa not in wmp and pname else
                    '%s - House (%s)' % (ptown, key))
     return {ar: n.replace('{', '(').replace('}', ')') for ar, n in out.items()}
@@ -390,6 +406,8 @@ def convert(a, stage):
             os.path.join(w, 'ie_travel_data.py')] + [os.path.join(w, 'ie_doors_%s.py' % ar.lower()) for ar in interiors] + [
             os.path.join(bake, 'ie_bake_%s.py' % ar.lower()) for ar in interiors]:
         shutil.copy(f, scr)
+    import ie_worldmap_art
+    ie_worldmap_art.build(ie, os.path.join(w, 'ie_travel_data.py'), M, scr)
     install_varhooks(scr)
     if os.path.isfile(os.path.join(mov, 'ie_movies_data.py')):
         shutil.copy(os.path.join(mov, 'ie_movies_data.py'), scr)

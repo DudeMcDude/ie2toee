@@ -1,10 +1,12 @@
-"""IWD2 proof of concept: converts Targos (IE areas AR1000-AR1007, AR1100-AR1107, AR1200-AR1201) of YOUR OWN Icewind Dale II install
-(GOG or retail) into ToEE maps for the preview Temple+ build.
+"""Build a Temple+ preview of Targos, Shaengarne and the Horde Fortress
+from the player's Icewind Dale II installation (GOG or retail).
 
   python ie2toee_preview_iwd2.py --iwd2 "C:\\GOG Games\\Icewind Dale 2" --toee "C:\\GOG Games\\ToEE-IWD2" [--out iwd2_out] [--install]
 
 Same converter steps as ie2toee_preview.py (map, spells, creatures, items, bake, travel exits, exit icons, path nodes),
-plus dialogue for the Targos NPCs (ie_dialogue.py; journal/quests not yet) and the IE dialogue window (ie_dialog_skin.py, from your install's GUI). Maps are named I2AR1000.. (map ids from map_id_base in guidance/iwd2.json, currently 5031-5048: AR1000-1006, AR1100, AR1200, AR1201 = 5031-5040 (unchanged, old saves), then AR1007, AR1101-1107 = 5041-5048) so they stay <= 5198 (temple.dll town map) and do not collide with IWD or ENGINE_MAP_IDS.
+plus NPC dialogue and the IE dialogue window (ie_dialog_skin.py, from your install's GUI).
+Map names start with I2AR. Targos keeps its released map IDs (5031-5048).
+CHAPTER_MAPS assigns the later region IDs within the engine's town-map limit.
 Install target (use a COPY of ToEE): maps, ground art, rules -> modules\\ToEE; scripts and description .mes ->
 modules\\ToEE_core (Temple+ discovers scripts before modules\\ToEE is mounted); item icons -> data\\.
 Nothing of IWD2 is shipped: everything is read from the install you point it at.
@@ -30,6 +32,14 @@ AREAS = ['AR1000', 'AR1001', 'AR1002', 'AR1003', 'AR1004', 'AR1005', 'AR1006', '
          # the rest of Targos (appended so the first ten keep their map ids): AR1007 goblin warehouse off AR1002,
          # AR1101-AR1107 the houses off AR1100 (Ulbrec 1101, Deirdre 1102, Koluhm 1107: the Shawford chain)
          'AR1007', 'AR1101', 'AR1102', 'AR1103', 'AR1104', 'AR1105', 'AR1106', 'AR1107']
+from ie_world_routes import FORTRESS, SHAENGARNE
+AREAS += SHAENGARNE
+AREAS.extend(FORTRESS)
+AREAS.append('AR4001')  # Oswald's airship after leaving Targos
+# AR2000 keeps the next Targos slot. Other maps stay clear of the engine and IWD ranges.
+CHAPTER_MAPS = dict(zip(SHAENGARNE, (5049, 5136, 5137, 5138, 5139, 5140)))
+CHAPTER_MAPS.update({area: 5141 + i for i, area in enumerate(FORTRESS)})
+CHAPTER_MAPS['AR4001'] = 5146
 SPAWN_SCRIPT_BASE = 2600   # runtime-spawned creatures with a dialog/scripts: 2600..2999
 # name ids stay below the ~30000 description cap: 28000+250i for the first 8 areas, then the free gap 20800-21999
 # (spawn names 20300.., item names 22000..); AR1200 has >100 actors, so its scripts get 150 slots.
@@ -37,10 +47,28 @@ SPAWN_SCRIPT_BASE = 2600   # runtime-spawned creatures with a dialog/scripts: 26
 # scripts 3000+100k (2600-2999 are the spawnables; vanilla ToEE has no scripts 1375-31999)
 AREA_BASES = {'AR1200': (21000, 2300), 'AR1201': (21400, 2450), 'AR1007': (21500, 3000)}
 AREA_BASES.update({ar: (21600 + 50 * k, 3100 + 100 * k) for k, ar in enumerate(['AR1101', 'AR1102', 'AR1103', 'AR1104', 'AR1105', 'AR1106', 'AR1107'])})
+# Shaengarne's first map alone has 189 actors. Each area gets 200 stable slots.
+AREA_BASES.update({ar: (18000 + 200 * i, 3800 + 200 * i) for i, ar in enumerate(SHAENGARNE)})
 LATE_AREAS = AREAS[10:]   # their journal entries get the 50 logbook slots last (the first ten keep theirs)
-SCRIPT_ID_MAX = 3799   # (installer: stale scripts of an earlier build in 1500..SCRIPT_ID_MAX are moved aside)
+AREA_BASES.update({area: (19200 + 200 * i, 5000 + 200 * i) for i, area in enumerate(FORTRESS)})
+AREA_BASES['AR4001'] = (20200, 6000)
+SCRIPT_ID_MAX = 6099
 SCRIPT_BASE = 1500  # area i's actor scripts 1500+100i.. (vanilla ToEE: <= 1374); dialogue for the actors with a DLG
 START = (450, 490)   # fallback: I2AR1000 tile of IWD2's own new-game spot (STARTARE.2DA 2390,860, the docks)
+
+
+def painted_map_limits(work, area, map_id):
+    """Native scroll bounds for a converted painting. Temple+ adds viewport padding."""
+    from ie2toee import CAL_X0, CAL_Y0
+    with open(os.path.join(work, 'I2' + area + '_objects.json')) as f:
+        placement = json.load(f)['placement']
+    with open(os.path.join(work, 'I2' + area + '_report.json')) as f:
+        width, height = json.load(f)['size_px']
+    cx, cy = placement['canvas_offset']
+    dx, dy = placement['cal']
+    left, top = CAL_X0 + dx - cx, CAL_Y0 + dy - cy
+    scale = placement['scale']
+    return '{%d}{%d,%d,%d,%d}' % (map_id, left, top, left - round(width*scale), top - round(height*scale))
 
 
 def starting_equipment(td, rules_dir):
@@ -103,6 +131,24 @@ def dialog_skin_for(ie):
     return 'iwd'
 
 
+def actor_script_arg(line):
+    """Keep quest and cutscene scripts on actors whose combat AI is handled by ToEE."""
+    if not line.strip():
+        return None
+    arg = line.split()[-1]
+    parts = arg.split(':', 4)
+    if len(parts) < 3:
+        return None
+    ident, area, sid, dlg, scripts = (parts + ['', ''])[:5]
+    if dlg:
+        return arg
+    # The chapter camps use 00TnnET to update the area TEAM_n variables.
+    # Other 00* scripts implement generic AI.
+    keep = [s for s in scripts.split(',') if s and (not s.lower().startswith('00') or
+            (area.upper() in CHAPTER_MAPS and re.fullmatch(r'00t\d{2}et', s, re.I)))]
+    return ':'.join((ident, area, sid, dlg, ','.join(keep)))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--iwd2', required=True, help='your Icewind Dale II folder (GOG or retail)')
@@ -140,7 +186,7 @@ def convert(a, stage):
     gbase = int(guide.get('ground_id_base', 950))
     for i, ar in enumerate(AREAS):
         G.setdefault(ar, {})
-        G[ar]['map'] = base + i
+        G[ar]['map'] = CHAPTER_MAPS.get(ar, base + i)
         G[ar].setdefault('ground', gbase + i)
     ids_used = [G[ar]['map'] for ar in AREAS]
     assert max(ids_used) <= TOWNMAP_ID_MAX, 'map ids above %d crash the town map (see map_id_base)' % TOWNMAP_ID_MAX
@@ -163,18 +209,13 @@ def convert(a, stage):
                                               '--name-base', str(AREA_BASES.get(ar, (28000 + 250 * i,))[0]),
                                               '--script-base', str(AREA_BASES.get(ar, (0, SCRIPT_BASE + 100 * i))[1])] + tpa):
                 cre[ar] = d
-    # dialogue: the actors that have a DLG (IE scripts of dialogue-less actors such as the goblins stay unconverted)
     actors = []
     for d in cre.values():
-        for l in open(os.path.join(d, 'dialogue_actors.txt')).read().split('\n'):
-            p_ = l.split()[-1].split(':') if l.strip() else []
-            if len(p_) > 3 and p_[3]:
-                actors += ['--actor', l.split()[-1]]
-            elif len(p_) > 2:   # no DLG: a stub script (binds the ident; the .mob names this id, so no "Failed to build script name")
-                # plus the actor's area-specific BCS (cutscene/battle scripts, e.g. AR1200's 12caba05 -> 12cSpn1a);
-                # the generic 00* combat/AI scripts stay with ToEE's own AI
-                own = [x for x in (p_[4].split(',') if len(p_) > 4 else []) if x and not x.lower().startswith('00')]
-                actors += ['--actor', '%s:%s:%s::%s' % (tuple(p_[:3]) + (','.join(own),))]
+        with open(os.path.join(d, 'dialogue_actors.txt')) as source:
+            for line in source:
+                arg = actor_script_arg(line)
+                if arg:
+                    actors += ['--actor', arg]
     dlg = os.path.join(w, 'dialogue')
     amap = sum((['--area-map', '%s:%d:%d,%d' % ((ar, G[ar]['map']) + tuple(json.load(open(os.path.join(w, 'I2' + ar + '_objects.json')))
                 ['placement']['canvas_offset']))] for ar in ok), [])
@@ -190,14 +231,14 @@ def convert(a, stage):
             print('warning: area script of %s: %s' % (ar, e))
     dlg_cmd = ['ie_dialogue.py', ie, dlg, '--strip-directions', '--quest-base', '150', '--quest-max', '199',
                '--new-game', 'CHAPTER=-1'] + actors + amap + ascr + sum((['--journal-late', x] for x in LATE_AREAS), [])
-    run_soft('dialogue', dlg_cmd)
+    run('dialogue', dlg_cmd)
     spw = os.path.join(w, 'spawnables')   # CreateCreature / spawn-point / summon CREs (ie_spawn.py at runtime)
     run_soft('spawnables', ['ie_creatures.py', 'spawnables', ie, toee, spw, '--whole-game', '--scr', dlg,
                             '--script-base', str(SPAWN_SCRIPT_BASE), '--script-max', str(SPAWN_SCRIPT_BASE + 399)] +
-             sum((['--area', ar] for ar in ok), []) + tpa)
+             sum((['--append-area' if ar in FORTRESS or ar == 'AR4001' else '--area', ar] for ar in ok), []) + tpa)
     sa = os.path.join(spw, 'dialogue_actors.txt')     # spawned creatures' own scripts/dialogue: second dialogue pass
     if os.path.isfile(sa) and open(sa).read().split():
-        run_soft('dialogue + spawnables', dlg_cmd + open(sa).read().split())
+        run('dialogue + spawnables', dlg_cmd + open(sa).read().split())
     stores = set()
     for root, _, files in os.walk(dlg):
         for name in files:
@@ -276,10 +317,16 @@ def convert(a, stage):
     if os.path.isdir(os.path.join(dlg, 'modules', 'ToEE', 'dlg')):
         copytree(os.path.join(dlg, 'modules', 'ToEE', 'dlg'), os.path.join(C, 'dlg'))
         copytree(os.path.join(dlg, 'modules', 'ToEE', 'scr'), scr)
+    if os.path.isdir(os.path.join(dlg, 'modules', 'ToEE', 'sound')):
+        copytree(os.path.join(dlg, 'modules', 'ToEE', 'sound'), os.path.join(M, 'sound'))
     for f in [os.path.join(HERE, 'runtime', m + '.py') for m in RUNTIME] + [
             os.path.join(w, 'spells', 'ie_spellmap.py'), os.path.join(w, 'items', 'ie_itemmap.py'), tr]:
         shutil.copy(f, scr)
+    import ie_worldmap_art
+    ie_worldmap_art.build(ie, os.path.join(w, 'ie_travel_data.py'), M, scr)
     install_varhooks(scr)
+    import ie_music
+    ie_music.convert(ie, toee, inst, [(ar, 'I2' + ar) for ar in ok], module='ToEE', scr_dir=scr)
     sn = {}
     for ar in ok:
         sp = os.path.join(w, 'I2' + ar + '_snippets.txt'); cur = None
@@ -352,8 +399,11 @@ def convert(a, stage):
         lim = td.read('rules/MapLimits.mes').decode('latin-1').splitlines()
     except FileNotFoundError:
         lim = []
-    open(os.path.join(M, 'rules', 'MapLimits.mes'), 'w', encoding='latin-1', newline='\r\n').write(
-        '\n'.join(l for l in lim if not (re.match(r'\s*\{(\d+)\}', l) and int(re.match(r'\s*\{(\d+)\}', l).group(1)) in our_ids)) + '\n')
+    lim = [l for l in lim if not (re.match(r'\s*\{(\d+)\}', l) and int(re.match(r'\s*\{(\d+)\}', l).group(1)) in our_ids)]
+    for ar in ok:
+        if G[ar].get('limit_scroll_to_art'):
+            lim.append(painted_map_limits(w, ar, G[ar]['map']))
+    open(os.path.join(M, 'rules', 'MapLimits.mes'), 'w', encoding='latin-1', newline='\r\n').write('\n'.join(lim) + '\n')
     open(os.path.join(M, 'rules', 'daynight.nxd'), 'wb').close()   # no vanilla NPC day/night moves (they name map ids)
     copy_early_to_core(M, C)   # town map names / scroll limits are read before modules\ToEE is mounted
     print('overlay: %s  (%d areas: %s)' % (os.path.join(out, 'install'), len(ok), ' '.join('I2' + x for x in ok)))

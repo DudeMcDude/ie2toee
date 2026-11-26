@@ -45,6 +45,13 @@ __pycache__/
 *.pnd
 *.cgf
 *.cif
+*.mp3
+*.wav
+*.WAV
+*.acm
+*.ACM
+*.mus
+*.MUS
 
 # local notes / test data
 progress.md

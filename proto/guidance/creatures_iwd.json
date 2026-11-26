@@ -131,6 +131,11 @@
   "_garb_about": "Class-based humanoids without body armour get ToEE garb (picked deterministically per creature) and boots, so they are not rendered unclothed."
  },
  "families": [
+  {"id":"bugbear_captain","label":"Bugbear captain","classic":["0xe8e8"],"proto":14093,"status":"match"},
+  {"id":"malarite","label":"Malarite priest","classic":["0xe7d9"],"track":"class","proto":14000,"status":"stand-in"},
+  {"id":"wererat","label":"Wererat","classic":["0xee18"],"proto":14056,"status":"stand-in"},
+  {"id":"werebadger","label":"Werebadger","classic":["0xee08"],"proto":14344,"status":"stand-in"},
+  {"id":"shaengarne_cat","label":"Panther or leopard","classic":["0x7f0a","0x7f0b"],"co8_model":1229,"proto":14050,"status":"stand-in"},
   {
    "id": "keg",
    "label": "Keg (IWD2 Targos inn props, 10keg*; ToEE has no breakable scenery: an NPC critter with the barrel mesh)",
@@ -248,6 +253,7 @@
    "classic": [
     "0xe868",
     "0xe878",
+    "0xe888",
     "0xe88c"
    ],
    "ee": [
@@ -263,7 +269,9 @@
   {
    "id": "hobgoblin",
    "label": "Hobgoblin",
-   "classic": [],
+   "classic": [
+    "0x8100"
+   ],
    "ee": [
     "0x8100"
    ],
@@ -453,6 +461,7 @@
    "id": "troll",
    "label": "Troll",
    "classic": [
+    "0xe7e8",
     "0xe718",
     "0xe728",
     "0xe738"
@@ -677,6 +686,7 @@
    "id": "spider",
    "label": "Giant spider",
    "classic": [
+    "0x7f2f",
     "0x7a00",
     "0x7a01",
     "0x7a02",
@@ -1001,7 +1011,7 @@
   {
    "id": "harpy",
    "label": "Harpy",
-   "classic": [],
+   "classic": ["0xe249"],
    "ee": [
     "0xe252"
    ],
@@ -1093,7 +1103,7 @@
   {
    "id": "boar",
    "label": "Boar",
-   "classic": [],
+   "classic": ["0xe7b8"],
    "ee": [
     "0xe265"
    ],
@@ -1104,7 +1114,7 @@
   {
    "id": "snake",
    "label": "Snake",
-   "classic": [],
+   "classic": ["0x7f13"],
    "ee": [
     "0x7f13"
    ],
@@ -1226,7 +1236,7 @@
   {
    "id": "ooze",
    "label": "Ooze / slime",
-   "classic": [],
+   "classic": ["0x7900","0x7901","0x7903"],
    "ee": [
     "0x7901",
     "0x7902",
@@ -1339,6 +1349,8 @@
   "overrides": {}
  },
  "resref_families": {
+  "21supprt": {"id":"bridge_support","label":"Dam support beam","proto":14000,"mesh":10122,"track":"monster","status":"stand-in"},
+  "21suprt2": {"id":"bridge_support","label":"Bridge support beam","proto":14000,"mesh":10122,"track":"monster","status":"stand-in"},
   "10dop": {"id": "resref_10dop", "label": "Doppelganger", "proto": 14000, "status": "stand-in", "notes": "Human form for the disguised Targos shapechanger. Its CRE supplies the stats and initial hidden state."},
   "_doc": "cre resref -> family (beats the animation family): IWD2 summons with no or the wrong animation match",
   "00sdrat": {"label": "Dire rat", "proto": 14056, "status": "match", "id": "resref_00sdrat"},

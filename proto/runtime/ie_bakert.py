@@ -157,7 +157,10 @@ def omit_placement(o, spec):
     if o and o != OBJ_HANDLE_NULL:
         ie_runtime._bound.pop(o.id, None)
         ie_runtime._bound.pop(_guid(o), None)
-        o.destroy()
+        # The owner's separately baked items still point to it on reload.
+        # OF_OFF suppresses AI and interaction while preserving that link.
+        if not o.object_flags_get() & OF_OFF:
+            o.object_flag_set(OF_OFF)
     return True
 
 
@@ -233,7 +236,7 @@ def died(o, area):
         return
     try:
         import ie_runtime
-        ie_runtime.death_vars(d['spec']['actor'])
+        ie_runtime.death_vars(d['spec']['actor'], d['spec'].get('death_counters', ()))
     except Exception, e:
         _log('IE_BAKE died %s: %s' % (d['spec'].get('actor'), e))
 
@@ -325,7 +328,8 @@ def _wants_hidden(m):
                 for r in resps:
                     for a in r[1]:
                         _names(a, ns)
-        _hb_mods[k] = 'CreatureHidden' in ns or 'StartCutScene' in ns
+        hidden_speaker = {'SetDialogueRange', 'Dialogue', 'ChangeEnemyAlly'}.issubset(ns)
+        _hb_mods[k] = 'CreatureHidden' in ns or 'StartCutScene' in ns or hidden_speaker
     return _hb_mods[k]
 
 def hidden_tick(gen, mapid):

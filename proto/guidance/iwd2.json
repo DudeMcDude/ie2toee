@@ -201,6 +201,24 @@
       "map": 5047,
       "ground": 966
     },
+    "AR2000": {
+      "door_clearance_subtiles": {"door4": 4}
+    },
+    "AR2001": {
+      "doors_at_toggle_point": ["door2"]
+    },
+    "AR2101": {
+      "doors_at_toggle_point": ["bridge"]
+    },
+    "AR3002": {
+      "anchor_fix": {"To3100": [429, 459]}
+    },
+    "AR3100": {
+      "doors_at_toggle_point": ["gate2"]
+    },
+    "AR4001": {
+      "limit_scroll_to_art": true
+    },
     "AR1107": {
       "map": 5048,
       "ground": 967

@@ -177,6 +177,24 @@ def matches(item, e):
     return e and item.proto == e['p'] and (not e.get('n') or item.obj_get_int(_field('obj_f_description')) == e['n'])
 
 
+def count_items(holders, res):
+    e = entry(res)
+    total = 0
+    for holder in holders:
+        seen = set()
+        for it in _inv(holder):
+            if it.id in seen or not matches(it, e):
+                continue
+            seen.add(it.id)
+            if it.type == obj_t_ammo:
+                total += it.obj_get_int(obj_f_ammo_quantity)
+            elif it.type == obj_t_money:
+                total += it.obj_get_int(obj_f_money_quantity)
+            else:
+                total += 1
+    return total
+
+
 def transfer(holder, item):
     """Keep different magical IE items on the same ToEE base prototype in separate stacks."""
     flags = item.item_flags_get()

@@ -111,6 +111,54 @@ def check_model(game, rt):
     print('PASS movement, delayed callback, party defeat and scoped variable round-trip')
 
 
+def check_door_keys(game):
+    import ie_doors
+    import ie_itemrt
+    from unittest.mock import Mock
+    user, companion, stranger = [game.spawn(name) for name in ('user', 'companion', 'stranger')]
+    game.party.extend((user, companion))
+    portal = Mock(type=0)
+    portal.portal_flags_get.return_value = 1
+    gate = {'key': 'KEYGATE', 'name': 'Outer Gate'}
+    items = {'keygate': {'p': 12011, 'n': 101}, 'keysanc': {'p': 12011, 'n': 102}}
+    with patch.dict(ie_itemrt.ITEMS, items), patch.multiple(
+            ie_doors, game=game, obj_t_portal=0, OPF_LOCKED=1, RUN_DEFAULT=1,
+            _doors=[(gate, portal, False)], create=True):
+        ie_itemrt.give('keysanc', user)
+        assert ie_doors.use_key(portal, user) == 1
+        portal.portal_flag_unset.assert_not_called()
+        ie_itemrt.give('keygate', companion)
+        ie_doors.use_key(portal, stranger)
+        portal.portal_flag_unset.assert_not_called()
+        ie_doors.use_key(portal, user)
+        portal.portal_flag_unset.assert_called_once_with(1)
+    print('PASS converted door accepts the matching party key and rejects another key with the same prototype')
+
+
+def check_dam_planks(game):
+    from unittest.mock import Mock
+    import ie_doors
+    import ie_itemrt
+    opener = game.spawn('opener')
+    game.party.append(opener)
+    portal = Mock(type=0)
+    portal.portal_flags_get.return_value = 0
+    spec = {'name': 'AR2101_Door2_Support1', 'script': '21DORSPT'}
+    area = 'I2AR2101'
+    with patch.dict(ie_itemrt.ITEMS, {'21genwp': {'p': 12011, 'n': 1}}), patch.multiple(
+            ie_doors, game=game, obj_t_portal=0, OPF_LOCKED=2, OPF_OPEN=1,
+            RUN_DEFAULT=1, _area=area, _doors=[[spec, portal, False]], _door_users={},
+            _apply=Mock(), create=True):
+        ie_doors.use_key(portal, opener)
+        ie_doors.poll(area)
+        assert not opener.inventory
+        portal.portal_flags_get.return_value = 1
+        ie_doors.poll(area)
+        ie_doors.poll(area)
+        assert len(opener.inventory) == 1 and ie_itemrt.find(opener, '21genwp')
+    print('PASS opening the dam support grants the original wood planks exactly once per opening')
+
+
 def check_inventory(game, rt):
     import ie_itemrt
     giver = game.spawn('giver')
@@ -145,6 +193,14 @@ def check_inventory(game, rt):
             assert ie_itemrt.find(giver, 'bolts') is None
             rt.A.TakePartyItemNum(ctx, 'bolts', 5)
             assert bolts.holder is giver and ie_itemrt.find(pc, 'bolts') is None
+        kept = ie_itemrt.give('scroll', pc)
+        carried = list(giver.inventory)
+        # An old conversion can also list an item whose actual owner is a PC.
+        giver.inventory.append(kept)
+        rt.A.DestroySelf(ctx)
+        assert giver.destroyed and carried and all(item.destroyed for item in carried)
+        assert kept.holder is pc and not kept.destroyed
+        print('PASS scripted despawn removes carried gear and preserves transferred items')
     print('PASS item identity, duplicate copies, transfer, removal and shared base prototypes')
 
 
@@ -276,6 +332,170 @@ def check_docks(game, rt, core):
     print('PASS %s: %d goblins defeated; the area script set %s' % (area, len(enemies), flag))
 
 
+def check_shaengarne(game, rt):
+    import ie_travel_data as travel
+    import ie_areas
+    area = travel.AREAS.get('I2AR2000')
+    if area is None:
+        return  # prologue-only installation
+    pc = game.spawn('leader', travel.AREAS['I2AR1000']['map'])
+    game.party.append(pc)
+    game.enable_area_scripts()
+    game.tick()
+    assert rt.get_var(None, 'Chapter', 'GLOBAL') == 0
+    entry = area['entrances']['FRWMAP']
+    game.fade_and_teleport(0, 0, 0, area['map'], *entry[:2])
+    game.tick()
+    assert rt.get_var(None, 'Chapter', 'GLOBAL') == 1
+    game.tick()
+    assert rt.get_var(None, 'Chapter', 'GLOBAL') == 1
+    assert 'AR2000' in ie_areas.SCRIPTS
+    trigger = next(r for r in area['triggers'] if r['name'] == 'Torak_Call_2')
+    script = importlib.import_module(trigger['module'])
+    ctx = rt.Ctx(None, pc, 'area_AR2000', 'AR2000', {'Entered': pc})
+    with patch.object(rt.A, 'StartCutScene') as start:
+        rt.run_script(ctx, script.BLOCKS)
+        start.assert_called_once_with(ctx, '20cTorD2')
+    import ie_travel
+    assert trigger.get('one_shot'), 'the original Torak proximity trap cannot reset'
+    x, y = trigger['poly'][0]
+    def enter(region):
+        ie_travel._triggers('I2AR2000', [region], [pc], [(x, y)])
+    with patch.object(rt.A, 'StartCutScene') as start:
+        enter(trigger)
+        ie_travel._inside.clear()  # reload the map, retaining the save-backed variables
+        enter(trigger)
+        assert start.call_count == 1
+        repeat = dict(trigger, name='resettable', one_shot=False)
+        enter(repeat)
+        ie_travel._inside.clear()
+        enter(repeat)
+        assert start.call_count == 3
+    print('PASS Shaengarne arrival and Torak cutscene triggers')
+
+
+def check_dereth_camps(game, rt):
+    import ie_areas
+    if 'AR2000' not in ie_areas.MAPS:
+        return
+    from ie_bcs_ar2000_area import BLOCKS
+    from ie_creatures_ar2000 import CREATURES
+    mid = ie_areas.MAPS['AR2000']
+    pc = game.spawn('leader', mid)
+    game.party.append(pc)
+    import py01099ie_baked as shared_script
+    assert shared_script._map_area(pc) == 'AR2000'
+    # The same installed script also runs back in Targos.
+    assert shared_script._map_area(game.spawn('town_actor', ie_areas.MAPS['AR1000'])) == 'AR1000'
+    ctx = rt.Ctx(None, pc, 'area_AR2000', 'AR2000')
+    for team, flag in ((3, 'SR_Dereth_Freed'), (4, 'SR_Cleared_House')):
+        active = []
+        for spec in CREATURES:
+            if not spec['actor'].startswith('T%d_' % team) or not rt.area_spawn_allowed(spec):
+                continue
+            obj = game.spawn(spec['ident'], mid)
+            rt.bind(obj, spec['ident'], 'AR2000')
+            active.append((spec, obj))
+        spec, guard = next(pair for pair in active if pair[0]['actor'] == 'T%d_Orc_1' % team)
+        wrapper = importlib.import_module('py%05die_%s' % (spec['script_id'], spec['ident']))
+        alert = next(s for s in wrapper.SCRIPTS if s.RESREF == '00t%02det' % team)
+        rt.run_script(rt.Ctx(guard, pc, spec['ident'], 'AR2000', {'AttackedBy': pc}), alert.BLOCKS)
+        assert rt.get_var(ctx, 'TEAM_%d' % team, 'MYAREA') == 1
+        for _ in range(4):  # arrival and Torak's greeting can run before the camp blocks
+            rt.run_script(ctx, BLOCKS)
+        assert rt.get_var(ctx, flag, 'GLOBAL') == 1
+        for _, obj in active:
+            obj.hp = 0
+        rt.run_script(ctx, BLOCKS)
+        assert rt.get_var(ctx, flag, 'GLOBAL') == 2
+    print('PASS attacking the original guards activates both Dereth camps and clearing each advances its quest')
+
+
+def check_camp_visibility(game, core):
+    import ie_areas
+    if 'AR2001' not in ie_areas.MAPS:
+        return
+    from ie_bake_i2ar2001 import OBJS
+    from toeemob import read_mob
+    actors = {entry['spec']['actor']: guid.lower() for guid, entry in OBJS.items()
+              if entry.get('k') == 'npc'}
+    directory = core.parent / 'ToEE' / 'maps' / 'I2AR2001'
+    for actor, hidden in [('Torak2', False), ('Arte', True), ('Emma', True)]:
+        obj = read_mob((directory / (actors[actor] + '.mob')).read_bytes())
+        assert bool(obj.get('flags') & 2) == hidden, actor
+    print('PASS Torak at the mill starts visible and the two scripted reveals stay hidden')
+
+    from types import SimpleNamespace
+    from ie_creatures_ar2001 import CREATURES
+    import ie_runtime as rt
+    wrappers = {s['ident']: s['script_id'] for s in CREATURES if s.get('script_id')}
+    for ident, passive in [('20arte', True), ('20kaitln', True), ('20orcwar_29', False)]:
+        actor = game.spawn(ident, ie_areas.MAPS['AR2001'])
+        wrapper = importlib.import_module('py%05die_%s' % (wrappers[ident], ident))
+        wrapper.san_first_heartbeat(actor, None)
+        assert bool(actor.npc_flags_get() & rt.ONF_NO_ATTACK) == passive, ident
+    print('PASS Arte and Kaitlin retain their escape scripts without joining the mill fight as attackers')
+    checked = 0
+    for guid, entry in OBJS.items():
+        spec = entry.get('spec', {})
+        if spec.get('family') != 'keg':
+            continue
+        ident = spec['ident']
+        wrapper = importlib.import_module('py%05die_%s' % (wrappers[ident], ident))
+        if not wrapper.SCRIPTS:
+            assert wrapper.san_start_combat(SimpleNamespace(id=guid), None) == rt.SKIP_DEFAULT
+            checked += 1
+    assert checked > 0
+    assert rt.scriptless_combat_turn(SimpleNamespace(id='unrelated'), 'AR2001') == rt.RUN_DEFAULT
+    print('PASS %d scriptless keg placements skip native monster AI' % checked)
+
+
+def check_bridge(game, rt):
+    import ie_areas
+    if 'AR2102' not in ie_areas.MAPS:
+        return
+    from ie_creatures_ar2102 import CREATURES
+    from ie_bcs_ar2102_area import BLOCKS
+    area = 'AR2102'
+    mid = ie_areas.MAPS[area]
+    pc = game.spawn('leader', mid)
+    game.party.append(pc)
+    ctx = rt.Ctx(None, pc, 'area_' + area, area)
+    actors = {}
+    omitted = next(s for s in CREATURES if s.get('ident') and not rt.area_spawn_allowed(s))
+    other = game.spawn(omitted['ident'], ie_areas.MAPS['AR2000'])
+    rt.bind(other, omitted['ident'], 'AR2000')
+    assert rt.N(ctx, omitted['actor']) is None, 'difficulty-omitted placement resolved to a different map'
+    for spec in CREATURES:
+        if not rt.area_spawn_allowed(spec):
+            continue
+        actor = game.spawn(spec['ident'], mid, rt.ie_to_tile(area, spec['x'], spec['y']))
+        rt.bind(actor, spec['ident'], area)
+        actors[spec['actor']] = actor
+    beams = [actors[name] for name in ('Support_Beam_North', 'Support_Beam_South')]
+    expected = {s['actor'] for s in CREATURES}
+    assert {'Cutscene_Commander', 'Bugbear_Captain_5', 'GTH05_08'} <= expected
+    with patch.object(rt.A, 'StartCutScene'):
+        for _ in range(6):
+            rt.run_script(ctx, BLOCKS)
+        assert not rt.get_var(ctx, 'Shaengarne_Bridge_Destroyed', 'GLOBAL')
+        assert not rt.get_var(ctx, 'Shaengarne_Bridge_Cleared', 'GLOBAL')
+        beams[0].hp = 0
+        rt.run_script(ctx, BLOCKS)
+        assert rt.get_var(ctx, 'Shaengarne_Bridge_Destroyed', 'GLOBAL') == 1
+        beams[1].hp = 0
+        rt.run_script(ctx, BLOCKS)
+        assert rt.get_var(ctx, 'Shaengarne_Bridge_Destroyed', 'GLOBAL') == 2
+        for name, actor in actors.items():
+            if name.startswith(('GTH', 'Bugbear_Captain', 'Ogre_')):
+                actor.hp = 0
+        for _ in range(4):
+            rt.run_script(ctx, BLOCKS)
+        assert rt.get_var(ctx, 'Shaengarne_Bridge_Cleared', 'GLOBAL') == 1
+        assert rt.get_var(ctx, 'Shaengarne_Award_XPVar', 'GLOBAL') == 1
+    print('PASS bridge starts intact and its area script counts the two supports separately')
+
+
 def main():
     sys.dont_write_bytecode = True
     parser = argparse.ArgumentParser(description=__doc__)
@@ -290,6 +510,8 @@ def main():
     game = install()
     import ie_runtime as rt
     rt._real = lambda: game.t
+    check_door_keys(game)
+    game.reset()
     check_inventory(game, rt)
     game.reset()
     check_model(game, rt)
@@ -302,6 +524,17 @@ def main():
         check_docks(game, rt, args.core)
     if args.save_vars:
         game.save_script_vars(args.save_vars)
+    if args.core:
+        game.reset()
+        check_shaengarne(game, rt)
+        if (args.core / 'scr/ie_bcs_21dorspt_door.py').is_file():
+            game.reset()
+            check_dam_planks(game)
+        game.reset()
+        check_dereth_camps(game, rt)
+        check_camp_visibility(game, args.core)
+        game.reset()
+        check_bridge(game, rt)
 
 
 if __name__ == '__main__':

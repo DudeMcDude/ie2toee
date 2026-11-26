@@ -46,7 +46,7 @@ else:
 
 # ---- 2. start_hidden heuristic without the area slot ----------------------------------------------------------------
 if HAVE_IE:
-    import ie_bake
+    import ie_bake, iecre
     tmp = tempfile.mkdtemp(prefix='test_scripts_', dir=HERE)
     try:
         json.dump({'creatures': [
@@ -56,18 +56,18 @@ if HAVE_IE:
             {'actor': 'Shawford_Crale', 'scripts': ['12shawf0'], 'area_script': '12shawf0'}]},
             open(os.path.join(tmp, 'AR1200_creatures.json'), 'w'))
         B = ie_bake.Baker.__new__(ie_bake.Baker)
+        B.flavour = 'IWD2'
         B.a = types.SimpleNamespace(ie=IE, specs=os.path.join(tmp, 'ie_creatures_ar1200.py')); B.area = 'AR1200'
         hid = B.start_hidden()
         check('goblin with 12ATKUHP only in the area slot: not hidden by the heuristic', '01_goblin_01' not in hid)
-        check('Vghotan (12ATKUHP as override) still hidden', '03_vghotan' in hid)
+        check('Vghotan: left to the IWD2 CRE hidden flag', '03_vghotan' not in hid and
+              iecre.Cre(g.read('12vghota', 'cre'), '12vghota').start_hidden)
         check('Shawford (12SHAWF0 area slot) not hidden', 'shawford_crale' not in hid)
         check('Phaen: left to the CRE hidden flag', '08_phaen' not in hid)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
-    import iecre
     c = iecre.Cre(g.read('12phaen', 'cre'), '12phaen')
-    check('12PHAEN: CRE hidden flag, neutral -> spec hidden (no START_HIDDEN_KEEP)',
-          c.start_hidden and '12phaen' not in ie_creatures.START_HIDDEN_KEEP)
+    check('12PHAEN starts hidden according to the CRE flag', c.start_hidden)
 
 # ---- 3. runtime ---------------------------------------------------------------------------------------------------
 for m in ('ie_itemrt', 'ie_bakert', 'ie_cutscene', 'ie_spellrt', 'ie_combat'):
@@ -113,6 +113,24 @@ rt.IN_GAME, rt.game, rt.OBJ_HANDLE_NULL, rt.ONF_KOS, rt.obj_t_npc, rt.OF_OFF = T
 rt.VARS.clear()
 rt.AREA_MAPS = {'AR1000': 5031, 'AR1200': 5040}
 A, T = rt.A, rt.T
+
+# A door may poll its script before all named actors have bound on map load.
+guard_ctx = rt.Ctx(None, None, 'AR3001_Door3', 'AR3001')
+check('unresolved door guard is not dead', not T.Dead(guard_ctx, None))
+check('missing named guard without a death variable is not dead', not T.Dead(guard_ctx, '09_HobDGu'))
+rt.set_var(guard_ctx, 'SPRITE_IS_DEAD09_HobDGu', 'GLOBAL', 1)
+check('the original guard death variable works without a loaded object', T.Dead(guard_ctx, '09_HobDGu'))
+
+old_orc = rt.Ctx(None, None, '31orcold', 'AR3101')
+rt._aliases['AR3101'] = {'06_bug_03': '31bugb01_36'}
+rt._named_spawns['AR3101'] = {'06_bug_03': {'area_spawn': ('AR3101', 4, 6, 8)}}
+rt.ie_vars.put('AR3101:ie2toee_spawn_difficulty', 1)
+check('Old Orc ignores the guard omitted at this encounter tier', T.Dead(old_orc, '06_Bug_03'))
+check('Old Orc still requires the first guard to die', not T.Dead(old_orc, '06_Bug_01'))
+check('other scripts still see an omitted guard as absent',
+      not T.Dead(rt.Ctx(None, None, 'observer', 'AR3101'), '06_Bug_03'))
+rt.ie_vars.put('AR3101:ie2toee_spawn_difficulty', 3)
+check('a higher-tier guard must actually die', not T.Dead(old_orc, '06_Bug_03'))
 
 def mod(name, blocks):
     m = types.ModuleType(name); m.BLOCKS = blocks; return m
