@@ -1,102 +1,107 @@
-Icewind Dale II in Temple+ | Windows player guide
-===============================================
+Icewind Dale II in Temple+ | Chapter 1 preview (2026-11-26) | Windows guide
+============================================================================
 
-Start on the Targos docks, help the town, defend the palisade and report
-to Ulbrec for the assignment to Shaengarne. This preview uses ToEE combat rules.
+Requires: Windows, Python 3.9 or newer, your own Icewind Dale II, and your
+own Temple of Elemental Evil.
+
+An early, AI-assisted conversion of Icewind Dale II's prologue and Chapter
+1 into Temple+, using ToEE combat rules. Defend Targos, clear Shaengarne
+Ford and bridge, storm the Horde Fortress, defeat Guthma, bring Braston
+back to Ennelia and board Oswald's airship for the start of Chapter 2.
 
 What you need
 -------------
 
-* Windows and Python 3.9 or newer with pip. Enable "Add python.exe to PATH"
-  during setup. The batch file installs NumPy, Pillow and fontTools through
-  pip, so allow internet access for the first setup.
+* Python 3.9 or newer with pip. Enable "Add python.exe to PATH" during
+  setup. The batch file installs NumPy, Pillow and fontTools through pip,
+  so allow internet access for the first setup.
   https://www.python.org/downloads/windows/
-* Your installed copy of Icewind Dale II (GOG 2.01 or retail).
+* Your installed copy of Icewind Dale II (GOG 2.01 or retail). This ZIP
+  contains no Icewind Dale II data: the converter reads it from your
+  installation.
 * Your own Temple of Elemental Evil (GOG or Steam). Make a separate copy of
-  its game folder for this preview. Use the Temple+ supplied in this ZIP.
+  its game folder for this preview, separate from any IWD copy. Use the
+  Temple+ supplied in this ZIP.
 
-Movie tools | install before conversion
+Media tools | install before conversion
 ---------------------------------------
 
-Download a Windows FFmpeg build containing ffmpeg.exe and ffprobe.exe.
-Choose a build with the libmp3lame encoder for chapter narration.
+Download a Windows FFmpeg build containing ffmpeg.exe and ffprobe.exe,
+with the libmp3lame encoder.
   https://ffmpeg.org/download.html
 
+FFmpeg is needed for the narrated chapter slides, area music, area
+ambient sounds and NPC dialogue voices. All of them are converted from
+your own game installation while convert runs. Without FFmpeg the
+conversion still finishes, but those are skipped.
+
 Extract the build. Put its bin directory on PATH, or create a folder named
-media-tools next to convert_iwd2.bat and copy the contents of bin there.
-Keep any DLLs supplied with the executables. Both tools are used during
-conversion. They do not need to be running when you play.
+media-tools next to the convert batch file and copy the contents of bin
+there. Keep any DLLs supplied with the executables. FFmpeg is used only
+during conversion, not while you play.
 
-IWD2 copies the Targos intro from the original game even when these tools
-are missing. FFmpeg and ffprobe are needed for the narrated chapter slides.
-IWD2 does not require RAD Video Tools.
+IWD2 copies its movies from the original game and does not need RAD Video
+Tools.
 
-Install and start a new game
----------------------------
+Install and start a new campaign
+--------------------------------
 
-1. Extract the preview ZIP into a fresh folder. Open Command Prompt there.
-2. Run the command below, substituting your installed game and ToEE copy.
-   Keep the quotes if the paths contain spaces.
+1. Extract this ZIP into a fresh folder. Open Command Prompt there.
+2. Run, substituting your game and your ToEE copy (keep the quotes):
 
-   convert_iwd2.bat "C:\Games\Icewind Dale II" "C:\Games\ToEE-Targos"
+   convert_iwd2.bat "C:\Games\Icewind Dale II" "C:\Games\ToEE-IWD2"
 
-3. Look for MOVIE SUMMARY at the end. A warning during installation lists
-   missing tools and the conversion continues. The final summary names the
-   prologue scenes ready for playback and anything missing from this build.
+3. Check MOVIE SUMMARY at the end and any warnings about missing tools.
    To repair missing media, install the named tools, reopen Command Prompt
-   if you changed PATH, and run the same conversion command again.
+   and run the same command again.
 4. Open TemplePlus\TemplePlusConfig.exe. Set the game folder to your
-   ToEE-Targos copy, select module "ToEE", and save. Keep the bundled
+   ToEE-IWD2 copy, select module "ToEE", and save. Keep the bundled
    Temple+ version if the config program offers an update.
-5. Launch TemplePlus\TemplePlus.exe and start a new game. Use a fresh party
-   after reconverting to see the opening and changes to previously visited
-   areas. Temple+ shares its configuration across installs. Switch the
-   game folder and module back before playing your regular ToEE game.
-
-Portraits in Targos
-------------------
-
-Gemini contributed fifteen additional character portraits for the trade
-depot, pavilion, palisade and warehouse. Harlesford, Caulder, Menon and
-the Weapon Instructor now each have their own portrait. Reconvert and
-visit these areas in a fresh campaign to see all updated assignments.
+5. Launch TemplePlus\TemplePlus.exe and start a NEW campaign. Temple+
+   shares its configuration across installs: switch the game folder and
+   module back before playing your regular ToEE.
 
 In the game
 -----------
 
-Click people to talk. Walk into doorway exits to travel. Hover over a
-painted container to see its outline, click to open it, or hold Tab to
-highlight containers that hold loot. Select a player character to loot.
+Click people to talk. Use the exit icons to travel; regional exits open
+the original world map, with travel times. Hover over a painted container
+to see its outline, or hold Tab to highlight containers that hold loot.
 
-The chapter autoplayer completed all sixteen sidequests, defended the
-palisade and received Ulbrec's assignment across same-party checkpoint
-replays. The opening film ran 3:06 and the narrated prologue 1:31. Some
-containers in the dock storehouse, Council Chambers and Weeping Widow are
-unreachable. Hedron's scene can
-pause before returning control. A previously reported siege crash did not
-recur in this playtest. One movie test crashed during shutdown.
+Optional: the chapter autoplayer can play the campaign by itself for
+testing; it takes over the game window. See Autoplayer\README.txt.
 
-For optional assisted chapter autoplay, see Autoplayer\README.txt. From
-Autoplayer\TemplePlus, run
+Known gaps
+----------
 
-  ieap.bat iwd2-ch1 menu "C:\Games\ToEE-Targos"
+* This is an early, AI-assisted conversion preview, not a finished port.
+  Expect rough edges in combat balance, pathing, containers and quests.
+  Chapter 1 was tested with the assisted chapter autoplayer (boosted
+  party, checkpoint replays), not by a full unassisted human playthrough.
+* Without FFmpeg the conversion still runs, but music, area ambients, NPC
+  voices and narrated slides are skipped. The converter prints a warning.
+* Icewind Dale: Dragon's Eye exterior (AR4000) is converted, the cavern
+  interior (AR4001) and the rest of Chapter 2 are not.
+* Icewind Dale II: the trip ends at Oswald's laboratory (AR4001). The
+  exterior beyond it (AR4000) and the rest of Chapter 2 are not converted.
+  Ennelia's reunion journal entry (16068) has no quest-log slot yet.
+* Saves from earlier previews are not supported. Reconvert and start a
+  new campaign.
 
 Feedback and credits
 --------------------
 
 Report issues in the ie2toee thread on the Circle of Eight forums. Include
-the game edition, area or quest, the installer summary for movie issues,
-and the relevant section of the game log.
+the game edition, area or quest, the installer summary, and the relevant
+section of the game log.
   %USERPROFILE%\Saved Games\TemplePlus\TemplePlus.log
   https://co8.org/
 
-The converter reads the original game assets from your own installations.
-See converter\LICENSE.txt for the converter license and
-TemplePlus\IE-PREVIEW-SOURCE.txt for engine changes and sources. Gemini
-contributed the commissioned portrait art. For earlier changes, see
+The converter reads all original game data, music, sounds and voices from
+your own installations at conversion time; none of it is in this ZIP.
+Character portraits in art\portraits are original AI-generated art
+(Google Gemini), commissioned for this project; they are not taken from
+the Icewind Dale games. See converter\LICENSE.txt for the converter
+license and TemplePlus\IE-PREVIEW-SOURCE.txt for engine sources. Earlier
+previews and source links:
   https://github.com/DudeMcDude/ie2toee/releases
-
-NOVEMBER 21, 2026 | PUBLIC PLAYER TEST
-The November 21 release uses the same Temple+ build for the player and chapter autoplayer.
-Targos covers sixteen tested sidequests, the palisade battle, and the assignment to Shaengarne.
-The siege defenders recognize allies, and enemies leave the practice barrels alone.
