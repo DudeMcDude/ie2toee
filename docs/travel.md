@@ -4,6 +4,12 @@ IE areas are joined by *travel regions* (ARE regions of type `travel`): walk int
 *entrance* of another area. ToEE instead uses clickable **exit icons** (map-change scenery that walks the party to it
 and jumps to a `jumppoint.tab` row), so the preview turns every travel region into one ToEE exit icon.
 
+## Regional travel
+
+Click an outdoor regional exit to open the campaign map. Select a named marker or its destination button to travel. Cancel keeps the party at the exit. The list shows the journey in game hours and updates when a quest reveals a destination.
+
+The converter reads the map painting, marker artwork, location names, and directional travel times from the player's Infinity Engine install. Routes sharing an entrance use one exit icon. On selection the party advances the game clock and arrives at the final road's original named entrance.
+
 ## Areas
 | IE area | role | map id | ground id |
 |---|---|---|---|

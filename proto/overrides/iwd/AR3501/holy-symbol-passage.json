@@ -1,0 +1,45 @@
+{
+  "format": "templeplus-dm-tile-edits",
+  "version": 1,
+  "module": "IWD",
+  "map_name": "AR3501",
+  "description": "Give a party member clearance along the passage behind the priest gate to the holy symbol sarcophagus.",
+  "tiles": [
+    {
+      "x": 483,
+      "y": 504,
+      "set": 0,
+      "clear": 104857600
+    },
+    {
+      "x": 483,
+      "y": 505,
+      "set": 0,
+      "clear": 2883584
+    },
+    {
+      "x": 484,
+      "y": 505,
+      "set": 0,
+      "clear": 67108864
+    },
+    {
+      "x": 484,
+      "y": 506,
+      "set": 0,
+      "clear": 9961472
+    },
+    {
+      "x": 485,
+      "y": 505,
+      "set": 0,
+      "clear": 23592960
+    },
+    {
+      "x": 485,
+      "y": 506,
+      "set": 0,
+      "clear": 2359296
+    }
+  ]
+}

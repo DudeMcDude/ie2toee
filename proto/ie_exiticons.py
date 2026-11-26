@@ -58,18 +58,29 @@ def icon_tile(poly):
     return int((p[0] + cx) / 2), int((p[1] + cy) / 2)
 
 
-def build(areas):
-    """-> (icons {area: [(u, v, jp)]}, jumppoint rows [(id, name, map, x, y)], skipped [str])"""
-    icons, rows, skipped = {}, [], []
+def numbered_exits(areas):
     n = 0
     for area in sorted(areas):
-        for r in sorted(areas[area]['regions'], key=lambda r: r['name']):
-            if not r.get('dest_map'):
-                skipped.append('%s %s -> %s (not converted)' % (area, r['name'], r['dest_area'])); continue
-            u, v, _o = areas[r['dest_area']]['entrances'][r['dest_entrance']]
-            jp = JP_BASE + n; n += 1
-            rows.append((jp, '%s-%s-to-%s' % (area, r['name'], r['dest_area']), r['dest_map'], int(u), int(v)))
-            iu, iv = r['anchor'] if r.get('anchor') else icon_tile(r['poly'])
+        for route in sorted(areas[area]['regions'], key=lambda r: r['name']):
+            if not route.get('dest_map'):
+                continue
+            jp = route.get('world_jump')
+            if jp is None:
+                jp = JP_BASE + n
+                n += 1
+            tile = route.get('anchor') or icon_tile(route['poly'])
+            yield area, route, jp, tile
+
+
+def build(areas):
+    """Return the icons, jump point rows, and destinations outside the conversion."""
+    icons, rows = {}, []
+    skipped = ['%s %s -> %s (not converted)' % (area, r['name'], r['dest_area'])
+               for area in sorted(areas) for r in areas[area]['regions'] if not r.get('dest_map')]
+    for area, r, jp, (iu, iv) in numbered_exits(areas):
+        u, v, _o = areas[r['dest_area']]['entrances'][r['dest_entrance']]
+        rows.append((jp, '%s-%s-to-%s' % (area, r['name'], r['dest_area']), r['dest_map'], int(u), int(v)))
+        if not r.get('requires_global') and r.get('world_icon', jp) == jp:
             icons.setdefault(area, []).append((iu, iv, jp))
     return icons, rows, skipped
 
@@ -92,6 +103,8 @@ def main():
             o.set('location', T.location(u, v)).set('offset_x', 0.0).set('offset_y', 0.0)
             o.set('flags', ICON_FLAGS).set('radius', ICON_RADIUS).set('3d_render_height', ICON_HEIGHT)
             o.set('scenery_teleport_to', jp)
+            if any(r.get('world_jump') == jp for r in areas[area]['regions']):
+                o.set('scripts_idx', T.script_array({1: (0, 0, 1099)}))  # san_use, shared baked script
             sec.objects.append(o)
             # The engine writes a sector's save diffs in tile order (row by row) and reads them back in file order,
             # so a static object appended out of tile order breaks the map on reload ("Cannot read diff footer").

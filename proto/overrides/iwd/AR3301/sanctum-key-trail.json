@@ -1,0 +1,39 @@
+{
+  "format": "templeplus-dm-tile-edits",
+  "version": 1,
+  "module": "IWD",
+  "map_name": "AR3301",
+  "description": "Give the existing passage from the entrance to the Sanctum Key sarcophagus clearance for a party member.",
+  "tiles": [
+    {
+      "x": 493,
+      "y": 464,
+      "set": 0,
+      "clear": 109051904
+    },
+    {
+      "x": 493,
+      "y": 465,
+      "set": 0,
+      "clear": 786432
+    },
+    {
+      "x": 494,
+      "y": 465,
+      "set": 0,
+      "clear": 130023424
+    },
+    {
+      "x": 494,
+      "y": 466,
+      "set": 0,
+      "clear": 6029312
+    },
+    {
+      "x": 495,
+      "y": 465,
+      "set": 0,
+      "clear": 16777216
+    }
+  ]
+}

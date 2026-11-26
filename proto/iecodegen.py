@@ -193,6 +193,10 @@ class Gen(object):
             for x in S.walk_calls([call.args[1]]):
                 self._note_var(x, 'A')
             return 'A.ActionOverride(c, %s, lambda c: %s)' % (self.arg(call.args[0]), self.action(call.args[1]))
+        if name.lower() == 'triggeractivation' and len(call.args) == 2:
+            target, active = call.args
+            if isinstance(target, S.Obj) and target.name and not target.chain:
+                return 'A.TriggerActivation(c, %s, %s)' % (pystr(target.name), self.arg(active))
         return 'A.%s(%s)' % (name, ', '.join(['c'] + self._args(call, sig)))
 
     def action_list(self, calls):

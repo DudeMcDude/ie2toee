@@ -18,6 +18,7 @@ VERSION = 1
 EXT = '.iev'
 
 STORE = {}
+SEEN_OBJECTS = {}  # Transient actor handles, cleared on new game and load.
 _state = {'token': None, 'hooked': False, 'last_file': None}
 _log = [None]          # optional logger (ie_runtime.log)
 
@@ -52,6 +53,7 @@ def _gv(game, v=None):
         return None
 
 def clear(reason=''):
+    SEEN_OBJECTS.clear()
     STORE.clear(); _state['token'] = None
     if reason:
         _say('clear (%s)' % reason)
@@ -68,6 +70,7 @@ def _check():
         return
     if STORE:
         _say('store of another game/save dropped (token %r, game %r): %d vars' % (_state['token'], t, len(STORE)))
+    SEEN_OBJECTS.clear()
     STORE.clear()
     nt = random.randint(1, 0x7fffffff)
     _state['token'] = nt; _gv(g, nt)
@@ -100,6 +103,7 @@ def loads(text):
     import json
     d = json.loads(text)
     vs = d.get('vars') or {}
+    SEEN_OBJECTS.clear()
     STORE.clear()
     for k, v in vs.items():
         STORE[str(k)] = int(v)

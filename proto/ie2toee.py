@@ -75,6 +75,9 @@ DEFAULT_GUIDANCE = {
         # give the PC radius a connected route (offline fit check 2026-10-30), so it was removed: the icon + anchor sit at
         # (481,463), just outside the cave mouth, where the leader stops (approved by Shai, 2026-10-28)
         "AR1200": {"anchor_fix": {"To1201": [481, 463]}},
+        # Use the temple landing. The doorway polygon sits above the stairs,
+        # beyond the reach of a full-size Temple+ party member.
+        "AR3600": {"anchor_fix": {"To3601": [475, 482]}},
         # AR1201: the IE container point is the chest's launch point, ~1.5 tiles from the chest drawn in the art; the ToEE
         # chest objects go to the tile of their IE polygon's centre instead
         "AR1201": {"container_fix": {"Chest 1": [489, 433], "Chest 2": [504, 500]}},
@@ -384,6 +387,16 @@ def write_doors(g, are, wed, tis_for, pl, guidance, sr, bbox, outdir, name, door
     os.makedirs(pdir, exist_ok=True)
     closed_set = {n.lower() for n in doors_closed}
     doors = []
+    import ie_overrides
+    area_overrides = ie_overrides.area_dir(guidance.get('overrides_dir'), name)
+    clearance = {}
+    use_points = []
+    if area_overrides and os.path.isfile(os.path.join(area_overrides, 'door-use-points.json')):
+        with open(os.path.join(area_overrides, 'door-use-points.json'), encoding='utf-8') as f:
+            use_points = json.load(f)['doors']
+    if area_overrides and os.path.isfile(os.path.join(area_overrides, 'door-open-clearance.json')):
+        with open(os.path.join(area_overrides, 'door-open-clearance.json'), encoding='utf-8') as f:
+            clearance = json.load(f)['doors']
     for k, d in enumerate(are.doors):
         wd = next((w for w in wed.doors if w['name'].lower() == d['wed_id'].lower()), None)
         m_open = door_cell_masks(d['open_cells'], pl, sr.shape)
@@ -423,6 +436,22 @@ def write_doors(g, are, wed, tis_for, pl, guidance, sr, bbox, outdir, name, door
                  round((u - math.floor(u) - 0.5) * INCH_PER_TILE, 2), round((v - math.floor(v) - 0.5) * INCH_PER_TILE, 2)],
             toggle_tile=[int(tu), int(tv)], tiles=tiles, patches=patches,
             wed_primary_closed=bool(wd['closed']) if wd else None))
+        if d['name'] in use_points:
+            door = doors[-1]
+            door['previous_loc'] = door['loc']
+            door['loc'] = [int(tu), int(tv), round((tu % 1 - 0.5) * INCH_PER_TILE, 2),
+                           round((tv % 1 - 0.5) * INCH_PER_TILE, 2)]
+        if d['name'] in clearance:
+            changes = []
+            for u, v, mask in clearance[d['name']]:
+                a, b = u - u0, v - v0
+                if not (0 <= a < flags_nod.shape[0] and 0 <= b < flags_nod.shape[1]):
+                    raise ValueError(f"{name} {d['name']} clearance tile {(u, v)} is outside the map")
+                if mask <= 0 or mask & ~((BLOCK0 | FLY0) * 511):
+                    raise ValueError(f"{name} {d['name']} invalid subtile mask {mask}")
+                base = int(flags_nod[a, b])
+                changes.append([u, v, mask, (base | m_closed.get((u, v), 0)) & mask])
+            doors[-1]['open_clearance'] = changes
     json.dump(dict(area=name, doors=doors), open(os.path.join(outdir, f'{name}_doors.json'), 'w'), indent=1)
     # Python 2.7 data module for the Temple+ runtime (ie_doors.py)
     with open(os.path.join(outdir, f'ie_doors_{name.lower()}.py'), 'w') as f:

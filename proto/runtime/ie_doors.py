@@ -23,6 +23,7 @@ OVERLAY_BASE = 7000
 
 _doors = []              # [(door dict, portal handle, last_open)]
 _area = None
+_door_users = {}
 _gen = 0             # bumped per start(): polls of an earlier load stop
 
 def _is_open(p):
@@ -31,6 +32,37 @@ def _is_open(p):
     except NameError:
         flag = 1
     return (p.portal_flags_get() & flag) != 0
+
+def use_key(portal, user):
+    """Let the normal door action proceed when the party possesses the matching IE key."""
+    if user in game.party and portal.type == obj_t_portal and portal.portal_flags_get() & OPF_LOCKED:
+        import ie_itemrt
+        for spec, obj, last in _doors:
+            if obj != portal or not spec.get('key'):
+                continue
+            key = spec['key'].lower()
+            entry = ie_itemrt.ITEMS.get(key)
+            if entry and entry.get('n') and any(ie_itemrt.find(pc, key) for pc in game.party):
+                portal.portal_flag_unset(OPF_LOCKED)
+                print("ie_doors: %s unlocked with %s" % (spec['name'], key))
+            break
+    if user in game.party and portal.type == obj_t_portal and not portal.portal_flags_get() & OPF_LOCKED:
+        if any(obj == portal and spec.get('script') for spec, obj, last in _doors):
+            _door_users[portal.id] = user
+    return RUN_DEFAULT
+
+
+def _attach_key(area, spec, portal):
+    if spec.get('key') or spec.get('script'):
+        try:
+            script = getattr(__import__('ie_bake_' + area.lower()), 'DOOR_SCRIPT', 0)
+        except ImportError:
+            return
+        if script:
+            for event in (1, 42):  # san_use, san_unlock_attempt
+                if not portal.scripts[event]:
+                    portal.scripts[event] = script
+
 
 def _apply(idx, d, is_open):
     for u, v, base, m_open, m_closed in d['tiles']:
@@ -42,6 +74,12 @@ def _apply(idx, d, is_open):
         if is_open:
             state = m_open   # (not 'is_open and m_open or m_closed': m_open is often 0)
         new = (cur & ~mask) | (base & mask) | state
+        game.tile_flags_set(loc, new)
+    for u, v, mask, closed_bits in d.get('open_clearance', ()):
+        loc = location_from_axis(u, v)
+        new = game.tile_flags_get(loc) & ~mask
+        if not is_open:
+            new |= closed_bits
         game.tile_flags_set(loc, new)
     patch = d['patches'].get(is_open and 'open' or 'closed')   # strings are truthy, safe
     if patch:
@@ -66,6 +104,7 @@ def setup(area, model_scale=MODEL_SCALE, proto=PORTAL_PROTO):
         if _is_open(p) != bool(d['open']):
             p.portal_toggle_open()
         _apply(idx, d, bool(d['open']))
+        _attach_key(area, d, p)
         _doors.append([d, p, bool(d['open'])])
     game.timeevent_add(poll, (area,), POLL_MS, 1)
     return len(_doors)
@@ -84,6 +123,7 @@ def start(area, model_scale=MODEL_SCALE, proto=PORTAL_PROTO):
     doors restored from a save) and create only the missing ones, so a reload never duplicates a door. The tile
     flags and ground patches follow each portal's current (saved) state."""
     global _doors, _area, _gen
+    _door_users.clear()
     mod = __import__('ie_doors_' + area.lower())
     game.ground_overlay_remove(-1)
     _doors = []
@@ -94,6 +134,10 @@ def start(area, model_scale=MODEL_SCALE, proto=PORTAL_PROTO):
         d = mod.DOORS[idx]
         x, y, ox, oy = d['loc']
         p = _find_portal(x, y, ox, oy)
+        if p is None and d.get('previous_loc'):
+            p = _find_portal(*d['previous_loc'])
+            if p is not None:
+                p.move(location_from_axis(x, y), ox, oy)
         if p is None:
             made = made + 1
             p = game.obj_create(proto, location_from_axis(x, y))
@@ -105,10 +149,27 @@ def start(area, model_scale=MODEL_SCALE, proto=PORTAL_PROTO):
                 p.portal_toggle_open()
         now = _is_open(p)
         _apply(idx, d, now)
+        _attach_key(area, d, p)
         _doors.append([d, p, now])
+    for d, p, now in _doors:
+        _run_door(area, d, p, now, initial=True)
     game.timeevent_add(poll, (area, _gen), POLL_MS, 1)
-    print "ie_doors: %s attached %d doors (%d created)" % (area, len(_doors), made)
+    print("ie_doors: %s attached %d doors (%d created)" % (area, len(_doors), made))
     return len(_doors)
+
+def _run_door(area, spec, portal, opened, initial=False):
+    if not spec.get('script'):
+        return
+    try:
+        script = __import__('ie_bcs_' + spec['script'].lower() + '_door')
+    except ImportError:
+        return
+    if initial and not getattr(script, 'CHECK_DOOR_STATE', False):
+        return
+    import ie_runtime as rt
+    user = _door_users.pop(portal.id, None)
+    events = {('Opened' if opened else 'Closed'): user} if user and not initial else {}
+    rt.run_script(rt.Ctx(portal, user, spec['name'], area, events), script.BLOCKS)
 
 def poll(area, gen=None):
     if area != _area or (gen is not None and gen != _gen):
@@ -122,7 +183,8 @@ def poll(area, gen=None):
         if now != last:
             _apply(idx, d, now)
             _doors[idx][2] = now
-            print "ie_doors: %s %s" % (d['name'], now and 'opened' or 'closed')
+            _run_door(area, d, p, now)
+            print("ie_doors: %s %s" % (d['name'], now and 'opened' or 'closed'))
     game.timeevent_add(poll, (area, gen), POLL_MS, 1)
     return 0
 

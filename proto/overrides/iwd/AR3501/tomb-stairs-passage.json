@@ -1,0 +1,51 @@
+{
+  "format": "templeplus-dm-tile-edits",
+  "version": 1,
+  "module": "IWD",
+  "map_name": "AR3501",
+  "description": "Allow a party member through the original western passages from the holy symbol door to the stairs.",
+  "tiles": [
+    {
+      "x": 444,
+      "y": 483,
+      "set": 0,
+      "clear": 109051904
+    },
+    {
+      "x": 445,
+      "y": 483,
+      "set": 0,
+      "clear": 2359296
+    },
+    {
+      "x": 458,
+      "y": 475,
+      "set": 0,
+      "clear": 125829120
+    },
+    {
+      "x": 458,
+      "y": 476,
+      "set": 0,
+      "clear": 524288
+    },
+    {
+      "x": 458,
+      "y": 477,
+      "set": 0,
+      "clear": 67108864
+    },
+    {
+      "x": 459,
+      "y": 475,
+      "set": 0,
+      "clear": 2097152
+    },
+    {
+      "x": 459,
+      "y": 477,
+      "set": 0,
+      "clear": 23068672
+    }
+  ]
+}

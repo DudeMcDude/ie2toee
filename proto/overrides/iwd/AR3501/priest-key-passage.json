@@ -1,0 +1,75 @@
+{
+  "format": "templeplus-dm-tile-edits",
+  "version": 1,
+  "module": "IWD",
+  "map_name": "AR3501",
+  "description": "Clear the original passage between the open sanctum door and the priest key sarcophagus for a party member.",
+  "tiles": [
+    {
+      "x": 497,
+      "y": 463,
+      "set": 0,
+      "clear": 1048576
+    },
+    {
+      "x": 498,
+      "y": 461,
+      "set": 0,
+      "clear": 67108864
+    },
+    {
+      "x": 498,
+      "y": 462,
+      "set": 0,
+      "clear": 38830080
+    },
+    {
+      "x": 498,
+      "y": 463,
+      "set": 0,
+      "clear": 1572864
+    },
+    {
+      "x": 499,
+      "y": 455,
+      "set": 0,
+      "clear": 67108864
+    },
+    {
+      "x": 499,
+      "y": 461,
+      "set": 0,
+      "clear": 16777216
+    },
+    {
+      "x": 499,
+      "y": 463,
+      "set": 0,
+      "clear": 1048576
+    },
+    {
+      "x": 500,
+      "y": 455,
+      "set": 0,
+      "clear": 132120576
+    },
+    {
+      "x": 500,
+      "y": 456,
+      "set": 0,
+      "clear": 786432
+    },
+    {
+      "x": 500,
+      "y": 462,
+      "set": 0,
+      "clear": 121634816
+    },
+    {
+      "x": 500,
+      "y": 463,
+      "set": 0,
+      "clear": 2883584
+    }
+  ]
+}

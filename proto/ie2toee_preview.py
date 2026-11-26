@@ -1,5 +1,5 @@
-"""One-command player preview build: converts the IE town area AR1000 of YOUR OWN Icewind Dale (classic or
-Enhanced Edition) install into a ToEE module overlay for the preview Temple+ build.
+"""Build a Temple+ preview from Easthaven through the Vale of Shadows using the
+player's Icewind Dale (classic or Enhanced Edition) installation.
 
   python ie2toee_preview.py --iwd "C:\\Games\\Icewind Dale" --toee "C:\\GOG Games\\ToEE" [--out iwd_preview_out]
                             [--install]
@@ -16,14 +16,16 @@ engine bake), so they win.
 The result is <out>/install: copy its contents into the ToEE folder (or pass --install to do that).
 Nothing of the IE game is shipped with the converter: everything is read from the install you point it at.
 """
-import argparse, os, re, shutil, subprocess, sys
+import argparse, glob, json, os, re, shutil, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import toeedata
 import ie_overrides
 import ie_install
+from ie_map_alerts import apply_map_alert_distances
 from ie_build import preview_build
+from ie_movies import movie_tool_check, report_prologue_media
 OVERRIDES = os.path.join(HERE, 'overrides', 'iwd')   # per-map hand overrides (ie_overrides.py, overrides/README.md)
 
 AREA, MAP_ID, GROUND_ID, START = 'AR1000', 5012, 900, (482, 424)
@@ -50,16 +52,22 @@ INTERIORS = ['AR10%02d' % i for i in range(1, 17)]
 # the Orc Cave chain off AR1000's south-east road exit (To1200): AR1200 hill road, AR1201 Orc Cave (map ids MAP_ID+17/+18,
 # ground ids 917/918); converted like the interiors (map, exits, actors, containers)
 INTERIORS += ['AR1200', 'AR1201']
-# Chapter 1's first area, the end of the prologue: Hrothgar's departure cutscene (EHHROTHM) jumps the party to AR2000
-# (Kuldahar Pass; classic IWD plays AVALANCH there on first entry, IWD:EE in the cutscene). Its own exits lead to
-# unconverted chapter-1 areas (they log and do nothing). Its map id is set in AREA_IDS: MAP_ID + n would be 5031, the
-# start of the IWD2 module's ids (5031..5040; 5041..5049 are kept for IWD2's remaining Targos areas + its AR2000).
-INTERIORS += ['AR2000']
-AREA_IDS = {'AR2000': 5051}     # interiors without an entry: MAP_ID + n (n = 1-based position in INTERIORS)
+# Keep the published pass id and the older prologue ids stable for existing saves.
+PASS_ROOMS = ['AR200%d' % n for n in range(1, 7)]
+KULDAHAR = ['AR21%02d' % n for n in range(17)]
+VALE = ['AR3000', 'AR3001', 'AR3101', 'AR3201', 'AR3301', 'AR3401', 'AR3501', 'AR3502', 'AR3503']
+FORGOTTEN_TEMPLE = ['AR3600', 'AR3601', 'AR3602', 'AR3603']
+CHAPTER_DUNGEONS = VALE + FORGOTTEN_TEMPLE + ['AR4000']  # Dragon's Eye exterior, Chapter 2 arrival
+NEW_AREAS = PASS_ROOMS + KULDAHAR + CHAPTER_DUNGEONS
+INTERIORS += ['AR2000'] + NEW_AREAS
+# 5052..5065, 5068..5069 and 5079 are usable. Leave the engine's special maps alone.
+AREA_IDS = {'AR2000': 5051}
+chapter_map_ids = [n for n in range(5052, 5199) if n not in ENGINE_MAP_IDS]
+AREA_IDS.update(zip(NEW_AREAS, chapter_map_ids))
 # the converted areas whose ARE header script runs (ie_cutscene area loop). AR1006 (the new-game start, Winter's Cradle):
 # the prologue chapter screen (IncrementChapter CHPTXT0/1) and, in IWD:EE, Hrothgar's opening cutscene EHHROTHT;
 # AR2000: the avalanche movie (classic) / journal clean-up (EE)
-AREA_SCRIPT_AREAS = (AREA, 'AR1006', 'AR2000')
+AREA_SCRIPT_AREAS = (AREA, 'AR1006', 'AR2000', *NEW_AREAS)
 
 
 def map_id(i, ar):
@@ -69,22 +77,29 @@ def map_id(i, ar):
 def script_base(i):
     """interior n's actor script ids (clear of the baked-object scripts GENERIC_BASE + n = 1281..)"""
     # (n >= 19: 1500.. in steps of 50, clear of the spawnables 1400..1498 and the speech bubbles 1499)
+    if i >= 1 and INTERIORS[i - 1] in CHAPTER_DUNGEONS:
+        return 5000 + 96 * CHAPTER_DUNGEONS.index(INTERIORS[i - 1])
+    if i >= 20:
+        return 1800 + 64 * (i - 20)
     return (SCRIPT_BASE + 20 + 10 * i if i <= 14 else 1300 + 10 * (i - 15) if i <= 17 else 1330 if i == 18
             else 1500 + 50 * (i - 19))
 
 
 def name_base(i):
     """interior n's creature name ids (description .mes): 20 per area, 60 for the cave (AR1201, 45 actors)"""
+    if i >= 1 and INTERIORS[i - 1] in CHAPTER_DUNGEONS:
+        return 29000 + 96 * CHAPTER_DUNGEONS.index(INTERIORS[i - 1])
     return 27000 + 20 * i + 80 if i <= 18 else 27000 + 20 * 18 + 80 + 60 * (i - 18)
 def install_varhooks(scr):
     """IE variable store save/load hook (ie_vars): Temple+ imports scr/tpModifiers/*.py at startup."""
     d = os.path.join(scr, 'tpModifiers'); os.makedirs(d, exist_ok=True)
-    shutil.copy(os.path.join(HERE, 'runtime', 'tpModifiers', 'ie_varhooks.py'), d)
+    for module in ('ie_varhooks.py', 'ie_raider_death.py', 'ie_palisade_defender.py'):
+        shutil.copy(os.path.join(HERE, 'runtime', 'tpModifiers', module), d)
     old = os.path.join(scr, 'ie_varslots.py')          # (slot table of older builds: no longer used)
     if os.path.isfile(old):
         os.remove(old)
 
-RUNTIME = ['ie_runtime', 'ie_critters', 'ie_spellrt', 'ie_combat', 'ie_doors', 'ie_bakert', 'ie_itemrt', 'ie_travel', 'ie_movies_rt', 'ie_cutscene', 'map_tick', 'ie_spawn', 'ie_vars']
+RUNTIME = ['ie_runtime', 'ie_critters', 'ie_spellrt', 'ie_combat', 'ie_doors', 'ie_bakert', 'ie_itemrt', 'ie_travel', 'ie_atlas', 'ie_movies_rt', 'ie_cutscene', 'map_tick', 'ie_spawn', 'ie_vars']
 
 
 IWD_START = ('AR1006', 440, 464)   # STARTARE.2DA of IWD:EE; classic IWD's copy is encrypted, so it is used for both
@@ -140,18 +155,25 @@ def flavour(ie):
     sys.exit('%s does not look like an Icewind Dale install (no chitin.key / dialog.tlk / lang folder)' % ie)
 
 
+def run_tool(args):
+    cmd = [sys.executable, os.path.join(HERE, args[0])]
+    if args[0] == 'ie_dialogue.py':
+        # Whole chapters exceed the Windows process command-line length limit.
+        return subprocess.run(cmd + ['--args-from-stdin'], input=json.dumps(args[1:]).encode('ascii'), cwd=HERE)
+    return subprocess.run(cmd + args[1:], cwd=HERE)
+
+
 def run(step, args):
     print('== %s' % step, flush=True)
-    cmd = [sys.executable, os.path.join(HERE, args[0])] + args[1:]
-    r = subprocess.run(cmd, cwd=HERE)
+    r = run_tool(args)
     if r.returncode:
-        sys.exit('step "%s" failed (exit %d): %s' % (step, r.returncode, ' '.join(cmd)))
+        sys.exit('step "%s" failed (exit %d): %s' % (step, r.returncode, args[0]))
 
 
 def run_soft(step, args):
     """like run(), but a failing step only returns False (one broken interior must not stop the whole preview)"""
     print('== %s' % step, flush=True)
-    r = subprocess.run([sys.executable, os.path.join(HERE, args[0])] + args[1:], cwd=HERE)
+    r = run_tool(args)
     return r.returncode == 0
 
 
@@ -171,6 +193,20 @@ def mes_with(td, rel, lines, dest):
     os.makedirs(os.path.dirname(dest), exist_ok=True)
     with open(dest, 'w', encoding='latin-1', newline='\r\n') as f:
         f.write('\n'.join(keep).rstrip('\n') + '\n' + '\n'.join(lines) + '\n')
+
+
+def install_module_names(td, core, module):
+    """Temple+ uses the module's gamedesc.mes for description IDs from 30000 up."""
+    names = {}
+    for filename in sorted(glob.glob(os.path.join(core, 'mes', 'description', 'ie2toee_*.mes'))):
+        with open(filename, encoding='latin-1') as source:
+            for line in source:
+                match = re.match(r'\s*\{(\d+)\}\s*\{', line)
+                if match and int(match[1]) >= 30000:
+                    names[int(match[1])] = line.strip()
+    if names:
+        mes_with(td, 'mes/gamedesc.mes', [names[k] for k in sorted(names)],
+                 os.path.join(module, 'mes', 'gamedesc.mes'))
 
 
 def area_names(ie, w, specs, shops):
@@ -201,6 +237,15 @@ def area_names(ie, w, specs, shops):
     except Exception as ex:
         print('warning: worldmap names: %s' % ex)
     town = wmp.get(AREA) or AREA
+    def region_name(area):
+        seen = set()
+        while area and area not in seen:
+            if wmp.get(area):
+                return wmp[area]
+            seen.add(area)
+            area = parent.get(area)
+        return town
+
     out = {}
     for ar, spec in specs.items():
         name = wmp.get(ar)
@@ -216,7 +261,7 @@ def area_names(ie, w, specs, shops):
             for c in gl.get('CREATURES', []):
                 if c.get('resref') in ie_creatures.PORTRAITS:
                     try:
-                        name = '%s - %s' % (town, t.get(iecre.Cre(g.read(c['resref'], 'cre'), c['resref']).as_dict()['name_strref']))
+                        name = '%s - %s' % (region_name(ar), t.get(iecre.Cre(g.read(c['resref'], 'cre'), c['resref']).as_dict()['name_strref']))
                         break
                     except Exception:
                         pass
@@ -229,8 +274,8 @@ def area_names(ie, w, specs, shops):
         except Exception:
             at = 0
         pa = parent.get(ar)
-        out[ar] = ('%s - Outskirts' % town if at & 1 else '%s - Cave' % town if at & 0x20 else
-                   '%s - Side Room' % out[pa] if pa not in (None, AREA) and out.get(pa) else '%s - House (%s)' % (town, ar))
+        out[ar] = ('%s - Outskirts' % region_name(ar) if at & 1 else '%s - Cave' % region_name(ar) if at & 0x20 else
+                   '%s - Side Room' % out[pa] if pa and pa not in wmp and out.get(pa) else '%s - House (%s)' % (region_name(ar), ar))
     return {ar: n.replace('{', '(').replace('}', ')') for ar, n in out.items()}
 
 
@@ -267,6 +312,31 @@ def map_names(td, names, maplist, dest):
             f.write('{%d}{%s}\n' % (k, d.get(k) or ml.get(k) or 'Map %d' % k))
 
 
+def starting_equipment(root, module, rules_dir):
+    """Keep custom kits; restore the stock class kit when Co8 expects its shop map."""
+    td = toeedata.ToEEData(root, module)
+    rel = 'rules/start_equipment.mes'
+    try:
+        effective = td.read(rel).decode('latin-1')
+    except FileNotFoundError:
+        return
+    source = next((a for a in reversed(td.sources) if rel in a.files and
+                   re.fullmatch(r'toee\d*\.dat', os.path.basename(a.path), re.I)), None)
+    if source is None:
+        return
+    entry = re.compile(r'^(\s*\{(\d+)\}\s*\{)([^}\r\n]*)(\})', re.M)
+    stock = {int(m[2]): m[3] for m in entry.finditer(source.read(rel).decode('latin-1'))}
+    def kit(m):
+        key = int(m[2])
+        if key < 200 and key % 100 <= 10 and m[3].split() == ['6142'] and key in stock:
+            return m[1] + stock[key] + m[4]
+        return m[0]
+    fixed = entry.sub(kit, effective)
+    if fixed != effective or os.path.isfile(os.path.join(root, 'modules', module, rel)):
+        with open(os.path.join(rules_dir, 'start_equipment.mes'), 'wb') as out:
+            out.write(fixed.encode('latin-1'))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--iwd', required=True, help='your Icewind Dale or Icewind Dale: Enhanced Edition folder')
@@ -284,7 +354,14 @@ def main():
                          'feature/pathnode-bake, given as --tp)')
     a = ap.parse_args()
     with preview_build(a.out, (a.iwd, a.toee, a.tp, a.movies_ee, HERE)) as stage:
+        if not a.no_movies:
+            missing = movie_tool_check('IWD')
+            report_prologue_media('IWD', missing)
         convert(a, stage)
+        if a.no_movies:
+            print('MOVIE SUMMARY - Skipped by request (--no-movies).', flush=True)
+        else:
+            report_prologue_media('IWD', missing, stage / 'work/movies/ie_movies_data.py')
 
 
 def convert(a, stage):
@@ -337,6 +414,8 @@ def convert(a, stage):
                                                               ['placement']['canvas_offset']))]      # (merges the interiors into ie_areas.py)
              for ar, mid in sorted(interiors.items())), []))
     for ar in [AREA] + sorted(interiors):     # ARE trigger regions with a script (e.g. AR1200 CARATRG1 -> Caravan_Quest)
+        if ar in FORGOTTEN_TEMPLE:
+            dlg_cmd += ['--append-journal-area', ar]
         for r in json.load(open(os.path.join(w, ar + '_objects.json')))['regions']:
             if r['type'] != 'travel' and r.get('script'):
                 dlg_cmd += ['--region-script', '%s:%s' % (ar, r['script'].lower())]
@@ -344,7 +423,8 @@ def convert(a, stage):
     spw = os.path.join(w, 'spawnables')   # CreateCreature / ARE spawn-point CREs of the converted areas (ie_spawn.py)
     run_soft('spawnables', ['ie_creatures.py', 'spawnables', ie, toee, spw, '--scr', os.path.join(cre, 'dialogue'),
                             '--script-base', '1400', '--script-max', '1498',     # (1499: speech bubbles)
-                            '--area', AREA] + sum((['--area', ar] for ar in sorted(interiors)), []) + tpa)
+                            '--area', AREA] + sum((['--append-area' if ar in FORGOTTEN_TEMPLE else '--area', ar]
+                                                   for ar in sorted(interiors)), []) + tpa)
     sa = os.path.join(spw, 'dialogue_actors.txt')     # spawned creatures' own scripts/dialogue: second dialogue pass
     if os.path.isfile(sa) and open(sa).read().split():
         run('dialogue + spawnables', dlg_cmd + open(sa).read().split())
@@ -384,7 +464,7 @@ def convert(a, stage):
         spec = os.path.join(icre[ar], 'ie_creatures_%s.py' % al) if ar in icre else None
         run('bake %s' % ar, ['ie_bake.py', 'bake', '--area', ar, '--flavour', F] + (['--specs', spec] + shops(spec, ar) if spec else []) +
             ['--items', os.path.join(w, 'items', 'ie_itemmap.py'), '--maps', os.path.join(w, 'maps', ar),
-             '--map-id', str(mid), '--placement', '%d,%d' % (ox, oy), '--generic-script', str(GENERIC_BASE + INTERIORS.index(ar) + 1),
+             '--map-id', str(mid), '--placement', '%d,%d' % (ox, oy), '--generic-script', str(4000 + NEW_AREAS.index(ar) if ar in NEW_AREAS else GENERIC_BASE + INTERIORS.index(ar) + 1),
              '--toee', toee, '--ie', ie, '--out', bake])
 
     run('travel exits', ['ie_exits.py', w, '--out', os.path.join(w, 'ie_travel_data.py'), '--ie', ie, '--area', '%s:%d' % (AREA, MAP_ID),
@@ -426,6 +506,8 @@ def convert(a, stage):
     copytree(os.path.join(bake, 'rules', 'info_regions'), os.path.join(M, 'rules', 'info_regions'))     # clickable info points
     copytree(os.path.join(cre, 'dialogue', 'modules', 'ToEE', 'dlg'), os.path.join(C, 'dlg'))
     copytree(os.path.join(cre, 'dialogue', 'modules', 'ToEE', 'scr'), os.path.join(C, 'scr'))
+    if os.path.isdir(os.path.join(cre, 'dialogue', 'modules', 'ToEE', 'sound')):
+        copytree(os.path.join(cre, 'dialogue', 'modules', 'ToEE', 'sound'), os.path.join(M, 'sound'))
     copytree(os.path.join(bake, 'modules', 'ToEE', 'scr'), os.path.join(C, 'scr'))
     for d in [cre] + list(icre.values()):
         copytree(os.path.join(d, 'modules', 'ToEE', 'mes', 'description'), os.path.join(C, 'mes', 'description'))
@@ -449,11 +531,15 @@ def convert(a, stage):
             os.path.join(w, 'ie_travel_data.py')] + [os.path.join(w, 'ie_doors_%s.py' % ar.lower()) for ar in interiors] + [
             os.path.join(bake, 'ie_bake_%s.py' % ar.lower()) for ar in interiors]:
         shutil.copy(f, scr)
+    import ie_worldmap_art
+    ie_worldmap_art.build(ie, os.path.join(w, 'ie_travel_data.py'), M, scr)
     install_varhooks(scr)
     if os.path.isfile(os.path.join(mov, 'ie_movies_data.py')):
         shutil.copy(os.path.join(mov, 'ie_movies_data.py'), scr)
         copytree(os.path.join(mov, 'data'), os.path.join(inst, 'data'))
         copytree(os.path.join(mov, 'modules', 'ToEE'), M)   # movies/, slide/, sound/speech/slide/, mes/subtitles/
+    import ie_music
+    ie_music.convert(ie, toee, inst, [(ar, ar) for ar in [AREA] + list(interiors)], module=MODULE, scr_dir=scr)
     with open(os.path.join(scr, 'iwd.py'), 'w') as f:      # (optional now: new games start in Easthaven)      # console helper:  import iwd; iwd.go()
         f.write('from toee import *\n\ndef go():\n    """Travel to the converted town (map %d)."""\n'
                 '    import ie_travel\n    ie_travel.start()      # walk into a building door / the road exit: the party travels (docs/travel.md)\n'
@@ -472,8 +558,14 @@ def convert(a, stage):
             if l.strip() and cur:
                 sn.setdefault(cur, []).append(l)
     td = toeedata.ToEEData(toee)
+    install_module_names(td, C, M)
+    starting_equipment(toee, MODULE, os.path.join(M, 'rules'))
     specs = {AREA: os.path.join(cre, 'ie_creatures_%s.py' % a1)}
     specs.update({ar: os.path.join(icre[ar], 'ie_creatures_%s.py' % ar.lower()) if ar in icre else None for ar in interiors})
+    # Scripted actors resolve their IE death variables and shared counters through this table.
+    for spec in specs.values():
+        if spec and os.path.isfile(spec):
+            shutil.copy2(spec, os.path.join(C, 'scr'))
     ids = dict(interiors, **{AREA: MAP_ID})
     names = area_names(ie, w, specs, area_shops)
     # vanilla town map files of the reused ids (ToEE*.dat stay loaded) would show through between ours: black them out
@@ -510,6 +602,9 @@ def convert(a, stage):
             found = True
     if not found:
         raise SystemExit('MapList.mes: no entry for map %d' % smap)
+    with open(os.path.join(HERE, 'guidance', 'map_alerts.json'), encoding='utf-8') as f:
+        alert_distances = json.load(f).get(MODULE, {})
+    t = apply_map_alert_distances('\n'.join(t), ids, alert_distances).split('\n')
     open(ml, 'w', encoding='latin-1', newline='').write('\n'.join(t))
     map_names(td, {ids[ar]: n for ar, n in names.items()}, '\n'.join(t), os.path.join(M, 'mes', 'map_names.mes'))
     try:      # vanilla scroll limits of the reused ids would clip our maps (no entry = no limit)

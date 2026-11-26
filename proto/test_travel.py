@@ -153,5 +153,85 @@ check('arrival: blocked entrance moves to the nearest walkable tile within 5', i
 check('arrival: nothing within 5 tiles -> unchanged, moved=None', ie2toee.arrival_tile(kind, bbox, 111.5, 200.5)[2] is None)
 check('arrival: nearer one wins', ie2toee.arrival_tile(kind, bbox, 104.5, 204.5) == (103, 203, True))
 
+# A scripted fallback must respect the same gate as the clickable world map exit.
+from unittest.mock import Mock, patch
+runtime = types.ModuleType('ie_runtime')
+locked = dict(data.AREAS['AR1000']['regions'][0], requires_global='AR2000_Revealed', world_jump=1800)
+with patch.dict(sys.modules, ie_runtime=runtime):
+    runtime.get_var = lambda *args: 0
+    before = list(game.teleports)
+    T.travel(locked)
+    check('unrevealed world route cannot teleport', game.teleports == before)
+    runtime.get_var = lambda *args: 1
+    T.travel(locked)
+    check('revealed world route uses designated arrival', game.teleports[-1] == (ROOM, 200, 200))
+
+    # Old sectors can predate a world exit. Rechecking must not duplicate it.
+    route = dict(locked, anchor=[110, 92])
+    saved_map = dict(regions=[route])
+    icon = Mock()
+    icon.scripts = {1: 0}
+    icon.obj_get_int.return_value = 1800
+    with patch.object(T, 'obj_f_scenery_teleport_to', 1, create=True), \
+         patch.object(T, 'OLC_SCENERY', 2, create=True), \
+         patch.object(game, 'obj_list_range', side_effect=[[], [icon]], create=True), \
+         patch.object(game, 'obj_create', return_value=icon, create=True) as spawn:
+        T._next_exit_check = 0
+        runtime.get_var = lambda *args: 0
+        T._revealed_exits(saved_map, 10)
+        check('locked world exit stays hidden on a loaded save', not spawn.called)
+        route.pop('requires_global')
+        T._revealed_exits(saved_map, 13)
+        T._revealed_exits(saved_map, 16)
+        check('old sector gets one usable world exit', spawn.call_count == 1
+              and icon.obj_set_int.call_args.args == (1, 1800) and icon.scripts[1] == 1099)
+
+# A remote switch controls one native exit even when two icons share an anchor.
+route = dict(locked, name='HiddenSteps', anchor=[110, 92], jump_id=2096)
+route.pop('requires_global')
+icon, neighbour = Mock(), Mock()
+icon.obj_get_int.return_value, neighbour.obj_get_int.return_value = 2096, 2095
+put_party(TOWN, 110, 92)
+with patch.dict(data.AREAS['AR1000'], regions=[route]), \
+     patch.multiple(T, obj_f_scenery_teleport_to=1, OLC_SCENERY=2, OF_CLICK_THROUGH=0x800, OF_DONTDRAW=0x100, create=True), \
+     patch.object(game, 'obj_list_range', return_value=[neighbour, icon], create=True):
+    before = list(game.teleports)
+    T.set_region_active('AR1000', 'hiddensteps', 0)
+    T.travel(route)
+    check('closed switch disables its own exit and scripted travel', icon.object_flag_set.call_args.args == (0x900,)
+          and not neighbour.object_flag_set.called and before == game.teleports)
+    T.set_region_active('AR1000', 'HIDDENSTEPS', 1)
+    T.travel(route)
+    check('opened switch restores its exit and destination', icon.object_flag_unset.call_args.args == (0x900,)
+          and not neighbour.object_flag_unset.called and len(game.teleports) == len(before) + 1)
+
+# The Forgotten God altar tests IsOverMe, even after Entered already fired
+# when the party reached the margin around the original polygon.
+altar = dict(name='Quest Trigger', poly=[[0, 0], [4, 0], [4, 4], [0, 4]], module='test_altar')
+module = types.SimpleNamespace(USES_IS_OVER_ME=True, BLOCKS=[])
+events = []
+runtime.Ctx = lambda me, other, ident, area, values: values
+runtime.run_script = lambda context, blocks: events.append(context)
+with patch.dict(sys.modules, ie_runtime=runtime, test_altar=module), patch.object(T, '_disabled', return_value=False):
+    T._triggers('AR3603', [altar], ['one', 'two'], [(4.5, 2), (8, 8)])
+    T._triggers('AR3603', [altar], ['one', 'two'], [(4.5, 2), (3, 3)])
+check('altar distinguishes entry margin from standing on it', events == [
+    {'Entered': 'one', 'IsOverMe': []}, {'IsOverMe': ['two']}])
+
+# Regional picks recheck the original gates and accumulate hours across connected roads.
+import ie_atlas
+atlas_data = types.SimpleNamespace(LOCATIONS=dict.fromkeys(('home', 'pass', 'temple'), (0,)))
+roads = {'home': {'regions': [dict(world_jump=1, dest_area='pass', travel_hours=2),
+                              dict(world_jump=2, dest_area='temple', requires_global='opened', travel_hours=9)]},
+         'pass': {'regions': [dict(world_jump=3, dest_area='home', travel_hours=3)]},
+         'temple': {'regions': []}}
+with patch.dict(sys.modules, ie_atlas_data=atlas_data, ie_runtime=runtime,
+                ie_travel_data=types.SimpleNamespace(AREAS=roads)):
+    runtime.get_var = lambda *args: 0
+    check('locked destination absent from the atlas', 'temple' not in ie_atlas.destinations('pass'))
+    runtime.get_var = lambda *args: 1
+    last, hours = ie_atlas.destinations('pass')['temple']
+    check('indirect route uses final entrance and sums directional hours', last['world_jump'] == 2 and hours == 12)
+
 print('\n%d failed' % len(fails) if fails else '\nall passed')
 sys.exit(1 if fails else 0)

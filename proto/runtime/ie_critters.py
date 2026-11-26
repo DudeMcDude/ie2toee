@@ -51,8 +51,15 @@ def _set(o, field, v, idx=None):
     except Exception, e:
         _log('  set %s failed: %s' % (field, e))
 
+def give_gold(o, s):
+    gold = s.get('gold', 0)
+    # Older converted specs can contain the unsigned representation of -1.
+    if gold > 0 and gold != 0xffffffff:
+        o.money_adj(gold * 100)
+
 def apply(o, s):
     """Apply a converted stat block to a freshly created critter."""
+    give_gold(o, s)
     _set(o, 'obj_f_critter_inventory_source', 0)   # no random template gear on top of the converted items
     ab = s.get('abilities')
     if ab:
@@ -79,7 +86,7 @@ def apply(o, s):
     con = ab[2] if ab else o.stat_level_get(stat_constitution)
     if s.get('hp'):
         _set(o, 'obj_f_hp_pts', max(1, int(s['hp']) - _mod(con) * total))
-        _set(o, 'obj_f_hp_damage', 0)
+        _set(o, 'obj_f_hp_damage', int(s['hp']) + 10 if s.get('initially_dead') else 0)
     if s.get('natural_ac') is not None:
         _set(o, 'obj_f_npc_ac_bonus', int(s['natural_ac']))
     for f, b in zip(SAVE_F, s.get('save_bonus') or ()):
@@ -166,7 +173,8 @@ def fix_hp(o, s):
             if not d:
                 break
             o.obj_set_int(f, max(1, o.obj_get_int(f) + d))
-        _set(o, 'obj_f_hp_damage', 0)
+        damage = o.stat_level_get(stat_hp_max) + 10 if s.get('initially_dead') else 0
+        _set(o, 'obj_f_hp_damage', damage)
 
 def spawn(s, loc, script_id=None, rotation=None):
     o = game.obj_create(int(s['proto']), loc)

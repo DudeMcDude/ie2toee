@@ -26,6 +26,14 @@ out*/
 *.PVRZ
 *.tlk
 *.TLK
+*.wav
+*.WAV
+*.acm
+*.ACM
+*.ogg
+*.OGG
+*.mp3
+*.MP3
 *.sec
 *.svb
 *.hsd

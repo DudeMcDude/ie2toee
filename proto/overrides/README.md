@@ -7,6 +7,7 @@ The files hold only tile coordinates / bit masks and Temple+ path node data, no 
 
 | file | what | applied |
 |---|---|---|
+| `door-open-clearance.json` | The `doors` object maps an ARE door name to rows of `[tile_x, tile_y, clear_mask]` | Temple+ clears these blocking or flyover bits when the door opens and restores the original closed geometry when it shuts. |
 | `*.json` (format `templeplus-dm-tile-edits`) | Temple+ DM "Save Tile Edits" file, dropped in unchanged (e.g. `map5012.json`) | map step (`ie2toee.py`): after the search map + `searchmap_fix` become tile flags, before the `.sec` files are written; so the path node generator, arrivals and exit icon anchors see the edited map |
 | `pathnodenew.pnd`, `pathnodedist.pnd`, `clearance.bin` (any subset) | hand-culled nodes + Temple+ neighbour recalc / clearance (DM window) | copied into the map folder after the path node generator (`ie_pathnodes.py`), and again after `--engine-pathnodes`: the override wins. Temple+ loads `pathnodenew.pnd` before the generator's `pathnode.pnd` |
 

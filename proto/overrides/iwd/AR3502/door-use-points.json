@@ -1,0 +1,4 @@
+{
+  "description": "The talisman switch operates stairs across the room. Put its clickable portal at the ARE use point.",
+  "doors": ["AR3502Switch1"]
+}
