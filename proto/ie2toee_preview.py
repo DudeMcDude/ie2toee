@@ -25,7 +25,6 @@ import json
 from ie_map_alerts import apply_map_alert_distances
 import ie_overrides
 import ie_install
-from ie_map_alerts import apply_map_alert_distances
 from ie_build import preview_build
 from ie_movies import movie_tool_check, report_prologue_media
 OVERRIDES = os.path.join(HERE, 'overrides', 'iwd')   # per-map hand overrides (ie_overrides.py, overrides/README.md)
