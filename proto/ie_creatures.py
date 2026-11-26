@@ -286,6 +286,12 @@ class Converter(object):
         p = S.find_tlk(game.root)
         self.text = S.StrrefText(S.Tlk.load(p) if p else None)
         self._itm = {}
+        self.fixed_normal_loot = {}
+        if game.find('rt_norm', '2da'):
+            for row in game.read('rt_norm', '2da').decode('latin1').lower().splitlines()[3:]:
+                cells = row.split()
+                if len(cells) >= 2 and len(set(cells[1:])) == 1:
+                    self.fixed_normal_loot[cells[0]] = cells[1]
 
     # IE difficulty levels (DIFFLEV.IDS): 1 easiest, 2 easy, 3 normal, 4 hard, 5 hardest/insane. IWD:EE gates extra
     # actors with tiny scripts (EFDELNOR/EFDELHRD/EFDELINS/EFDELEAS/EFDELDEF) of the form
@@ -344,14 +350,21 @@ class Converter(object):
         effs, gear = list(cre.effects), []
         eq = cre.equipped
         for slot, ref in sorted(cre.slots.items()):
+            selected = ref == eq.get('selected_weapon') and slot.startswith('weapon')
+            # Some IWD2 weapon slots contain a loot token with a fixed normal-mode weapon.
+            # Read the actual ITM before converting its abilities, name and enhancement.
+            if cre.rules3e is not None and selected and slot == 'weapon%d' % (cre.selected_weapon + 1) and ref in self.fixed_normal_loot:
+                weapon = self.itm(self.fixed_normal_loot[ref])
+                if weapon and any(a['attack_type'] in (1, 2, 4) for a in weapon.abilities):
+                    ref = weapon.resref
             it = self.itm(ref)
             if not it:
                 continue
             if it.flags & 4:            # droppable: real gear (worn, quiver, inventory)
                 gear.append((slot, ref, it))
-            elif slot in eq or ref == eq.get('selected_weapon'):   # creature-only item: its equip effects are the creature's abilities
+            elif slot in eq or selected:   # creature-only item: its equip effects are the creature's abilities
                 effs.extend(it.equip_effects)
-                if ref == eq.get('selected_weapon') and slot.startswith('weapon') and \
+                if selected and \
                         any(a['attack_type'] in (1, 2, 4) for a in it.abilities):
                     gear.append((slot, ref, it))   # creature weapon in hand (IWD2 001d4s claws/fists, goblin bows): wield a stand-in
         return effs, gear

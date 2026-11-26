@@ -4,6 +4,8 @@ import shutil
 import struct
 import tempfile
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 import ie_music
 
 
@@ -87,6 +89,25 @@ class MusicConverterTests(unittest.TestCase):
         self.assertIn(r'ambient\ie_am1000_n.mp3 /VOL:38 /loop /time:0-5', lines)
         self.assertIn(r'ambient\ie_crow1.mp3 /scatter /freq:7 /VOL:26 /time:6-17', lines)
         self.assertIn(r'ambient\ie_crow2.mp3 /scatter /freq:7 /VOL:26 /time:6-17', lines)
+
+    def test_startup_and_module_catalogs_keep_their_own_base_entries(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'ie/music').mkdir(parents=True)
+            for location, name in [('data', 'Startup'), ('modules/ToEE', 'Module')]:
+                sound = root / 'base' / location / 'sound'
+                sound.mkdir(parents=True)
+                (sound / 'schemeindex.mes').write_text('{231}{' + name + ' #23100}\n')
+                (sound / 'schemelist.mes').write_text('{23100}{' + name + '.mp3}\n')
+            with patch.object(ie_music.iefs, 'IEGame') as game, patch.object(ie_music, 'parse_songlist', return_value={}):
+                game.return_value.read.return_value = _fake_are()
+                ie_music.convert(str(root / 'ie'), str(root / 'base'), str(root / 'out'), [('AR1000', 'AR1000')])
+            for location, name in [('data', 'Startup'), ('modules/ToEE', 'Module')]:
+                sound = root / 'out' / location / 'sound'
+                index = (sound / 'schemeindex.mes').read_text()
+                self.assertIn('{70}{IE AR1000 #7000}', index)
+                self.assertIn('{231}{' + name + ' #23100}', index)
+                self.assertIn('{23100}{' + name + '.mp3}', (sound / 'schemelist.mes').read_text())
 
     def test_update_mapinfo_soundscheme_is_idempotent(self):
         tmp = tempfile.mkdtemp(prefix='test_mapinfo_')

@@ -387,11 +387,14 @@ def update_mapinfo_soundscheme(mapinfo_path, scheme1, scheme2=0):
         f.write('\n'.join(lines) + '\n')
 
 
-def _strip_scheme_range(mes_text, min_key):
+def _strip_scheme_range(mes_text, first, stop):
     out = []
     for line in mes_text.splitlines():
         m = re.match(r'^\s*\{(\d+)\}', line)
-        if m and int(m.group(1)) >= min_key:
+        if line.startswith('// IE converted area sound schemes') or re.fullmatch(r'// AR\d+ \(scheme \d+\)', line):
+            continue
+        generated = re.match(r'^\s*\{\d+\}\{(?:IE AR\d+ #\d+\}|(?:music|ambient)\\ie_)', line, re.I)
+        if m and (first <= int(m.group(1)) < stop or (int(m.group(1)) >= first and generated)):
             continue
         out.append(line)
     return '\n'.join(out).rstrip() + '\n'
@@ -411,6 +414,7 @@ def convert(ie_dir, toee_dir, out_dir, area_maps, module='ToEE', scheme_base=70,
     Writes sound/music/ie_*.mp3, sound/ambient/ie_*.mp3, sound/schemeindex.mes, sound/schemelist.mes
     under <out_dir>/modules/<module>/sound/, and updates each map's mapinfo.txt with SoundScheme.
     """
+    area_maps = list(area_maps)
     game = iefs.IEGame(ie_dir)
     td = toeedata.ToEEData(toee_dir, module=module)
     songlist = parse_songlist(game)
@@ -433,9 +437,6 @@ def convert(ie_dir, toee_dir, out_dir, area_maps, module='ToEE', scheme_base=70,
     except Exception:
         lst_text = '{0}{dummy - none}\n'
 
-    idx_text = _strip_scheme_range(idx_text, scheme_base)
-    lst_text = _strip_scheme_range(lst_text, scheme_base * 100)
-
     mus_cache = {}
     amb_cache = {}
     tmp_dir = tempfile.mkdtemp(prefix='ie_music_')
@@ -448,8 +449,6 @@ def convert(ie_dir, toee_dir, out_dir, area_maps, module='ToEE', scheme_base=70,
             theme_mp3 = convert_mus_track(music_dir, theme_mus, out_music_dir, ffmpeg_bin, tmp_dir, mus_cache)
             if theme_mp3:
                 report['theme'] = theme_mp3
-                lst_text = _replace_mes_line(lst_text, 1400, f'music\\{theme_mp3} /VOL:60 /loop')
-                lst_text = _replace_mes_line(lst_text, 2900, f'music\\{theme_mp3} /VOL:50 /loop')
 
         idx_add = ['\n// IE converted area sound schemes (generated on the fly by ie_music.py)']
         lst_add = ['\n// IE converted area sound schemes (generated on the fly by ie_music.py)']
@@ -503,10 +502,25 @@ def convert(ie_dir, toee_dir, out_dir, area_maps, module='ToEE', scheme_base=70,
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
-    with open(os.path.join(sound_root, 'schemeindex.mes'), 'w', encoding='latin-1', newline='\r\n') as f:
-        f.write(idx_text.rstrip() + '\n' + '\n'.join(idx_add) + '\n')
-    with open(os.path.join(sound_root, 'schemelist.mes'), 'w', encoding='latin-1', newline='\r\n') as f:
-        f.write(lst_text.rstrip() + '\n' + '\n'.join(lst_add) + '\n')
+    # Native SoundGame reads its registries at engine startup, before mounting the module.
+    # The actual streams are opened later and can stay in the module.
+    startup_sound = os.path.join(out_dir, 'data', 'sound')
+    os.makedirs(startup_sound, exist_ok=True)
+    for filename, module_text, additions, scale in (
+            ('schemeindex.mes', idx_text, idx_add, 1),
+            ('schemelist.mes', lst_text, lst_add, 100)):
+        startup_text = module_text
+        original = os.path.join(toee_dir, 'data', 'sound', filename)
+        if os.path.isfile(original):
+            with open(original, encoding='latin-1') as f:
+                startup_text = f.read()
+        for folder, text in ((sound_root, module_text), (startup_sound, startup_text)):
+            text = _strip_scheme_range(text, scheme_base * scale, (scheme_base + len(area_maps)) * scale)
+            if filename == 'schemelist.mes' and report['theme']:
+                for key, volume in ((1400, 60), (2900, 50)):
+                    text = _replace_mes_line(text, key, 'music\\%s /VOL:%d /loop' % (report['theme'], volume))
+            with open(os.path.join(folder, filename), 'w', encoding='latin-1', newline='\r\n') as f:
+                f.write(text.rstrip() + '\n' + '\n'.join(additions) + '\n')
 
     report['music_files'] = len(mus_cache)
     report['ambient_files'] = len(amb_cache)
