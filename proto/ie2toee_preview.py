@@ -21,6 +21,8 @@ import argparse, glob, json, os, re, shutil, subprocess, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import toeedata
+import json
+from ie_map_alerts import apply_map_alert_distances
 import ie_overrides
 import ie_install
 from ie_map_alerts import apply_map_alert_distances

@@ -974,6 +974,9 @@ MONSTER_POOLS['fire_beetle_queen'] = ((13990, 14000), ())
 MONSTER_FAMILY['30beetq'] = 'fire_beetle_queen'
 
 
+PORTRAITS['hermit'] = 12920
+
+
 def monster_portrait(resref, seed):
     """Per-instance portrait for a generic monster resref (None if not ours). seed: stable per spawn, e.g. 'AREA:x:y'."""
     import zlib

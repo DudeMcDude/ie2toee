@@ -12,6 +12,7 @@ ART = os.path.join(os.path.dirname(HERE), 'art', 'portraits')
 MASTERS = os.environ.get('IE_PORTRAIT_MASTERS', '/workspace/portrait-art/masters')   # ie_<key>/ie_<key>_master.png
 # key -> (portraits.mes base id, display name used in file names)
 ART_IDS = {
+    'hermit': (12920, 'Hermit'),
     'hrothgar': (9900, 'Hrothgar'), 'everard': (9910, 'Everard'), 'arundel': (9920, 'Arundel'),
     'poquelin': (9930, 'Poquelin'), 'belhifet': (9940, 'Belhifet'), 'yxunomei': (9950, 'Yxunomei'),
     'kresselack': (9960, 'Kresselack'), 'conlan': (9970, 'Conlan'),
