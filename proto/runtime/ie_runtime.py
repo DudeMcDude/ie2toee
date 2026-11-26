@@ -1840,6 +1840,9 @@ def scriptless_combat_turn(obj, area):
     # Temple+ starts its ordinary monster AI if a turn script returns RUN_DEFAULT.
     # Destructible kegs can be attacked, but have no turn actions of their own.
     if area:
+        if area in ('AR2102', 'I2AR2102') and IN_GAME:
+            import ie_bakert
+            ie_bakert.ready_company_melee(obj, area)
         try:
             data = __import__('ie_bake_i2' + area.lower())
         except ImportError:
@@ -1857,6 +1860,9 @@ def combat_round(obj, ident, area, scripts):
     ident, area = who(obj, ident, area)
     if not IN_GAME:
         return 1
+    if area in ('AR2102', 'I2AR2102'):
+        import ie_bakert
+        ie_bakert.ready_company_melee(obj, area)
     if ident not in _first:
         _first[ident] = 1; bind(obj, ident, area); script_ai(obj, ident, scripts)
     _busy.pop(ident, None)

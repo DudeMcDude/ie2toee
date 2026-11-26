@@ -85,6 +85,14 @@ check('goblin (factionless) keeps the proto (none)', B.factions({'proto': 14186,
 check('factionless neutral (keg) keeps the proto (none)', B.factions({'proto': 14186, 'hostility': 'neutral'}) is None)
 check('hostile never gets the town faction', B.factions({'proto': 99, 'hostility': 'hostile'}) == [7])
 check('foreign-mesh proto missing from protos.tab: keep', B.factions({'proto': 14199, 'hostility': 'neutral'}) is None)
+B.area, B.flavour = 'AR2102', 'IWD2'
+for actor, proto in [('GTH02_01', 14056), ('GTH02_05', 14186), ('Bugbear_Captain_1', 14000)]:
+    check(actor + ' shares the bridge company faction',
+          B.factions(dict(actor=actor, proto=proto, hostility='hostile')) == [ie_bake.SHAENGARNE_COMPANY])
+check('support stays outside the company',
+      not B.bridge_company(dict(actor='Support_Beam_North', hostility='neutral')))
+B.area = 'AR2101'
+check('bridge company applies only on the bridge', B.factions(dict(actor='GTH02_01', proto=14056, hostility='hostile')) is None)
 
 # ---- 3. start hidden -------------------------------------------------------------------------------------------------
 ie = os.environ.get('IWD2_DIR', '/workspace/iwd2-data')

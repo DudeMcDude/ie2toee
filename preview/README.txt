@@ -1,4 +1,4 @@
-Icewind Dale II in Temple+ | Chapter 1 preview (2026-11-26b) | Windows guide
+Icewind Dale II in Temple+ | Chapter 1 preview (2026-11-26c) | Windows guide
 ============================================================================
 
 Requires: Windows, Python 3.9 or newer, your own Icewind Dale II, and your

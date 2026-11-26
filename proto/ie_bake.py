@@ -30,6 +30,10 @@ NS = uuid.UUID('6f1c1d1e-2b9a-5e2e-8a6f-1e2b70ee0000')     # ie2toee bake namesp
 # (EA >= EVILCUTOFF) actors, which keep their factionless monster protos. Factionless neutrals (kegs on a barrel mesh,
 # rats) stay factionless so KOS monsters do not go after them (Temple+ WillKos skips factionless NPCs).
 IE_TOWN_FACTION = 160      # unused by vanilla protos.tab (1-34, 150)
+SHAENGARNE_COMPANY = 101
+# The first Shaengarne preview baked only these CREs in ARE order. Installing
+# the expanded bridge over it leaves their old .mob files alongside the new ones.
+EARLY_BRIDGE_CRES = frozenset('20orca3 20orca4 20orcach 20orcshm 20orcw3 20orcw4 21anivil 21elfmge 21ogr 21orcace 21orcelt 21verb 21xuki'.split())
 
 # engine enums (Temple+ temple_enums.h / OpenTemple GameObjects/*Flag.cs)
 OF = {n: 1 << i for i, n in enumerate(
@@ -262,7 +266,13 @@ class Baker(object):
                 used.add(slot); loc = 200 + slot
             else:
                 loc = pack; pack += 1
-            io = self.item((i, k), it['proto'], it.get('res'), o, loc, u, v)
+            res, pid = it.get('res'), it['proto']
+            token = it.get('weapon_token')
+            if token and token in self.items:
+                # Saved mobile diffs refer to the original object's GUID and field layout.
+                # Keep that item intact on disk and redeem it after the save has loaded.
+                res, pid = token, self.items[token]['p']
+            io = self.item((i, k), pid, res, o, loc, u, v)
             if io is not None:
                 inv.append(io.id)
         if inv:
@@ -274,8 +284,17 @@ class Baker(object):
             if box is not None:
                 o.set('npc_substitute_inventory', box.id)
         self.mobs.append(o)
-        keep = ('ident', 'actor', 'resref', 'hp', 'conditions', 'dead', 'spells', 'ai_strategy', 'to_hit_bonus', 'difficulty', 'feats', 'skills', 'area_spawn', 'death_counters')
+        keep = ('ident', 'actor', 'resref', 'hp', 'conditions', 'dead', 'spells', 'ai_strategy', 'to_hit_bonus', 'difficulty', 'feats', 'skills', 'area_spawn', 'death_counters', 'melee_backup')
         self.runtime[T.guid_name(o.id)] = {'k': 'npc', 'spec': {k: s[k] for k in keep if s.get(k) not in (None, [], '')}}
+        runtime_spec = self.runtime[T.guid_name(o.id)]['spec']
+        primary = next((it for it in s.get('items', ()) if it['slot'] == 'weapon1' and
+                        self.protos.get(it['proto'], ['', ''])[1].strip() in ('obj_t_weapon', '4')), None)
+        if primary:
+            runtime_spec['primary_weapon'] = primary['proto']
+            if primary.get('weapon_token') in self.items:
+                runtime_spec['redeem_weapon'] = (primary['weapon_token'], primary['res'])
+        if self.bridge_company(s):
+            runtime_spec['company_faction'] = SHAENGARNE_COMPANY
         if s.get('family') in ('keg', 'bridge_support'):
             self.runtime[T.guid_name(o.id)]['spec']['family'] = s['family']
         if s.get('hidden') and s.get('hostility') == 'hostile':
@@ -283,11 +302,18 @@ class Baker(object):
         self.report['npcs'] += 1
         return o
 
+    def bridge_company(self, s):
+        return (getattr(self, 'area', '') == 'AR2102' and self.flavour == 'IWD2' and
+                s.get('hostility') == 'hostile' and s.get('actor', '').lower().startswith(
+                    ('gth0', 'bugbear_captain_', 'ogre_north', 'ogre_south', 'cutscene_orc_warrior')))
+
     def factions(self, s):
         """obj_f_npc_faction for a converted actor, or None to keep the template proto's (IE_TOWN_FACTION)."""
         r = self.protos.get(int(s['proto']))
         have = [int(x) for x in (r[154].split() if r else []) if x.lstrip('-').isdigit() and int(x)]
         if s.get('hostility') == 'hostile':
+            if self.bridge_company(s):
+                return [SHAENGARNE_COMPANY]
             return [f for f in have if f != IE_TOWN_FACTION] if IE_TOWN_FACTION in have else None
         return [IE_TOWN_FACTION] if have else None
 
@@ -491,6 +517,10 @@ class Baker(object):
             for g, d in sorted(self.runtime.items()):
                 f.write('    %r: %r,\n' % (g, d))
             f.write('}\n')
+            if self.flavour == 'IWD2' and self.area == 'AR2102':
+                early = (s['resref'] for s in self.specs if s['resref'] in EARLY_BRIDGE_CRES)
+                retired = [T.guid_name(self.gid('npc', i, res)) for i, res in enumerate(early)]
+                f.write('RETIRED_NPCS = %r\n' % sorted(set(retired).difference(self.runtime)))
         if self.a.generic_script:
             sd = os.path.join(self.a.out, 'modules', 'ToEE', 'scr'); os.makedirs(sd, exist_ok=True)
             with open(os.path.join(sd, 'py%05die_baked.py' % self.a.generic_script), 'w') as f:

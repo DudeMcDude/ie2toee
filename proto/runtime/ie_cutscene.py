@@ -64,6 +64,11 @@ def area_start(area):
             pass
     STATE['gen'] += 1
     _area[A_] = (STATE['gen'], mod)
+    if A_ == 'AR2102' and game.leader.map == rt.AREA_MAPS.get(A_):
+        # The bridge can enter initiative before its first NPC heartbeat; on a
+        # restored arrival save that heartbeat may wait until the fight ends.
+        import ie_bakert
+        ie_bakert.area_pass('I2AR2102')
     ev = rt._events.setdefault('area_' + A_, {})
     ev['OnCreation'] = game.leader     # IE: OnCreation() is true on the first script round after the area loads
     rt.log('AREA_SCRIPT %s start (%s)%s' % (A_, name, STATE['hook'] and ' [engine tick]' or ''))

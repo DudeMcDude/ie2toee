@@ -139,6 +139,7 @@ def apply(o, s):
             _log('  item_get %s %s -> %s' % (it['proto'], it.get('res', ''), r))
         except Exception, e:
             _log('  item %s failed: %s' % (it, e))
+    give_melee_backup(o, s)
     wear(o, s)
     try:
         o.d20_status_init()
@@ -159,6 +160,21 @@ def apply(o, s):
     if s.get('name_id'):
         _set(o, 'obj_f_description', int(s['name_id']))
         _set(o, 'obj_f_critter_description_unknown', int(s['name_id']))   # IE shows names without an introduction
+
+def give_melee_backup(o, s):
+    backup = s.get('melee_backup')
+    if not backup or o.item_find_by_proto(backup[1]) != OBJ_HANDLE_NULL:
+        return True
+    import ie_itemrt
+    item = ie_itemrt.make(backup[0], o.location)
+    if not item:
+        return False
+    o.item_get(item)
+    if o.item_find_by_proto(backup[1]) == OBJ_HANDLE_NULL:
+        item.destroy()
+        return False
+    item.item_flag_set(OIF_NO_LOOT)
+    return True
 
 def wear(o, s):
     try:

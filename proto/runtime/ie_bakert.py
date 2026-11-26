@@ -16,6 +16,7 @@ import re
 
 LOG = [None]
 STAMP = 0x1E2B0001
+BACKUP_STAMP = 0x1E2B0002
 _last = {}           # area -> wall clock of the last area pass
 _members = {}        # area -> {guid: 1} of the critters whose first heartbeat ran since the last area pass
 
@@ -77,7 +78,7 @@ def finalize_critter(o, d, F):
     s = d['spec']
     ie_critters.passive_prop(o, s)
     mark = F['npc_pad_i_3']
-    first = o.obj_get_int(mark) != STAMP
+    first = o.obj_get_int(mark) not in (STAMP, BACKUP_STAMP)
     if first:
         for c in s.get('conditions') or ():
             try:
@@ -110,6 +111,12 @@ def finalize_critter(o, d, F):
             except Exception, e:
                 _log('IE_BAKE kill corpse %s: %s' % (s.get('ident') or s.get('resref'), e))
     if not s.get('dead'):
+        faction = s.get('company_faction')
+        if faction and o.npc_flags_get() & ONF_KOS and not o.faction_has(faction):
+            o.faction_add(faction)
+        if s.get('melee_backup') and o.obj_get_int(mark) != BACKUP_STAMP and not o.is_dead_or_destroyed():
+            if ie_critters.give_melee_backup(o, s):
+                o.obj_set_int(mark, BACKUP_STAMP)
         arm(o, s)
     return first
 
@@ -118,7 +125,25 @@ def arm(o, s):
     """Safety net (every load, also fixes old saves): a living critter with an empty main hand that carries a
     weapon wields its best gear (the bake puts weapons in the wielded slot; this catches saves / spawns that lost it)."""
     try:
+        if s.get('redeem_weapon'):
+            import ie_itemrt
+            token, weapon = s['redeem_weapon']
+            it = ie_itemrt.find(o, token)
+            if it:
+                real = ie_itemrt.make(weapon, o.location)
+                if real:
+                    o.item_get(real)
+                    if real in ie_itemrt._inv(o):
+                        it.destroy()
+                        o.item_wield(real, item_wear_weapon_primary)
+                    else:
+                        real.destroy()
         if o.item_worn_at(3) != OBJ_HANDLE_NULL:     # item_wear_weapon_primary
+            return
+        if s.get('primary_weapon'):
+            weapon = o.item_find_by_proto(s['primary_weapon'])
+            if weapon != OBJ_HANDLE_NULL:
+                o.item_wield(weapon, item_wear_weapon_primary)
             return
         if not any(it.get('slot') in ('weapon', 'weapon1', 'quiver', 'ranged') or 'weapon' in str(it.get('slot'))
                    for it in s.get('items') or ()):
@@ -128,6 +153,19 @@ def arm(o, s):
             _log('IE_BAKE armed %s' % (s.get('ident') or s.get('resref')))
     except Exception, e:
         _log('IE_BAKE arm %s: %s' % (s.get('ident') or s.get('resref'), e))
+
+def ready_company_melee(o, area):
+    """The native weapon picker can stow a bow when threatened. Use the CRE's melee set."""
+    if area not in ('AR2102', 'I2AR2102') or o.item_worn_at(item_wear_weapon_primary) or o.npc_flags_get() & ONF_NO_EQUIP:
+        return
+    data = _data('I2AR2102')
+    s = data and data.OBJS.get(_guid(o), {}).get('spec', {})
+    if not s or not s.get('company_faction'):
+        return
+    pid = s['melee_backup'][1] if s.get('melee_backup') else s.get('primary_weapon')
+    weapon = o.item_find_by_proto(pid) if pid else None
+    if weapon and not weapon.obj_get_int(obj_f_weapon_flags) & OWF_RANGED_WEAPON:
+        o.item_wield(weapon, item_wear_weapon_primary)
 
 
 def finalize_item(o, d, F):
@@ -164,6 +202,13 @@ def omit_placement(o, spec):
     return True
 
 
+def hide_retired_npc(o):
+    if o and o != OBJ_HANDLE_NULL:
+        import ie_runtime
+        ie_runtime._bound.pop(ie_runtime._key(o), None)
+        if not o.object_flags_get() & OF_OFF:
+            o.object_flag_set(OF_OFF)
+
 def area_pass(area):
     """Finalize every baked object of the area that is still in the world, attach the doors."""
     m = _data(area)
@@ -173,6 +218,9 @@ def area_pass(area):
     if m is None:
         return 0
     import ie_runtime as rt
+    # Keep the backing objects and their inventory links valid for saved mobile diffs.
+    for guid in getattr(m, 'RETIRED_NPCS', ()):
+        hide_retired_npc(game.get_obj_by_id(guid))
     # Old saves can already contain the visible version of the palisade mobs.
     before_siege = area == 'I2AR1200' and not any(rt.get_var(None, flag, 'GLOBAL') for flag in
         ('Goblins_Attack_Palisade', '1200_BATTLE_SETUP', 'Goblin_Palisade_Quest'))
@@ -265,6 +313,9 @@ def first_heartbeat(o, area):
         mark_targos_combatant(o, _data('I2' + a[-6:]), g)
     # Sectors can load after the area pass. Apply the same gate on their first heartbeat.
     data = _data(a) or _data('I2' + a)
+    if data and g in getattr(data, 'RETIRED_NPCS', ()):
+        hide_retired_npc(o)
+        return
     if data and omit_placement(o, data.OBJS.get(g, {}).get('spec', {})):
         return
     seen = _members.get(a)
